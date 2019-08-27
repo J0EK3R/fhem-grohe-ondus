@@ -1,10 +1,10 @@
 #!/bin/bash   
-rm fhem-grohe-ondus.txt
+rm controls_grohe_ondus.txt
 find ./FHEM -type f \( ! -iname ".*" \) -print0 | while IFS= read -r -d '' f; 
   do
-   echo "DEL ${f}" >> fhem-grohe-ondus.txt
+   echo "DEL ${f}" >> controls_grohe_ondus.txt
    out="UPD "$(stat -f "%Sm" -t "%Y-%m-%d_%T" $f)" "$(stat -f%z $f)" ${f}"
-   echo ${out//.\//} >> fhem-grohe-ondus.txt
+   echo ${out//.\//} >> controls_grohe_ondus.txt
 done
 
 # CHANGED file
