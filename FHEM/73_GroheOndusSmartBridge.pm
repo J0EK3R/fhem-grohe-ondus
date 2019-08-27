@@ -2,8 +2,11 @@
 #
 # Developed with eclipse
 #
-#  (c) 2017-2019 Copyright: J.K. (J0EK3R at gmx dot net)
+#  (c) 2019 Copyright: J.K. (J0EK3R at gmx dot net)
 #  All rights reserved
+#
+#  The GroheOndus modules are based on 73_GardenaSmartBridge.pm and 
+#  74_GardenaSmartDevice from Marko Oldenburg (leongaultier at gmail dot com)
 #
 #   Special thanks goes to comitters:
 #
