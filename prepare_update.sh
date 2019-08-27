@@ -1,11 +1,13 @@
-#!/bin/bash   
+#!/bin/bash
 rm controls_grohe_ondus.txt
-find ./FHEM -type f \( ! -iname ".*" \) -print0 | while IFS= read -r -d '' f; 
-  do
-   echo "DEL ${f}" >> controls_grohe_ondus.txt
-   out="UPD "$(stat -f "%Sm" -t "%Y-%m-%d_%T" $f)" "$(stat -f%z $f)" ${f}"
-   echo ${out//.\//} >> controls_grohe_ondus.txt
-done
+while IFS= read -r -d '' FILE
+do
+    TIME=$(git log --pretty=format:%cd -n 1 --date=iso -- "$FILE")
+    TIME=$(TZ=Europe/Berlin date -d "$TIME" +%Y-%m-%d_%H:%M:%S)
+    FILESIZE=$(stat -c%s "$FILE")
+	FILE=$(echo "$FILE"  | cut -c 3-)
+	printf "UPD %s %-7d %s\n" "$TIME" "$FILESIZE" "$FILE"  >> controls_grohe_ondus.txt
+done <   <(find ./FHEM -maxdepth 2 \( -name "*.pm" -o -name "*.txt" \) -print0 | sort -z -g)
 
 # CHANGED file
 echo "FHEM Grohe Ondus last changes:" > CHANGED
