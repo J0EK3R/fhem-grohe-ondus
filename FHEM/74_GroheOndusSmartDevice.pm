@@ -477,7 +477,8 @@ sub Set($@)
     ### Command 'refreshvalues'
    	if ( lc $cmd eq 'refreshvalues' ) 
     {
-		my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
+		#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
+		my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(gettimeofday());
 		# today -> get all data from this day
     	my $ymd = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
     
@@ -1788,6 +1789,11 @@ sub WriteReadings($$)
 			  	if( defined( $decode_json->{data}->{data}->{withdrawals} )
 		    	  and ref( $decode_json->{data}->{data}->{withdrawals} ) eq "ARRAY" )
 				{
+					# analysis
+					my $dataAnalyzeStartTimestamp;
+					my $dataAnalyzeStopTimestamp;
+					my $dataAnalyzeCount = 0;
+
 					# get entry with latest timestamp 
 					my $dataLastStartTimestamp;
 					my $dataLastStopTimestamp;
@@ -1798,6 +1804,9 @@ sub WriteReadings($$)
 					my $dataLastEnergyCost;
 
 					# result of today 
+					my $dataTodayAnalyzeStartTimestamp;
+					my $dataTodayAnalyzeStopTimestamp;
+					my $dataTodayAnalyzeCount = 0;
 					my $dataTodayWaterconsumption = 0;
 					my $dataTodayMaxflowrate = 0;
 					my $dataTodayHotwaterShare = 0;
@@ -1821,6 +1830,22 @@ sub WriteReadings($$)
     		    		  and defined( $data->{water_cost} )
     		    		  and defined( $data->{energy_cost} ) )
 	        			{
+	        				$dataAnalyzeCount += 1;
+	        				
+	        				# find first timestamp of analysis? 
+        					if(not defined( $dataAnalyzeStartTimestamp )
+    	    				  or $data->{starttime} lt $dataAnalyzeStartTimestamp)
+		        			{
+		        				$dataAnalyzeStartTimestamp = $data->{starttime};
+		        			}
+
+	        				# find last timestamp of analysis? 
+        					if(not defined( $dataAnalyzeStopTimestamp )
+    	    				  or $data->{stoptime} gt $dataAnalyzeStopTimestamp)
+		        			{
+		        				$dataAnalyzeStopTimestamp = $data->{stoptime};
+		        			}
+	        				
         					# is timestamp younger? 
         					if(not defined( $dataLastStartTimestamp )
     	    				  or $data->{starttime} gt $dataLastStartTimestamp)
@@ -1841,6 +1866,21 @@ sub WriteReadings($$)
 	        				if($data->{starttime} gt $today_ymd
 	        				  and $data->{starttime} lt $tomorrow_ymd)
 	        				{
+	        					# find first timestamp of tody? 
+        						if(not defined( $dataTodayAnalyzeStartTimestamp )
+    	    				  	  or $data->{starttime} lt $dataTodayAnalyzeStartTimestamp)
+		        				{
+		        					$dataTodayAnalyzeStartTimestamp = $data->{starttime};
+		        				}
+
+	        					# find last timestamp of tody? 
+        						if(not defined( $dataTodayAnalyzeStopTimestamp )
+    	    				  	  or $data->{stoptime} gt $dataTodayAnalyzeStopTimestamp)
+		        				{
+		        					$dataTodayAnalyzeStopTimestamp = $data->{stoptime};
+		        				}
+	        					
+	        					$dataTodayAnalyzeCount += 1;
 								$dataTodayWaterconsumption += $data->{waterconsumption};
 								$dataTodayHotwaterShare += $data->{hotwater_share};
 								$dataTodayWaterCost += $data->{water_cost};
@@ -1849,6 +1889,13 @@ sub WriteReadings($$)
 	        				}
 		        		}
 	    	    	}
+
+					# analysis
+   					readingsBulkUpdateIfChanged( $hash, "AnalyzeStartTimestamp", $dataAnalyzeStartTimestamp )
+					  if( defined($dataAnalyzeStartTimestamp) );
+   					readingsBulkUpdateIfChanged( $hash, "AnalyzeLastStopTimestamp", $dataAnalyzeStopTimestamp )
+					  if( defined($dataAnalyzeStopTimestamp) );
+   					readingsBulkUpdateIfChanged( $hash, "AnalyzeCount", $dataAnalyzeCount );
 
 					# last dataset
    					readingsBulkUpdateIfChanged( $hash, "LastStartTimestamp", $dataLastStartTimestamp )
@@ -1867,6 +1914,11 @@ sub WriteReadings($$)
 	   				  if( defined($dataLastEnergyCost) );
 
 					# today's values
+   					readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStartTimestamp", $dataTodayAnalyzeStartTimestamp )
+					  if( defined($dataTodayAnalyzeStartTimestamp) );
+   					readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStopTimestamp", $dataTodayAnalyzeStopTimestamp )
+					  if( defined($dataTodayAnalyzeStopTimestamp) );
+   					readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeCount", $dataTodayAnalyzeCount );
    					readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumption", $dataTodayWaterconsumption );
    					readingsBulkUpdateIfChanged( $hash, "TodayMaxFlowRate", $dataTodayMaxflowrate );
 	   				readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShare", $dataTodayHotwaterShare );

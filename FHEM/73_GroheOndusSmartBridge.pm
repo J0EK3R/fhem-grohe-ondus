@@ -1149,12 +1149,13 @@ sub WriteReadings($$)
     my ( $hash, $decode_json ) = @_;
     my $name = $hash->{NAME};
 
+    readingsBeginUpdate($hash);
+
 #    if ( defined( $decode_json->{id} )
 #        and $decode_json->{id}
 #        and defined( $decode_json->{name} )
 #        and $decode_json->{name} )
 #    {
-#        readingsBeginUpdate($hash);
 #        if ( $decode_json->{id} eq $hash->{helper}{current_location_id} ) 
 #        {
 #            readingsBulkUpdateIfChanged( $hash, 'name', $decode_json->{name} );
@@ -1234,8 +1235,9 @@ sub WriteReadings($$)
 #
 #            } while ( $properties >= 0 );
 #        }
-#        readingsEndUpdate( $hash, 1 );
 #    }
+
+    readingsEndUpdate( $hash, 1 );
 
     Log3 $name, 4, "GroheOndusSmartBridge ($name) - readings would be written";
 }
