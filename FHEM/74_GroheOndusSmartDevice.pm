@@ -1893,7 +1893,7 @@ sub WriteReadings($$)
 					# analysis
    					readingsBulkUpdateIfChanged( $hash, "AnalyzeStartTimestamp", $dataAnalyzeStartTimestamp )
 					  if( defined($dataAnalyzeStartTimestamp) );
-   					readingsBulkUpdateIfChanged( $hash, "AnalyzeLastStopTimestamp", $dataAnalyzeStopTimestamp )
+   					readingsBulkUpdateIfChanged( $hash, "AnalyzeStopTimestamp", $dataAnalyzeStopTimestamp )
 					  if( defined($dataAnalyzeStopTimestamp) );
    					readingsBulkUpdateIfChanged( $hash, "AnalyzeCount", $dataAnalyzeCount );
 
