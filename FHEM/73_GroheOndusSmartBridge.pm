@@ -1646,9 +1646,9 @@ sub DeletePassword($)
 <ul>
   <u><b>Prerequisite</b></u>
   <br><br>
-  <li>In combination with GroheOndusSmartDevice this FHEM Module controls the communication between the GroheOndusCloud and connected Devices like Mover, Watering_Computer, Temperature_Sensors</li>
+  <li>In combination with GroheOndusSmartDevice this FHEM Module controls the communication between the GroheOndusCloud and connected Devices like Grohe Sense and Grohe SenseGUARD</li>
   <li>Installation of the following packages: apt-get install libio-socket-ssl-perl</li>
-  <li>The GroheOndus-Gateway and all connected Devices must be correctly installed in the GroheOndusAPP</li>
+  <li>All connected Devices must be correctly installed in the GroheOndusAPP</li>
 </ul>
 <br>
 <a name="GroheOndusSmartBridgedefine"></a>
@@ -1656,7 +1656,7 @@ sub DeletePassword($)
 <ul><br>
   <code>define &lt;name&gt; GroheOndusSmartBridge</code>
   <br><br>
-  Beispiel:
+  Example:
   <ul><br>
     <code>define GroheOndus_Bridge GroheOndusSmartBridge</code><br>
   </ul>
@@ -1667,17 +1667,8 @@ sub DeletePassword($)
   <br><br>
   <b>Readings</b>
   <ul>
-    <li>address - your Adress (Longversion)</li>
-    <li>authorized_user_ids - </li>
-    <li>city - Zip, City</li>
-    <li>devices - Number of Devices in the Cloud (Gateway included)</li>
-    <li>lastRequestState - Last Status Result</li>
-    <li>latitude - Breitengrad des Grundstücks</li>
-    <li>longitude - Längengrad des Grundstücks</li>
-    <li>name - Name of your Garden – Default „My Garden“</li>
     <li>state - State of the Bridge</li>
     <li>token - SessionID</li>
-    <li>zones - </li>
   </ul>
   <br><br>
   <a name="GroheOndusSmartBridgeset"></a>
@@ -1707,10 +1698,10 @@ sub DeletePassword($)
 <ul>
   <u><b>Voraussetzungen</b></u>
   <br><br>
-  <li>Zusammen mit dem Device GroheOndusSmartDevice stellt dieses FHEM Modul die Kommunikation zwischen der GroheOndusCloud und Fhem her. Es k&ouml;nnen damit Rasenm&auml;her, Bew&auml;sserungscomputer und Bodensensoren überwacht und gesteuert werden</li>
+  <li>Zusammen mit dem Device GroheOndusSmartDevice stellt dieses FHEM Modul die Kommunikation zwischen der GroheOndusCloud und Fhem her. Es k&ouml;nnen damit Grohe Sense und Grohe SenseGUARD überwacht und gesteuert werden</li>
   <li>Das Perl-Modul "SSL Packet" wird ben&ouml;tigt.</li>
   <li>Unter Debian (basierten) System, kann dies mittels "apt-get install libio-socket-ssl-perl" installiert werden.</li>
-  <li>Das GroheOndus-Gateway und alle damit verbundenen Ger&auml;te und Sensoren m&uuml;ssen vorab in der GroheOndusApp eingerichtet sein.</li>
+  <li>Alle verbundenen Ger&auml;te und Sensoren m&uuml;ssen vorab in der GroheOndusApp eingerichtet sein.</li>
 </ul>
 <br>
 <a name="GroheOndusSmartBridgedefine"></a>
@@ -1729,17 +1720,8 @@ sub DeletePassword($)
   <br><br>
   <b>Readings</b>
   <ul>
-    <li>address - Adresse, welche in der App eingetragen wurde (Langversion)</li>
-    <li>authorized_user_ids - </li>
-    <li>city - PLZ, Stadt</li>
-    <li>devices - Anzahl der Ger&auml;te, welche in der GroheCloud angemeldet sind (Gateway z&auml;hlt mit)</li>
-    <li>lastRequestState - Letzter abgefragter Status der Bridge</li>
-    <li>latitude - Breitengrad des Grundst&uuml;cks</li>
-    <li>longitude - Längengrad des Grundst&uuml;cks</li>
-    <li>name - Name für das Grundst&uuml;ck – Default „My Garden“</li>
     <li>state - Status der Bridge</li>
     <li>token - SessionID</li>
-    <li>zones - </li>
   </ul>
   <br><br>
   <a name="GroheOndusSmartBridgeset"></a>
@@ -1774,20 +1756,19 @@ sub DeletePassword($)
   "keywords": [
     "fhem-mod-device",
     "fhem-core",
-    "Garden",
     "Grohe",
     "Smart"
   ],
   "release_status": "stable",
   "license": "GPL_2",
   "author": [
-    "Marko Oldenburg <leongaultier@gmail.com>"
+    "J0EK3R <J0EK3R@gmx.net>"
   ],
   "x_fhem_maintainer": [
-    "CoolTux"
+    ""
   ],
   "x_fhem_maintainer_github": [
-    "LeonGaultier"
+    "J0EK3R"
   ],
   "prereqs": {
     "runtime": {
