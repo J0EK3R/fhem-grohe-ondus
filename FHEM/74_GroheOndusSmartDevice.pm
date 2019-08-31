@@ -479,13 +479,14 @@ sub Set($@)
     {
 		#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
 		my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(gettimeofday());
-		# today -> get all data from this day
+		# today -> get all data from within this day
     	my $ymd = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
     
         ### sense_guard
 	    if ( $model eq 'sense_guard' )
     	{
     		$modelId = 103;
+			$hash->{helper}{lastrequestfromtimestamp} = $ymd;
 
 			# playload
     		$payload =
@@ -499,6 +500,7 @@ sub Set($@)
 	    elsif ( $model eq 'sense' )
     	{
     		$modelId = 100;
+    		$hash->{helper}{lastrequestfromtimestamp} = $ymd;
     	
 			# playload
     		$payload =
@@ -1898,6 +1900,8 @@ sub WriteReadings($$)
    					readingsBulkUpdateIfChanged( $hash, "AnalyzeCount", $dataAnalyzeCount );
 
 					# last dataset
+   					readingsBulkUpdateIfChanged( $hash, "LastRequestFromTimestamp", $hash->{helper}{lastrequestfromtimestamp} )
+					  if( defined($hash->{helper}{lastrequestfromtimestamp}) );
    					readingsBulkUpdateIfChanged( $hash, "LastStartTimestamp", $dataLastStartTimestamp )
 					  if( defined($dataLastStartTimestamp) );
    					readingsBulkUpdateIfChanged( $hash, "LastStopTimestamp", $dataLastStopTimestamp )
@@ -1925,6 +1929,21 @@ sub WriteReadings($$)
    					readingsBulkUpdateIfChanged( $hash, "TodayWaterCost", $dataTodayWaterCost );
    					readingsBulkUpdateIfChanged( $hash, "TodayEnergyCost", $dataTodayEnergyCost );
 				}
+			}
+			# no data available:
+			#{
+		   	#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+			#	"data":
+			#	{
+			#		"message":"Not found",
+			#		"code":404
+			#	}
+			#}
+			# if no data for requested timespan is available this response is sent
+		  	elsif( defined( $decode_json->{data}->{message} )
+			  and defined( $decode_json->{data}->{code} )
+			  and $decode_json->{data}->{code} eq 404 )
+			{
 			}
 			else
 			{
