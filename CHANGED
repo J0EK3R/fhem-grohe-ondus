@@ -1,3 +1,3 @@
 FHEM Grohe Ondus last changes:
-2019-08-28
- - Typo fixed
+2019-08-31
+ - new statistic reading "LastRequestFromTimestamp" an handling for response "no data available"
