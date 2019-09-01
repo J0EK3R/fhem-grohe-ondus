@@ -477,22 +477,46 @@ sub Set($@)
     ### Command 'refreshvalues'
    	if ( lc $cmd eq 'refreshvalues' ) 
     {
-		#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
-		my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(gettimeofday());
+    	# it seems that the timestamp for this command has to be in GMT
+    	# we want to request all data from within the current day beginning from 00:00:00
+    	# so we need to transform the current date 00:00:00 to GMT
+    	# localtime           -> request GMT
+    	# 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
+    	# 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
+    	# 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
+    	# 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
+    	# 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
+    	my $currentTimestamp = gettimeofday();
+    	
+    	# calculate the offset between localtime and GMT in hours
+    	#my $offsetLocalTimeGMTime = localtime($currentTimestamp) - gmtime($currentTimestamp);
+    	my $offsetLocalTimeGMT_hours = ( localtime $currentTimestamp + 3600*( 12 - (gmtime)[2] ) )[2] - 12;
+    	
+		#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($currentTimestamp);
+		#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime($currentTimestamp);
+
+		# current date in Greenwich
+		my ($d,$m,$y) = (gmtime($currentTimestamp))[3,4,5];
+		# Greenwich's date minus offset
+		my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(timegm(0,0,0,$d,$m,$y) - $offsetLocalTimeGMT_hours * 3600);
+
 		# today -> get all data from within this day
-    	my $ymd = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
+    	#my $requestFromTimestamp = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
+    	my $requestFromTimestamp = sprintf("%04d-%02d-%02dT%02d:00:00", $year+1900, $month+1, $mday, $hour);
+
+   		$hash->{helper}{offsetLocalTimeGMTime} = $offsetLocalTimeGMT_hours;
+		$hash->{helper}{lastrequestfromtimestamp} = $requestFromTimestamp;
     
         ### sense_guard
 	    if ( $model eq 'sense_guard' )
     	{
     		$modelId = 103;
-			$hash->{helper}{lastrequestfromtimestamp} = $ymd;
 
 			# playload
     		$payload =
     		{
     			'method' => 'GET',
-    			'URI' => '/data?from=' . $ymd,
+    			'URI' => '/data?from=' . $requestFromTimestamp,
     			'payload' => ""
 			};
 	    }
@@ -500,13 +524,12 @@ sub Set($@)
 	    elsif ( $model eq 'sense' )
     	{
     		$modelId = 100;
-    		$hash->{helper}{lastrequestfromtimestamp} = $ymd;
     	
 			# playload
     		$payload =
     		{
     			'method' => 'Get',
-    			'URI' => '/data?from=' . $ymd,
+    			'URI' => '/data?from=' . $requestFromTimestamp,
     			'payload' => ""
 			};
 	    }
@@ -1900,8 +1923,10 @@ sub WriteReadings($$)
    					readingsBulkUpdateIfChanged( $hash, "AnalyzeCount", $dataAnalyzeCount );
 
 					# last dataset
-   					readingsBulkUpdateIfChanged( $hash, "LastRequestFromTimestamp", $hash->{helper}{lastrequestfromtimestamp} )
+   					readingsBulkUpdateIfChanged( $hash, "LastRequestFromTimestampGMT", $hash->{helper}{lastrequestfromtimestamp} )
 					  if( defined($hash->{helper}{lastrequestfromtimestamp}) );
+   					readingsBulkUpdateIfChanged( $hash, "OffsetLocalTimeGMTime", $hash->{helper}{offsetLocalTimeGMTime} )
+					  if( defined($hash->{helper}{offsetLocalTimeGMTime}) );
    					readingsBulkUpdateIfChanged( $hash, "LastStartTimestamp", $dataLastStartTimestamp )
 					  if( defined($dataLastStartTimestamp) );
    					readingsBulkUpdateIfChanged( $hash, "LastStopTimestamp", $dataLastStopTimestamp )
