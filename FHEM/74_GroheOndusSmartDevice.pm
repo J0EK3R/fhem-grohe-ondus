@@ -474,7 +474,9 @@ sub Set($@)
 
     Log3 $name, 4, "GroheOndusSmartDevice ($name) - Set was called: cmd= $cmd";
 
-    ### sense_guard
+	#########################################################
+    ### sense_guard #########################################
+	#########################################################
     if ( $model eq 'sense_guard' )
    	{
 	  	$modelId = 103;
@@ -482,32 +484,8 @@ sub Set($@)
 	    ### Command 'refreshvalues'
 	   	if ( lc $cmd eq 'refreshvalues' ) 
     	{
-    		# it seems that the timestamp for this command has to be in GMT
-	    	# we want to request all data from within the current day beginning from 00:00:00
-	    	# so we need to transform the current date 00:00:00 to GMT
-    		# localtime           -> request GMT
-    		# 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
-	    	# 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
-    		# 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
-    		# 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
-	    	# 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
-    		my $currentTimestamp = gettimeofday();
-    	
-    		# calculate the offset between localtime and GMT in hours
-	    	#my $offsetLocalTimeGMTime = localtime($currentTimestamp) - gmtime($currentTimestamp);
-    		my $offsetLocalTimeGMT_hours = ( localtime $currentTimestamp + 3600*( 12 - (gmtime)[2] ) )[2] - 12;
-    	
-			#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($currentTimestamp);
-			#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime($currentTimestamp);
-
-			# current date in Greenwich
-			my ($d,$m,$y) = (gmtime($currentTimestamp))[3,4,5];
-			# Greenwich's date minus offset
-			my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(timegm(0,0,0,$d,$m,$y) - $offsetLocalTimeGMT_hours * 3600);
-
-			# today -> get all data from within this day
-	    	#my $requestFromTimestamp = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
-    		my $requestFromTimestamp = sprintf("%04d-%02d-%02dT%02d:00:00", $year+1900, $month+1, $mday, $hour);
+    		my $offsetLocalTimeGMT_hours = getGMTOffset();
+    		my $requestFromTimestamp = getGMTMidnightDate();
 
 	   		$hash->{helper}{offsetLocalTimeGMTime} = $offsetLocalTimeGMT_hours;
 			$hash->{helper}{lastrequestfromtimestamp} = $requestFromTimestamp;
@@ -630,7 +608,9 @@ sub Set($@)
 	        return "Unknown argument $cmd, choose one of $list";
     	}
     }
-	### sense
+	#########################################################
+	### sense ###############################################
+	#########################################################
 	elsif ( $model eq 'sense' )
     {
  		$modelId = 100;
@@ -638,32 +618,8 @@ sub Set($@)
 	    ### Command 'refreshvalues'
 	   	if ( lc $cmd eq 'refreshvalues' ) 
 	    {
-	    	# it seems that the timestamp for this command has to be in GMT
-    		# we want to request all data from within the current day beginning from 00:00:00
-    		# so we need to transform the current date 00:00:00 to GMT
- 		   	# localtime           -> request GMT
- 		   	# 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
-  		  	# 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
-  		  	# 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
-  		  	# 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
-  		  	# 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
-  		  	my $currentTimestamp = gettimeofday();
-    	
-   		 	# calculate the offset between localtime and GMT in hours
-  		  	#my $offsetLocalTimeGMTime = localtime($currentTimestamp) - gmtime($currentTimestamp);
-    		my $offsetLocalTimeGMT_hours = ( localtime $currentTimestamp + 3600*( 12 - (gmtime)[2] ) )[2] - 12;
-    	
-			#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($currentTimestamp);
-			#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime($currentTimestamp);
-
-			# current date in Greenwich
-			my ($d,$m,$y) = (gmtime($currentTimestamp))[3,4,5];
-			# Greenwich's date minus offset
-			my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(timegm(0,0,0,$d,$m,$y) - $offsetLocalTimeGMT_hours * 3600);
-
-			# today -> get all data from within this day
-   		 	#my $requestFromTimestamp = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
-   		 	my $requestFromTimestamp = sprintf("%04d-%02d-%02dT%02d:00:00", $year+1900, $month+1, $mday, $hour);
+    		my $offsetLocalTimeGMT_hours = getGMTOffset();
+    		my $requestFromTimestamp = getGMTMidnightDate();
 
    			$hash->{helper}{offsetLocalTimeGMTime} = $offsetLocalTimeGMT_hours;
 			$hash->{helper}{lastrequestfromtimestamp} = $requestFromTimestamp;
@@ -713,6 +669,10 @@ sub Set($@)
 
 
 #####################################
+# This methode parses the given json string.
+# If there is a defined GroheOndusSmartDevice module then the json-structure
+# is passed to the methode WriteReadings.
+# Else a new GroheOndusSmartDevice module is created.
 sub Parse($$) 
 {
     my ( $io_hash, $json ) = @_;
@@ -1950,6 +1910,60 @@ sub updateValues($)
         
         Log3 $name, 3, "GroheOndusSmartDevice ($name) - device is disabled";
     }
+}
+
+##################################
+# This methode calculates the offset in hours from GMT and localtime
+# returns ($offsetLocalTimeGMT_hours)
+sub getGMTOffset() 
+{
+	# it seems that the timestamp for this command has to be in GMT
+   	# we want to request all data from within the current day beginning from 00:00:00
+   	# so we need to transform the current date 00:00:00 to GMT
+	# localtime           -> request GMT
+	# 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
+  	# 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
+	# 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
+	# 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
+  	# 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
+	my $currentTimestamp = gettimeofday();
+   	
+	# calculate the offset between localtime and GMT in hours
+  	#my $offsetLocalTimeGMTime = localtime($currentTimestamp) - gmtime($currentTimestamp);
+	my $offsetLocalTimeGMT_hours = ( localtime $currentTimestamp + 3600*( 12 - (gmtime)[2] ) )[2] - 12;
+    	
+	return ( $offsetLocalTimeGMT_hours );
+}
+
+##################################
+# This methode returns today's date convertet to GMT
+# returns $gmtMidnightDate
+sub getGMTMidnightDate() 
+{
+	# it seems that the timestamp for this command has to be in GMT
+   	# we want to request all data from within the current day beginning from 00:00:00
+   	# so we need to transform the current date 00:00:00 to GMT
+	# localtime           -> request GMT
+	# 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
+  	# 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
+	# 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
+	# 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
+  	# 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
+	my $currentTimestamp = gettimeofday();
+   	
+	# calculate the offset between localtime and GMT in hours
+	my $offsetLocalTimeGMT_hours = getGMTOffset();
+
+	# current date in Greenwich
+	my ($d,$m,$y) = (gmtime($currentTimestamp))[3,4,5];
+	# Greenwich's date minus offset
+	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(timegm(0,0,0,$d,$m,$y) - $offsetLocalTimeGMT_hours * 3600);
+
+	# today -> get all data from within this day
+	#my $requestFromTimestamp = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
+    my $gmtMidnightDate = sprintf("%04d-%02d-%02dT%02d:00:00", $year+1900, $month+1, $mday, $hour);
+
+	return $gmtMidnightDate;
 }
 
 1;
