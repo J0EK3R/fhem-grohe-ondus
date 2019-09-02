@@ -474,74 +474,55 @@ sub Set($@)
 
     Log3 $name, 4, "GroheOndusSmartDevice ($name) - Set was called: cmd= $cmd";
 
-    ### Command 'refreshvalues'
-   	if ( lc $cmd eq 'refreshvalues' ) 
-    {
-    	# it seems that the timestamp for this command has to be in GMT
-    	# we want to request all data from within the current day beginning from 00:00:00
-    	# so we need to transform the current date 00:00:00 to GMT
-    	# localtime           -> request GMT
-    	# 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
-    	# 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
-    	# 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
-    	# 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
-    	# 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
-    	my $currentTimestamp = gettimeofday();
+    ### sense_guard
+    if ( $model eq 'sense_guard' )
+   	{
+	  	$modelId = 103;
+	
+	    ### Command 'refreshvalues'
+	   	if ( lc $cmd eq 'refreshvalues' ) 
+    	{
+    		# it seems that the timestamp for this command has to be in GMT
+	    	# we want to request all data from within the current day beginning from 00:00:00
+	    	# so we need to transform the current date 00:00:00 to GMT
+    		# localtime           -> request GMT
+    		# 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
+	    	# 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
+    		# 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
+    		# 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
+	    	# 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
+    		my $currentTimestamp = gettimeofday();
     	
-    	# calculate the offset between localtime and GMT in hours
-    	#my $offsetLocalTimeGMTime = localtime($currentTimestamp) - gmtime($currentTimestamp);
-    	my $offsetLocalTimeGMT_hours = ( localtime $currentTimestamp + 3600*( 12 - (gmtime)[2] ) )[2] - 12;
+    		# calculate the offset between localtime and GMT in hours
+	    	#my $offsetLocalTimeGMTime = localtime($currentTimestamp) - gmtime($currentTimestamp);
+    		my $offsetLocalTimeGMT_hours = ( localtime $currentTimestamp + 3600*( 12 - (gmtime)[2] ) )[2] - 12;
     	
-		#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($currentTimestamp);
-		#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime($currentTimestamp);
+			#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($currentTimestamp);
+			#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime($currentTimestamp);
 
-		# current date in Greenwich
-		my ($d,$m,$y) = (gmtime($currentTimestamp))[3,4,5];
-		# Greenwich's date minus offset
-		my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(timegm(0,0,0,$d,$m,$y) - $offsetLocalTimeGMT_hours * 3600);
+			# current date in Greenwich
+			my ($d,$m,$y) = (gmtime($currentTimestamp))[3,4,5];
+			# Greenwich's date minus offset
+			my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(timegm(0,0,0,$d,$m,$y) - $offsetLocalTimeGMT_hours * 3600);
 
-		# today -> get all data from within this day
-    	#my $requestFromTimestamp = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
-    	my $requestFromTimestamp = sprintf("%04d-%02d-%02dT%02d:00:00", $year+1900, $month+1, $mday, $hour);
+			# today -> get all data from within this day
+	    	#my $requestFromTimestamp = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
+    		my $requestFromTimestamp = sprintf("%04d-%02d-%02dT%02d:00:00", $year+1900, $month+1, $mday, $hour);
 
-   		$hash->{helper}{offsetLocalTimeGMTime} = $offsetLocalTimeGMT_hours;
-		$hash->{helper}{lastrequestfromtimestamp} = $requestFromTimestamp;
+	   		$hash->{helper}{offsetLocalTimeGMTime} = $offsetLocalTimeGMT_hours;
+			$hash->{helper}{lastrequestfromtimestamp} = $requestFromTimestamp;
     
-        ### sense_guard
-	    if ( $model eq 'sense_guard' )
-    	{
-    		$modelId = 103;
-
 			# playload
-    		$payload =
-    		{
-    			'method' => 'GET',
-    			'URI' => '/data?from=' . $requestFromTimestamp,
-    			'payload' => ""
+	 		$payload =
+   			{
+ 				'method' => 'GET',
+  		  		'URI' => '/data?from=' . $requestFromTimestamp,
+	 			'payload' => ""
 			};
-	    }
-	    ### sense
-	    elsif ( $model eq 'sense' )
-    	{
-    		$modelId = 100;
-    	
-			# playload
-    		$payload =
-    		{
-    			'method' => 'Get',
-    			'URI' => '/data?from=' . $requestFromTimestamp,
-    			'payload' => ""
-			};
-	    }
-    }
-    ### Command 'refreshstate'
-   	elsif ( lc $cmd eq 'refreshstate' ) 
-    {
-	    ### sense_guard
-	    if ( $model eq 'sense_guard' )
-    	{
-    		$modelId = 103;
-
+  	  	}
+    	### Command 'refreshstate'
+   		elsif ( lc $cmd eq 'refreshstate' ) 
+   	 	{
 			# playload
     		$payload =
     		{
@@ -550,28 +531,9 @@ sub Set($@)
     			'payload' => ""
 			};
 	    }
-	    ### sense
-	    elsif ( $model eq 'sense' )
+    	### Command 'getApplianceCommand'
+   		elsif ( lc $cmd eq 'getappliancecommand' ) 
     	{
-    		$modelId = 100;
-    	
-			# playload
-    		$payload =
-    		{
-    			'method' => 'Get',
-    			'URI' => '/status',
-    			'payload' => ""
-			};
-	    }
-    }
-    ### Command 'getApplianceCommand'
-   	elsif ( lc $cmd eq 'getappliancecommand' ) 
-    {
-	    ### sense_guard
-	    if ( $model eq 'sense_guard' )
-    	{
-    		$modelId = 103;
-
 			# playload
     		$payload =
     		{
@@ -580,40 +542,9 @@ sub Set($@)
     			'payload' => ""
 			};
 	    }
-    }
-    ### Command 'on'
-    elsif ( lc $cmd eq 'on' ) 
-	{
-	    ### sense_guard
-	    if ( $model eq 'sense_guard' )
-    	{
-    		$modelId = 103;
-
-			# we did not need to send whole command structure
-			# it's possible to send just the wanted part like "valve_open"
-			## default values
-			#my $measure_now = 0;
-			#my $temp_user_unlock_on = 0;
-			#my $buzzer_on = 0;
-			#my $buzzer_sound_profile = 2;
-			#my $valve_open = 1;
-			#
-			# replace defaults with stored values
-			#if( defined ( $hash->{helper}{command} ) )
-			#{
-			#	Log3 $name, 5, "GroheOndusSmartDevice ($name) - command on: use stored values";
-			#	
-			#	$measure_now = $hash->{helper}{command}{measure_now};
-			#	$temp_user_unlock_on = $hash->{helper}{command}{temp_user_unlock_on};
-			#	$buzzer_on = $hash->{helper}{command}{buzzer_on};
-			#	$buzzer_sound_profile = $hash->{helper}{command}{buzzer_sound_profile};
-			#   $valve_open = 1;
-			#}
-			#else
-			#{
-			#	Log3 $name, 3, "GroheOndusSmartDevice ($name) - command on: no values defined yet so use defaults";
-			#}
-
+    	### Command 'on'
+    	elsif ( lc $cmd eq 'on' ) 
+		{
     		my $command =  
 	        {
    		    	'appliance_id' => $deviceId,
@@ -636,40 +567,9 @@ sub Set($@)
     			'payload' => encode_json( $command )
 			};
 	    }
-	}
-    ### Command 'off'
-    elsif ( lc $cmd eq 'off' ) 
-    {
-	    ### sense_guard
-	    if ( $model eq 'sense_guard' )
+    	### Command 'off'
+    	elsif ( lc $cmd eq 'off' ) 
     	{
-    		$modelId = 103;
-
-			# we did not need to send whole command structure
-			# it's possible to send just the wanted part like "valve_open"
-			## default values
-			#my $measure_now = 0;
-			#my $temp_user_unlock_on = 0;
-			#my $buzzer_on = 0;
-			#my $buzzer_sound_profile = 2;
-			#my $valve_open = 0;
-			#
-			## replace defaults with stored values
-			#if( defined ( $hash->{helper}{command} ) )
-			#{
-			#	Log3 $name, 5, "GroheOndusSmartDevice ($name) - command off: use stored values";
-			#	
-			#	$measure_now = $hash->{helper}{command}{measure_now};
-			#	$temp_user_unlock_on = $hash->{helper}{command}{temp_user_unlock_on};
-			#	$buzzer_on = $hash->{helper}{command}{buzzer_on};
-			#	$buzzer_sound_profile = $hash->{helper}{command}{buzzer_sound_profile};
-			#   $valve_open = 0;
-			#}
-			#else
-			#{
-			#	Log3 $name, 3, "GroheOndusSmartDevice ($name) - command off: no values defined yet so use defaults";
-			#}
-
     		my $command =  
 	        {
    		    	'appliance_id' => $deviceId,
@@ -692,44 +592,13 @@ sub Set($@)
     			'payload' => encode_json( $command )
 			};
 	    }
-    }
-    ### Command 'buzzer'
-    elsif ( lc $cmd eq 'buzzer' ) 
-    {
-	    ### sense_guard
-	    if ( $model eq 'sense_guard' )
+    	### Command 'buzzer'
+    	elsif ( lc $cmd eq 'buzzer' ) 
     	{
     		# parameter is "on" or "off" so convert to "true" : "false"
     		my $onoff = join( " ", @args ) eq "on" ? "true" : "false";
     		
 			Log3 $name, 5, "GroheOndusSmartDevice ($name) - command buzzer: $onoff";
-    		
-      		$modelId = 103;
-
-			# we did not need to send whole command structure
-			# it's possible to send just the wanted part like "valve_open"
-			## default values
-			#my $measure_now = 0;
-			#my $temp_user_unlock_on = 0;
-			#my $buzzer_on = 0;
-			#my $buzzer_sound_profile = 2;
-			#my $valve_open = 1;
-			#
-			## replace defaults with stored values
-			#if( defined ( $hash->{helper}{command} ) )
-			#{
-			#	Log3 $name, 5, "GroheOndusSmartDevice ($name) - command buzzer: use stored values";
-			#	
-			#	$measure_now = $hash->{helper}{command}{measure_now};
-			#	$temp_user_unlock_on = $hash->{helper}{command}{temp_user_unlock_on};
-			#	$buzzer_sound_profile = $hash->{helper}{command}{buzzer_sound_profile};
-			#   $valve_open = $hash->{helper}{command}{valve_open};
-			#	$buzzer_on = $onoff;
-			#}
-			#else
-			#{
-			#	Log3 $name, 3, "GroheOndusSmartDevice ($name) - command buzzer: no values defined yet so use defaults";
-			#}
 
     		my $command =  
 	        {
@@ -753,25 +622,84 @@ sub Set($@)
     			'payload' => encode_json( $command )
 			};
 	  	}
+  	    ### unknown Command
+    	else 
+	    {
+    	    my $list = 'on:noArg off:noArg refreshValues:noArg refreshState:noArg getApplianceCommand:noArg buzzer:on,off';
+
+	        return "Unknown argument $cmd, choose one of $list";
+    	}
     }
-    ### unknown Command
-    else 
+	### sense
+	elsif ( $model eq 'sense' )
     {
-        my $list = '';
-        ### sense_guard
-	    if ( $model eq 'sense_guard' )
-    	{
-	        $list .= 'on:noArg off:noArg refreshValues:noArg refreshState:noArg getApplianceCommand:noArg buzzer:on,off';
-    	}
-   	    ### sense
-	    elsif ( $model eq 'sense' )
-    	{
-	        $list .= 'refreshValues:noArg refreshState:noArg';
-    	}
+ 		$modelId = 100;
 
-        return "Unknown argument $cmd, choose one of $list";
+	    ### Command 'refreshvalues'
+	   	if ( lc $cmd eq 'refreshvalues' ) 
+	    {
+	    	# it seems that the timestamp for this command has to be in GMT
+    		# we want to request all data from within the current day beginning from 00:00:00
+    		# so we need to transform the current date 00:00:00 to GMT
+ 		   	# localtime           -> request GMT
+ 		   	# 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
+  		  	# 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
+  		  	# 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
+  		  	# 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
+  		  	# 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
+  		  	my $currentTimestamp = gettimeofday();
+    	
+   		 	# calculate the offset between localtime and GMT in hours
+  		  	#my $offsetLocalTimeGMTime = localtime($currentTimestamp) - gmtime($currentTimestamp);
+    		my $offsetLocalTimeGMT_hours = ( localtime $currentTimestamp + 3600*( 12 - (gmtime)[2] ) )[2] - 12;
+    	
+			#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime($currentTimestamp);
+			#my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime($currentTimestamp);
+
+			# current date in Greenwich
+			my ($d,$m,$y) = (gmtime($currentTimestamp))[3,4,5];
+			# Greenwich's date minus offset
+			my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = gmtime(timegm(0,0,0,$d,$m,$y) - $offsetLocalTimeGMT_hours * 3600);
+
+			# today -> get all data from within this day
+   		 	#my $requestFromTimestamp = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
+   		 	my $requestFromTimestamp = sprintf("%04d-%02d-%02dT%02d:00:00", $year+1900, $month+1, $mday, $hour);
+
+   			$hash->{helper}{offsetLocalTimeGMTime} = $offsetLocalTimeGMT_hours;
+			$hash->{helper}{lastrequestfromtimestamp} = $requestFromTimestamp;
+    
+			# playload
+	 		$payload =
+   			{
+   				'method' => 'Get',
+   				'URI' => '/data?from=' . $requestFromTimestamp,
+   				'payload' => ""
+			};
+  		}    
+    	### Command 'refreshstate'
+ 	  	elsif ( lc $cmd eq 'refreshstate' ) 
+  	  	{
+			# playload
+    		$payload =
+    		{
+    			'method' => 'Get',
+    			'URI' => '/status',
+    			'payload' => ""
+			};
+	    }
+      	### unknown Command
+	    else 
+    	{
+        	my $list = 'refreshValues:noArg refreshState:noArg';
+	        return "Unknown argument $cmd, choose one of $list";
+    	}
     }
-
+    ### unknown ###
+    else 
+   	{
+        return "Unknown model '$model'";
+   	}
+    
     $hash->{helper}{deviceAction} = $payload;
     #readingsSingleUpdate( $hash, "state", "send command to grohe cloud", 1 );
 
