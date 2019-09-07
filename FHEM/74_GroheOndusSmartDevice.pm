@@ -888,7 +888,9 @@ sub WriteReadings($$)
     
     readingsBeginUpdate($hash);
 
-    ### sense ###
+	#########################################################
+    ### sense ###############################################
+	#########################################################
     if ( $model eq 'sense' )
    	{
    		# config:
@@ -1145,19 +1147,31 @@ sub WriteReadings($$)
    			readingsBulkUpdateIfChanged( $hash, "LastTemperature", $dataTemperature )
    				if( defined($dataTemperature) );
 		}
+		# no data available:
+		#{
+	   	#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		#	"data":
+		#	{
+		#		"message":"Not found",
+		#		"code":404
+		#	}
+		#}
+		# if no data for requested timespan is available this response is sent
+	  	elsif( defined( $decode_json->{data}->{message} )
+		  and defined( $decode_json->{data}->{code} )
+		  and $decode_json->{data}->{code} eq 404 )
+		{
+		}
+		##### unknown
 		else
 		{
    			# write json string to reading "unknown"
-			readingsBulkUpdateIfChanged( $hash, "unknown", encode_json( $decode_json ) );
-
-	    	foreach my $key (keys %{ $decode_json })
-    		{
-    			readingsBulkUpdateIfChanged( $hash, $key, $decode_json->{$key} )
-    			  if($key ne 'config')
-    		}
+  			readingsBulkUpdateIfChanged( $hash, "unknown", encode_json( $decode_json ) );
 		}
     } 
-    ### sense_guard ###
+	#########################################################
+    ### sense_guard #########################################
+	#########################################################
     elsif ( $model eq 'sense_guard' )
    	{
 		# config:
@@ -1554,315 +1568,305 @@ sub WriteReadings($$)
        			}
         	}
 		}
+   		# ApplianceCommand:
+		#{
+	   	#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+   		#	"data":
+		#	{
+		#		"commandb64":"AgI=",
+  		#		"command":
+		#		{
+		#			"buzzer_on":false,
+  		#			"measure_now":false,
+		#			"temp_user_unlock_on":false,
+		#			"valve_open":true,
+  		#			"buzzer_sound_profile":2
+		#		},
+		#		"timestamp":"2019-08-07T04:17:02.985Z",
+	   	#		"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+   		#		"type":103
+   		#	}
+		#}
 		elsif( defined( $decode_json->{data} )
-		  and ref( $decode_json->{data} ) eq "HASH" )
+		  and ref( $decode_json->{data} ) eq "HASH"
+		  and defined( $decode_json->{data}->{command} )
+		  and ref( $decode_json->{data}->{command} ) eq "HASH" 
+		  and defined( $decode_json->{data}->{command}->{buzzer_on} )
+		  and defined( $decode_json->{data}->{command}->{measure_now} )
+		  and defined( $decode_json->{data}->{command}->{temp_user_unlock_on} )
+		  and defined( $decode_json->{data}->{command}->{valve_open} )
+		  and defined( $decode_json->{data}->{command}->{buzzer_sound_profile} ) )
 		{
-	   		# ApplianceCommand:
-   			#{
-		   	#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-	   		#	"data":
-   			#	{
-   			#		"commandb64":"AgI=",
-	   		#		"command":
-   			#		{
-   			#			"buzzer_on":false,
-	   		#			"measure_now":false,
-   			#			"temp_user_unlock_on":false,
-   			#			"valve_open":true,
-	   		#			"buzzer_sound_profile":2
-   			#		},
-   			#		"timestamp":"2019-08-07T04:17:02.985Z",
-		   	#		"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-   			#		"type":103
-   			#	}
-	   		#}
-		  	if( defined( $decode_json->{data}->{command} )
-			  and ref( $decode_json->{data}->{command} ) eq "HASH" 
-			  and defined( $decode_json->{data}->{command}->{buzzer_on} )
-			  and defined( $decode_json->{data}->{command}->{measure_now} )
-			  and defined( $decode_json->{data}->{command}->{temp_user_unlock_on} )
-			  and defined( $decode_json->{data}->{command}->{valve_open} )
-			  and defined( $decode_json->{data}->{command}->{buzzer_sound_profile} ) )
-			{
-				my $measure_now = $decode_json->{data}->{command}->{measure_now};
-				my $temp_user_unlock_on = $decode_json->{data}->{command}->{temp_user_unlock_on};
-				my $valve_open = $decode_json->{data}->{command}->{valve_open};
-				my $buzzer_on = $decode_json->{data}->{command}->{buzzer_on};
-				my $buzzer_sound_profile = $decode_json->{data}->{command}->{buzzer_sound_profile};
-				
-				# update readings
-				readingsBulkUpdateIfChanged( $hash, "CmdMeasureNow", "$measure_now" );
-				readingsBulkUpdateIfChanged( $hash, "CmdTempUserUnlockOn", "$temp_user_unlock_on" );
-				readingsBulkUpdateIfChanged( $hash, "CmdValveOpen", "$valve_open" );
-				readingsBulkUpdateIfChanged( $hash, "CmdBuzzerOn", "$buzzer_on" );
-				readingsBulkUpdateIfChanged( $hash, "CmdBuzzerSoundProfile", "$buzzer_sound_profile" );
-				
-				# store current values in helper
-				#$hash->{helper}{command} = 
-				#{
-    			#  'measure_now' => \0,
-   	    		#  'buzzer_on' => $buzzer_on,
-   		  		#  'buzzer_sound_profile' => $buzzer_sound_profile,
-	    	  	#  'valve_open' => $valve_open,
-   		    	#  'temp_user_unlock_on' => $temp_user_unlock_on
-				#};
-			}
+			my $measure_now = $decode_json->{data}->{command}->{measure_now};
+			my $temp_user_unlock_on = $decode_json->{data}->{command}->{temp_user_unlock_on};
+			my $valve_open = $decode_json->{data}->{command}->{valve_open};
+			my $buzzer_on = $decode_json->{data}->{command}->{buzzer_on};
+			my $buzzer_sound_profile = $decode_json->{data}->{command}->{buzzer_sound_profile};
 			
-			# Data
-			#{
-		   	#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-			#	"data":
-			#	{
-		   	#		"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-			#		"data":
-			#		{
-			#			"measurement":
-			#			[
-			#				{
-			#					"timestamp":"2019-07-14T02:07:36.000+02:00",
-			#					"flowrate":0,
-			#					"temperature_guard":22.5,
-			#					"pressure":3
-			#				},
-			#				{
-			#					"timestamp":"2019-07-14T02:22:36.000+02:00",
-			#					"temperature_guard":22.5,
-			#					"flowrate":0,
-			#					"pressure":3
-			#				}
-			#			],
-			#			"withdrawals":
-			#			[
-			#				{
-			#					"water_cost":0.01447,
-			#					"hotwater_share":0,
-			#					"waterconsumption":3.4,
-			#					"stoptime":"2019-07-14T03:16:51.000+02:00",
-			#					"starttime":"2019-07-14T03:16:24.000+02:00",
-			#					"maxflowrate":10.7,
-			#					"energy_cost":0
-			#				},
-			#				{
-			#					"waterconsumption":7.6,
-			#					"hotwater_share":0,
-			#					"energy_cost":0,
-			#					"starttime":"2019-07-14T03:58:19.000+02:00",
-			#					"stoptime":"2019-07-14T03:59:13.000+02:00",
-			#					"maxflowrate":10.9,
-			#					"water_cost":0.032346
-			#				}
-			#			]
-			#		},
-			#		"type":103
-			#	}
-			#}
-		  	elsif( defined( $decode_json->{data}->{data} )
-			  and ref( $decode_json->{data}->{data} ) eq "HASH" )
+			# update readings
+			readingsBulkUpdateIfChanged( $hash, "CmdMeasureNow", "$measure_now" );
+			readingsBulkUpdateIfChanged( $hash, "CmdTempUserUnlockOn", "$temp_user_unlock_on" );
+			readingsBulkUpdateIfChanged( $hash, "CmdValveOpen", "$valve_open" );
+			readingsBulkUpdateIfChanged( $hash, "CmdBuzzerOn", "$buzzer_on" );
+			readingsBulkUpdateIfChanged( $hash, "CmdBuzzerSoundProfile", "$buzzer_sound_profile" );
+		}
+		# Data
+		#{
+	   	#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		#	"data":
+		#	{
+	   	#		"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		#		"data":
+		#		{
+		#			"measurement":
+		#			[
+		#				{
+		#					"timestamp":"2019-07-14T02:07:36.000+02:00",
+		#					"flowrate":0,
+		#					"temperature_guard":22.5,
+		#					"pressure":3
+		#				},
+		#				{
+		#					"timestamp":"2019-07-14T02:22:36.000+02:00",
+		#					"temperature_guard":22.5,
+		#					"flowrate":0,
+		#					"pressure":3
+		#				}
+		#			],
+		#			"withdrawals":
+		#			[
+		#				{
+		#					"water_cost":0.01447,
+		#					"hotwater_share":0,
+		#					"waterconsumption":3.4,
+		#					"stoptime":"2019-07-14T03:16:51.000+02:00",
+		#					"starttime":"2019-07-14T03:16:24.000+02:00",
+		#					"maxflowrate":10.7,
+		#					"energy_cost":0
+		#				},
+		#				{
+		#					"waterconsumption":7.6,
+		#					"hotwater_share":0,
+		#					"energy_cost":0,
+		#					"starttime":"2019-07-14T03:58:19.000+02:00",
+		#					"stoptime":"2019-07-14T03:59:13.000+02:00",
+		#					"maxflowrate":10.9,
+		#					"water_cost":0.032346
+		#				}
+		#			]
+		#		},
+		#		"type":103
+		#	}
+		#}
+		elsif( defined( $decode_json->{data} )
+		  and ref( $decode_json->{data} ) eq "HASH"
+		  and defined( $decode_json->{data}->{data} )
+		  and ref( $decode_json->{data}->{data} ) eq "HASH" )
+		{
+			# Measurement
+	  		if( defined( $decode_json->{data}->{data}->{measurement} )
+		      and ref( $decode_json->{data}->{data}->{measurement} ) eq "ARRAY" )
 			{
-				# Measurement
-		  		if( defined( $decode_json->{data}->{data}->{measurement} )
-			      and ref( $decode_json->{data}->{data}->{measurement} ) eq "ARRAY" )
-				{
-					# get entry with latest timestamp 
-					my $dataTimestamp;
-					my $dataFlowrate;
-					my $dataTemperature;
-					my $dataPressure;
+				# get entry with latest timestamp 
+				my $dataTimestamp;
+				my $dataFlowrate;
+				my $dataTemperature;
+				my $dataPressure;
 						
-					foreach my $data ( @{ $decode_json->{data}->{data}->{measurement} } ) 
-    	    		{
-        				# is this the correct dataset?
-        				if( defined( $data->{timestamp} )
-    	    			  and defined( $data->{flowrate} )
-		        		  and defined( $data->{temperature_guard} )
-    		    		  and defined( $data->{pressure} ) )
-    	    			{
-	        				# is timestamp newer? 
-        					if(not defined( $dataTimestamp )
-        					  or $data->{timestamp} gt $dataTimestamp)
-	        				{
-    	    					$dataTimestamp = $data->{timestamp};
-        						$dataFlowrate = $data->{flowrate};
-    		    				$dataTemperature = $data->{temperature_guard};
-	    	    				$dataPressure = $data->{pressure};
-	        				}
-	        			}
-    	    		}
+				foreach my $data ( @{ $decode_json->{data}->{data}->{measurement} } ) 
+   	    		{
+       				# is this the correct dataset?
+       				if( defined( $data->{timestamp} )
+   	    			  and defined( $data->{flowrate} )
+	        		  and defined( $data->{temperature_guard} )
+   		    		  and defined( $data->{pressure} ) )
+   	    			{
+        				# is timestamp newer? 
+       					if(not defined( $dataTimestamp )
+       					  or $data->{timestamp} gt $dataTimestamp)
+        				{
+   	    					$dataTimestamp = $data->{timestamp};
+       						$dataFlowrate = $data->{flowrate};
+   		    				$dataTemperature = $data->{temperature_guard};
+    	    				$dataPressure = $data->{pressure};
+        				}
+        			}
+   	    		}
 
-   					readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $dataTimestamp )
-					  if( defined($dataTimestamp) );
-	   				readingsBulkUpdateIfChanged( $hash, "LastFlowrate", $dataFlowrate )
-   					  if( defined($dataFlowrate) );
-   					readingsBulkUpdateIfChanged( $hash, "LastTemperature", $dataTemperature )
-   					  if( defined($dataTemperature) );
-   					readingsBulkUpdateIfChanged( $hash, "LastPressure", $dataPressure )
-	   				  if( defined($dataPressure) );
-				}
-				# withdrawals
-			  	if( defined( $decode_json->{data}->{data}->{withdrawals} )
-		    	  and ref( $decode_json->{data}->{data}->{withdrawals} ) eq "ARRAY" )
-				{
-					# analysis
-					my $dataAnalyzeStartTimestamp;
-					my $dataAnalyzeStopTimestamp;
-					my $dataAnalyzeCount = 0;
+				readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $dataTimestamp )
+				  if( defined($dataTimestamp) );
+   				readingsBulkUpdateIfChanged( $hash, "LastFlowrate", $dataFlowrate )
+				  if( defined($dataFlowrate) );
+				readingsBulkUpdateIfChanged( $hash, "LastTemperature", $dataTemperature )
+				  if( defined($dataTemperature) );
+				readingsBulkUpdateIfChanged( $hash, "LastPressure", $dataPressure )
+   				  if( defined($dataPressure) );
+			}
+			# withdrawals
+		  	if( defined( $decode_json->{data}->{data}->{withdrawals} )
+	    	  and ref( $decode_json->{data}->{data}->{withdrawals} ) eq "ARRAY" )
+			{
+				# analysis
+				my $dataAnalyzeStartTimestamp;
+				my $dataAnalyzeStopTimestamp;
+				my $dataAnalyzeCount = 0;
 
-					# get entry with latest timestamp 
-					my $dataLastStartTimestamp;
-					my $dataLastStopTimestamp;
-					my $dataLastWaterconsumption;
-					my $dataLastMaxflowrate;
-					my $dataLastHotwaterShare;
-					my $dataLastWaterCost;
-					my $dataLastEnergyCost;
+				# get entry with latest timestamp 
+				my $dataLastStartTimestamp;
+				my $dataLastStopTimestamp;
+				my $dataLastWaterconsumption;
+				my $dataLastMaxflowrate;
+				my $dataLastHotwaterShare;
+				my $dataLastWaterCost;
+				my $dataLastEnergyCost;
 
-					# result of today 
-					my $dataTodayAnalyzeStartTimestamp;
-					my $dataTodayAnalyzeStopTimestamp;
-					my $dataTodayAnalyzeCount = 0;
-					my $dataTodayWaterconsumption = 0;
-					my $dataTodayMaxflowrate = 0;
-					my $dataTodayHotwaterShare = 0;
-					my $dataTodayWaterCost = 0;
-					my $dataTodayEnergyCost = 0;
+				# result of today 
+				my $dataTodayAnalyzeStartTimestamp;
+				my $dataTodayAnalyzeStopTimestamp;
+				my $dataTodayAnalyzeCount = 0;
+				my $dataTodayWaterconsumption = 0;
+				my $dataTodayMaxflowrate = 0;
+				my $dataTodayHotwaterShare = 0;
+				my $dataTodayWaterCost = 0;
+				my $dataTodayEnergyCost = 0;
 					
-					# get current date	
-					my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
-    				my $today_ymd = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
-    				my $tomorrow_ymd = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday+1); # day > 31 is OK for stringcompare
+				# get current date	
+				my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(gettimeofday());
+   				my $today_ymd = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
+   				my $tomorrow_ymd = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday+1); # day > 31 is OK for stringcompare
 						
-					# my convention: dataset contains all withdrawals of today
-					foreach my $data ( @{ $decode_json->{data}->{data}->{withdrawals} } ) 
-    	    		{
-        				# is it the right dataset?
-    	    			if( defined( $data->{starttime} )
-	        			  and defined( $data->{stoptime} )
-	        			  and defined( $data->{waterconsumption} )
-    	    			  and defined( $data->{maxflowrate} ) 
-    	    			  and defined( $data->{hotwater_share} )
-    		    		  and defined( $data->{water_cost} )
-    		    		  and defined( $data->{energy_cost} ) )
+				# my convention: dataset contains all withdrawals of today
+				foreach my $data ( @{ $decode_json->{data}->{data}->{withdrawals} } ) 
+   	    		{
+       				# is it the right dataset?
+   	    			if( defined( $data->{starttime} )
+        			  and defined( $data->{stoptime} )
+        			  and defined( $data->{waterconsumption} )
+   	    			  and defined( $data->{maxflowrate} ) 
+   	    			  and defined( $data->{hotwater_share} )
+   		    		  and defined( $data->{water_cost} )
+   		    		  and defined( $data->{energy_cost} ) )
+        			{
+        				$dataAnalyzeCount += 1;
+	        				
+        				# find first timestamp of analysis? 
+       					if(not defined( $dataAnalyzeStartTimestamp )
+   	    				  or $data->{starttime} lt $dataAnalyzeStartTimestamp)
 	        			{
-	        				$dataAnalyzeCount += 1;
-	        				
-	        				# find first timestamp of analysis? 
-        					if(not defined( $dataAnalyzeStartTimestamp )
-    	    				  or $data->{starttime} lt $dataAnalyzeStartTimestamp)
-		        			{
-		        				$dataAnalyzeStartTimestamp = $data->{starttime};
-		        			}
+	        				$dataAnalyzeStartTimestamp = $data->{starttime};
+	        			}
 
-	        				# find last timestamp of analysis? 
-        					if(not defined( $dataAnalyzeStopTimestamp )
-    	    				  or $data->{stoptime} gt $dataAnalyzeStopTimestamp)
-		        			{
-		        				$dataAnalyzeStopTimestamp = $data->{stoptime};
-		        			}
+        				# find last timestamp of analysis? 
+       					if(not defined( $dataAnalyzeStopTimestamp )
+   	    				  or $data->{stoptime} gt $dataAnalyzeStopTimestamp)
+	        			{
+	        				$dataAnalyzeStopTimestamp = $data->{stoptime};
+	        			}
 	        				
-        					# is timestamp younger? 
-        					if(not defined( $dataLastStartTimestamp )
-    	    				  or $data->{starttime} gt $dataLastStartTimestamp)
-		        			{
-    	    					$dataLastStartTimestamp = $data->{starttime};
-        						$dataLastStopTimestamp = $data->{stoptime};
-    	    					$dataLastWaterconsumption = $data->{waterconsumption};
-    	    					$dataLastMaxflowrate = $data->{maxflowrate};
-    	    					$dataLastHotwaterShare = $data->{hotwater_share};
-    		    				$dataLastWaterCost = $data->{water_cost};
-    		    				$dataLastEnergyCost = $data->{energy_cost};
-		        			}
+       					# is timestamp younger? 
+       					if(not defined( $dataLastStartTimestamp )
+   	    				  or $data->{starttime} gt $dataLastStartTimestamp)
+	        			{
+   	    					$dataLastStartTimestamp = $data->{starttime};
+       						$dataLastStopTimestamp = $data->{stoptime};
+   	    					$dataLastWaterconsumption = $data->{waterconsumption};
+   	    					$dataLastMaxflowrate = $data->{maxflowrate};
+   	    					$dataLastHotwaterShare = $data->{hotwater_share};
+   		    				$dataLastWaterCost = $data->{water_cost};
+   		    				$dataLastEnergyCost = $data->{energy_cost};
+	        			}
 	        			
-	        				# is dataset within today?
-	        				#   $today_ymd         2019-08-31
-	        				#   $data->{starttime} 2019-08-31T03:58:19.000+02:00
-	        				#   $tomorrow_ymd      2019-08-32 -> OK for stringcompare
-	        				if($data->{starttime} gt $today_ymd
-	        				  and $data->{starttime} lt $tomorrow_ymd)
+        				# is dataset within today?
+        				#   $today_ymd         2019-08-31
+        				#   $data->{starttime} 2019-08-31T03:58:19.000+02:00
+        				#   $tomorrow_ymd      2019-08-32 -> OK for stringcompare
+        				if($data->{starttime} gt $today_ymd
+        				  and $data->{starttime} lt $tomorrow_ymd)
+        				{
+        					# find first timestamp of today? 
+       						if(not defined( $dataTodayAnalyzeStartTimestamp )
+   	    				  	  or $data->{starttime} lt $dataTodayAnalyzeStartTimestamp)
 	        				{
-	        					# find first timestamp of tody? 
-        						if(not defined( $dataTodayAnalyzeStartTimestamp )
-    	    				  	  or $data->{starttime} lt $dataTodayAnalyzeStartTimestamp)
-		        				{
-		        					$dataTodayAnalyzeStartTimestamp = $data->{starttime};
-		        				}
-
-	        					# find last timestamp of tody? 
-        						if(not defined( $dataTodayAnalyzeStopTimestamp )
-    	    				  	  or $data->{stoptime} gt $dataTodayAnalyzeStopTimestamp)
-		        				{
-		        					$dataTodayAnalyzeStopTimestamp = $data->{stoptime};
-		        				}
-	        					
-	        					$dataTodayAnalyzeCount += 1;
-								$dataTodayWaterconsumption += $data->{waterconsumption};
-								$dataTodayHotwaterShare += $data->{hotwater_share};
-								$dataTodayWaterCost += $data->{water_cost};
-								$dataTodayEnergyCost += $data->{energy_cost};
-								$dataTodayMaxflowrate = ($dataTodayMaxflowrate, $data->{maxflowrate})[$dataTodayMaxflowrate < $data->{maxflowrate}]; # get maximum
+	        					$dataTodayAnalyzeStartTimestamp = $data->{starttime};
 	        				}
-		        		}
-	    	    	}
 
-					# analysis
-   					readingsBulkUpdateIfChanged( $hash, "AnalyzeStartTimestamp", $dataAnalyzeStartTimestamp )
-					  if( defined($dataAnalyzeStartTimestamp) );
-   					readingsBulkUpdateIfChanged( $hash, "AnalyzeStopTimestamp", $dataAnalyzeStopTimestamp )
-					  if( defined($dataAnalyzeStopTimestamp) );
-   					readingsBulkUpdateIfChanged( $hash, "AnalyzeCount", $dataAnalyzeCount );
+        					# find last timestamp of today? 
+       						if(not defined( $dataTodayAnalyzeStopTimestamp )
+   	    				  	  or $data->{stoptime} gt $dataTodayAnalyzeStopTimestamp)
+	        				{
+	        					$dataTodayAnalyzeStopTimestamp = $data->{stoptime};
+	        				}
+	        					
+        					$dataTodayAnalyzeCount += 1;
+							$dataTodayWaterconsumption += $data->{waterconsumption};
+							$dataTodayHotwaterShare += $data->{hotwater_share};
+							$dataTodayWaterCost += $data->{water_cost};
+							$dataTodayEnergyCost += $data->{energy_cost};
+							$dataTodayMaxflowrate = ($dataTodayMaxflowrate, $data->{maxflowrate})[$dataTodayMaxflowrate < $data->{maxflowrate}]; # get maximum
+        				}
+	        		}
+    	    	}
 
-					# last dataset
-   					readingsBulkUpdateIfChanged( $hash, "LastRequestFromTimestampGMT", $hash->{helper}{lastrequestfromtimestamp} )
-					  if( defined($hash->{helper}{lastrequestfromtimestamp}) );
-   					readingsBulkUpdateIfChanged( $hash, "OffsetLocalTimeGMTime", $hash->{helper}{offsetLocalTimeGMTime} )
-					  if( defined($hash->{helper}{offsetLocalTimeGMTime}) );
-   					readingsBulkUpdateIfChanged( $hash, "LastStartTimestamp", $dataLastStartTimestamp )
-					  if( defined($dataLastStartTimestamp) );
-   					readingsBulkUpdateIfChanged( $hash, "LastStopTimestamp", $dataLastStopTimestamp )
-					  if( defined($dataLastStopTimestamp) );
-   					readingsBulkUpdateIfChanged( $hash, "LastWaterConsumption", $dataLastWaterconsumption )
-   					  if( defined($dataLastWaterconsumption) );
-   					readingsBulkUpdateIfChanged( $hash, "LastMaxFlowRate", $dataLastMaxflowrate )
-   					  if( defined($dataLastMaxflowrate) );
-	   				readingsBulkUpdateIfChanged( $hash, "LastHotWaterShare", $dataLastHotwaterShare )
-   					  if( defined($dataLastHotwaterShare) );
-   					readingsBulkUpdateIfChanged( $hash, "LastWaterCost", $dataLastWaterCost )
-   					  if( defined($dataLastWaterCost) );
-   					readingsBulkUpdateIfChanged( $hash, "LastEnergyCost", $dataLastEnergyCost )
-	   				  if( defined($dataLastEnergyCost) );
+				# analysis
+				readingsBulkUpdateIfChanged( $hash, "AnalyzeStartTimestamp", $dataAnalyzeStartTimestamp )
+				  if( defined($dataAnalyzeStartTimestamp) );
+				readingsBulkUpdateIfChanged( $hash, "AnalyzeStopTimestamp", $dataAnalyzeStopTimestamp )
+				  if( defined($dataAnalyzeStopTimestamp) );
+				readingsBulkUpdateIfChanged( $hash, "AnalyzeCount", $dataAnalyzeCount );
 
-					# today's values
-   					readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStartTimestamp", $dataTodayAnalyzeStartTimestamp )
-					  if( defined($dataTodayAnalyzeStartTimestamp) );
-   					readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStopTimestamp", $dataTodayAnalyzeStopTimestamp )
-					  if( defined($dataTodayAnalyzeStopTimestamp) );
-   					readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeCount", $dataTodayAnalyzeCount );
-   					readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumption", $dataTodayWaterconsumption );
-   					readingsBulkUpdateIfChanged( $hash, "TodayMaxFlowRate", $dataTodayMaxflowrate );
-	   				readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShare", $dataTodayHotwaterShare );
-   					readingsBulkUpdateIfChanged( $hash, "TodayWaterCost", $dataTodayWaterCost );
-   					readingsBulkUpdateIfChanged( $hash, "TodayEnergyCost", $dataTodayEnergyCost );
-				}
+				# last dataset
+				readingsBulkUpdateIfChanged( $hash, "LastRequestFromTimestampGMT", $hash->{helper}{lastrequestfromtimestamp} )
+				  if( defined($hash->{helper}{lastrequestfromtimestamp}) );
+				readingsBulkUpdateIfChanged( $hash, "OffsetLocalTimeGMTime", $hash->{helper}{offsetLocalTimeGMTime} )
+				  if( defined($hash->{helper}{offsetLocalTimeGMTime}) );
+				readingsBulkUpdateIfChanged( $hash, "LastStartTimestamp", $dataLastStartTimestamp )
+				  if( defined($dataLastStartTimestamp) );
+				readingsBulkUpdateIfChanged( $hash, "LastStopTimestamp", $dataLastStopTimestamp )
+				  if( defined($dataLastStopTimestamp) );
+				readingsBulkUpdateIfChanged( $hash, "LastWaterConsumption", $dataLastWaterconsumption )
+				  if( defined($dataLastWaterconsumption) );
+				readingsBulkUpdateIfChanged( $hash, "LastMaxFlowRate", $dataLastMaxflowrate )
+				  if( defined($dataLastMaxflowrate) );
+  				readingsBulkUpdateIfChanged( $hash, "LastHotWaterShare", $dataLastHotwaterShare )
+				  if( defined($dataLastHotwaterShare) );
+				readingsBulkUpdateIfChanged( $hash, "LastWaterCost", $dataLastWaterCost )
+				  if( defined($dataLastWaterCost) );
+				readingsBulkUpdateIfChanged( $hash, "LastEnergyCost", $dataLastEnergyCost )
+  				  if( defined($dataLastEnergyCost) );
+
+				# today's values
+				readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStartTimestamp", $dataTodayAnalyzeStartTimestamp )
+				  if( defined($dataTodayAnalyzeStartTimestamp) );
+				readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStopTimestamp", $dataTodayAnalyzeStopTimestamp )
+				  if( defined($dataTodayAnalyzeStopTimestamp) );
+				readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeCount", $dataTodayAnalyzeCount );
+				readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumption", $dataTodayWaterconsumption );
+				readingsBulkUpdateIfChanged( $hash, "TodayMaxFlowRate", $dataTodayMaxflowrate );
+  				readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShare", $dataTodayHotwaterShare );
+				readingsBulkUpdateIfChanged( $hash, "TodayWaterCost", $dataTodayWaterCost );
+				readingsBulkUpdateIfChanged( $hash, "TodayEnergyCost", $dataTodayEnergyCost );
 			}
-			# no data available:
-			#{
-		   	#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-			#	"data":
-			#	{
-			#		"message":"Not found",
-			#		"code":404
-			#	}
-			#}
-			# if no data for requested timespan is available this response is sent
-		  	elsif( defined( $decode_json->{data}->{message} )
-			  and defined( $decode_json->{data}->{code} )
-			  and $decode_json->{data}->{code} eq 404 )
-			{
-			}
-			else
-			{
-       			# write json string to reading "unknown"
-   				readingsBulkUpdateIfChanged( $hash, "unknown", encode_json( $decode_json ) );
-			}
+		}
+		# no data available:
+		#{
+	   	#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		#	"data":
+		#	{
+		#		"message":"Not found",
+		#		"code":404
+		#	}
+		#}
+		# if no data for requested timespan is available this response is sent
+	  	elsif( defined( $decode_json->{data}->{message} )
+		  and defined( $decode_json->{data}->{code} )
+		  and $decode_json->{data}->{code} eq 404 )
+		{
+		}
+		##### unknown
+		else
+		{
+   			# write json string to reading "unknown"
+  			readingsBulkUpdateIfChanged( $hash, "unknown", encode_json( $decode_json ) );
 		}
     }
 
