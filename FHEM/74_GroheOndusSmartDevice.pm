@@ -55,8 +55,7 @@
 ## unserer packagename
 package FHEM::GroheOndusSmartDevice;
 
-use GPUtils qw(GP_Import)
-  ;    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use GPUtils qw(GP_Import);    # wird f�r den Import der FHEM Funktionen aus der fhem.pl benötigt
 
 my $missingModul = "";
 
@@ -66,26 +65,27 @@ use POSIX;
 use FHEM::Meta;
 use Time::Local;
 use Time::HiRes qw(gettimeofday);
-our $VERSION = '1.0.0';
+our $VERSION = '2.0.0';
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
-eval {
+eval 
+{
     require JSON::MaybeXS;
     import JSON::MaybeXS qw( decode_json encode_json );
     1;
 };
 
-if ($@) {
+if ($@) 
+{
     $@ = undef;
 
     # try to use JSON wrapper
     #   for chance of better performance
-    eval {
-
+    eval 
+    {
         # JSON preference order
-        local $ENV{PERL_JSON_BACKEND} =
-          'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
+        local $ENV{PERL_JSON_BACKEND} = 'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
           unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
 
         require JSON;
@@ -93,40 +93,47 @@ if ($@) {
         1;
     };
 
-    if ($@) {
+    if ($@) 
+    {
         $@ = undef;
 
         # In rare cases, Cpanel::JSON::XS may
         #   be installed but JSON|JSON::MaybeXS not ...
-        eval {
+        eval 
+        {
             require Cpanel::JSON::XS;
             import Cpanel::JSON::XS qw(decode_json encode_json);
             1;
         };
 
-        if ($@) {
+        if ($@) 
+        {
             $@ = undef;
 
             # In rare cases, JSON::XS may
             #   be installed but JSON not ...
-            eval {
+            eval 
+            {
                 require JSON::XS;
                 import JSON::XS qw(decode_json encode_json);
                 1;
             };
 
-            if ($@) {
+            if ($@) 
+            {
                 $@ = undef;
 
                 # Fallback to built-in JSON which SHOULD
                 #   be available since 5.014 ...
-                eval {
+                eval 
+                {
                     require JSON::PP;
                     import JSON::PP qw(decode_json encode_json);
                     1;
                 };
 
-                if ($@) {
+                if ($@) 
+                {
                     $@ = undef;
 
                     # Fallback to JSON::backportPP in really rare cases
@@ -141,8 +148,8 @@ if ($@) {
 
 ## Import der FHEM Funktionen
 #-- Run before package compilation
-BEGIN {
-
+BEGIN 
+{
     # Import from main context
     GP_Import(
         qw(readingsSingleUpdate
@@ -171,12 +178,14 @@ BEGIN {
 
 #####################################
 # _Export - Export references to main context using a different naming schema
-sub _Export {
+sub _Export 
+{
     no strict qw/refs/;    ## no critic
     my $pkg  = caller(0);
     my $main = $pkg;
     $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
-    foreach (@_) {
+    foreach (@_) 
+    {
         *{ $main . $_ } = *{ $pkg . '::' . $_ };
     }
 }
@@ -865,15 +874,9 @@ sub Parse($$)
         	    return undef;
 	        }
 	        
-            Log3 $name, 3,
-                "GroheOndusSmartDevice ($name) - autocreate new device "
-              . makeDeviceName( $decode_json->{name} )
-              . " with applianceId $decode_json->{appliance_id}, model $deviceTypeName";
+            Log3 $name, 3, "GroheOndusSmartDevice ($name) - autocreate new device " . makeDeviceName( $decode_json->{name} ) . " with applianceId $decode_json->{appliance_id}, model $deviceTypeName";
 
-            return
-                "UNDEFINED "
-              . makeDeviceName( $decode_json->{name} )
-              . " GroheOndusSmartDevice $decode_json->{appliance_id} $deviceTypeName";
+            return "UNDEFINED " . makeDeviceName( $decode_json->{name} ) . " GroheOndusSmartDevice $decode_json->{appliance_id} $deviceTypeName";
         }
     }
 }
