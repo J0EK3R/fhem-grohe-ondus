@@ -1,3 +1,5 @@
 FHEM Grohe Ondus last changes:
-2019-09-07
- - refactored WriteReadings
+2020-03-19
+ - changed login machanism to weblogin
+
+changed login machanism to weblogin
