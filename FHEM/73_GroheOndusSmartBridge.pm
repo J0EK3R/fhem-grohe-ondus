@@ -1238,6 +1238,7 @@ sub ErrorHandling($$$)
 
 	my $decode_json = eval { decode_json($data) };
 
+	# check result of parsing json
 	if ($@) 
 	{
 		Log3 $name, 3, "GroheOndusSmartBridge ($name) - JSON error while request";
@@ -1331,7 +1332,7 @@ sub ErrorHandling($$$)
 		$data =~ /Error/
 		or (    defined($decode_json)
 			and ref($decode_json) eq 'HASH'
-			and defined( $decode_json->{errors} ) )
+			and defined( $decode_json->{codes} ) )
 	  )
 	{
 		readingsBeginUpdate($dhash);
@@ -1396,6 +1397,15 @@ sub ErrorHandling($$$)
 		delete $dhash->{helper}{deviceAction}
 		  if ( defined( $dhash->{helper}{deviceAction} ) );
 
+		return;
+	}
+
+	# errorhandling: 
+	if (exists( $param->{code} ) and 
+		$param->{code} == 401  and
+		defined( $hash->{helper}{token} ))
+	{
+		getToken( $hash );
 		return;
 	}
 
