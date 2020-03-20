@@ -1,3 +1,3 @@
 FHEM Grohe Ondus last changes:
 2020-03-20
- - more debug output
+ - error handling
