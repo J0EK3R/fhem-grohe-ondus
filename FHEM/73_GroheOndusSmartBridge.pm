@@ -428,40 +428,37 @@ sub Notify($$)
 
 	# process 'global' events
 	if (
-		(
-			$devtype eq 'Global'
-			and (
-				grep /^INITIALIZED$/,
-				@{$events} or grep /^REREADCFG$/,
-				@{$events} or grep /^DEFINED.$name$/,
-				@{$events} or grep /^MODIFIED.$name$/,
-				@{$events} or grep /^ATTR.$name.groheOndusAccountEmail.+/,
-				@{$events}
+		 (
+			$devtype eq 'Global' and 
+			(
+				grep /^INITIALIZED$/, @{$events} or 
+				grep /^REREADCFG$/,	@{$events} or 
+				grep /^DEFINED.$name$/,	@{$events} or 
+				grep /^MODIFIED.$name$/, @{$events} or 
+				grep /^ATTR.$name.groheOndusAccountEmail.+/, @{$events}
 			)
-		)
-		or (
-			$devtype eq 'GroheOndusSmartBridge'
-			and (
-				grep /^groheOndusAccountPassword.+/,
-				@{$events} or ReadingsVal( '$devname', 'token', '' ) eq 'none'
+		 )
+		 or (
+			$devtype eq 'GroheOndusSmartBridge'	and 
+			(
+				grep /^groheOndusAccountPassword.+/, @{$events} or 
+				ReadingsVal( '$devname', 'token', '' ) eq 'none'
 			)
-		)
+		 )
 	  )
 	{
 		getToken($hash);
 	}
 
 	# process 'global' events
-	if (
-		$devtype eq 'Global'
-		and (
-			grep /^DELETEATTR.$name.disable$/,
-			@{$events} or grep /^ATTR.$name.disable.0$/,
-			@{$events} or grep /^DELETEATTR.$name.interval$/,
-			@{$events} or grep /^ATTR.$name.interval.[0-9]+/,
-			@{$events}
-		)
-		and $init_done
+	if ( $devtype eq 'Global' and 
+		$init_done and
+		(
+			grep /^DELETEATTR.$name.disable$/, @{$events} or 
+			grep /^ATTR.$name.disable.0$/, @{$events} or 
+			grep /^DELETEATTR.$name.interval$/, @{$events} or 
+			grep /^ATTR.$name.interval.[0-9]+/, @{$events}
+		) 
 	  )
 	{
 		getDevices($hash);
@@ -469,11 +466,10 @@ sub Notify($$)
 
 	# process internal events
 	if (
-		$devtype eq 'GroheOndusSmartBridge'
-		and (
-			grep /^state:.connected.to.cloud$/,
-			@{$events} or grep /^lastRequestState:.request_error$/,
-			@{$events}
+		$devtype eq 'GroheOndusSmartBridge'	and 
+		(
+			grep /^state:.connected.to.cloud$/,	@{$events} or 
+			grep /^lastRequestState:.request_error$/, @{$events}
 		)
 	  )
 	{
@@ -1055,7 +1051,7 @@ sub Write($@)
 		}
 	);
 
-	Log3( $name, 4, "GroheOndusSmartBridge ($name) - Send with URL: $hash->{URL}$uri, HEADER: $header, DATA: $payload, METHOD: $method" );
+	Log3( $name, 4, "GroheOndusSmartBridge ($name) - Send with URL: $uri, HEADER: $header, DATA: $payload, METHOD: $method" );
 }
 
 #####################################
@@ -1247,7 +1243,7 @@ sub ErrorHandling($$$)
 		Log3 $name, 3, "GroheOndusSmartBridge ($name) - JSON error while request";
 	}
 
-#Log3($name, 5, "GroheOndusSmartBridge ($name) - Result with CODE: $param->{code} JSON: $data");
+	Log3($name, 5, "GroheOndusSmartBridge ($name) - Result with CODE: $param->{code} JSON: $data");
 
 	# error
 	if ( defined($err) ) 
@@ -1388,7 +1384,8 @@ sub ErrorHandling($$$)
 			Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: check the ???";
 
 		}
-		else {
+		else 
+		{
 			Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: http error " . $param->{code};
 		}
 
