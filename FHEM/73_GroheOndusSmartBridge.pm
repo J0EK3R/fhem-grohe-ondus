@@ -465,8 +465,7 @@ sub Notify($$)
 	}
 
 	# process internal events
-	if (
-		$devtype eq 'GroheOndusSmartBridge'	and 
+	if ( $devtype eq 'GroheOndusSmartBridge' and 
 		(
 			grep /^state:.connected.to.cloud$/,	@{$events} or 
 			grep /^lastRequestState:.request_error$/, @{$events}
@@ -500,8 +499,8 @@ sub Set($@)
 		return "please set groheOndusAccountPassword first"
 		  if ( not defined( ReadPassword($hash) ) );
 
-		return "token is up to date"
-		  if ( defined( $hash->{helper}{token} ) );
+		#return "token is up to date"
+		#  if ( defined( $hash->{helper}{token} ) );
 
 		getToken($hash);
 	}
@@ -816,6 +815,10 @@ sub WebFormResponseProcessing($$)
 		{
 			$hash->{helper}{token} = $decode_json->{access_token};
     		Log3 $name, 5, "GroheOndusSmartBridge ($name) - AccessToken\n$hash->{helper}{token}";
+
+			readingsBeginUpdate($hash);
+			readingsBulkUpdateIfChanged( $hash, "token", $hash->{helper}{token}, 1 );
+			readingsEndUpdate( $hash, 1 );
 
 			getDevices($hash);
 		}
@@ -1405,6 +1408,8 @@ sub ErrorHandling($$$)
 		$param->{code} == 401  and
 		defined( $hash->{helper}{token} ))
 	{
+		Log3 $dname, 3,	"GroheOndusSmartBridge ($dname) - reconnect";
+
 		getToken( $hash );
 		return;
 	}
@@ -1429,7 +1434,6 @@ sub ResponseProcessing($$)
 
 	my $hash        = $param->{hash};
 	my $name        = $hash->{NAME};
-	my $decode_json = eval { decode_json($json) };
 
 	my $dhash = $hash;
 
@@ -1439,6 +1443,7 @@ sub ResponseProcessing($$)
 
 	my $dname = $dhash->{NAME};
 
+	my $decode_json = eval { decode_json($json) };
 	if ($@) 
 	{
 		Log3 $name, 3, "GroheOndusSmartBridge ($name) - JSON error while request: $@";
@@ -1453,7 +1458,7 @@ sub ResponseProcessing($$)
 	}
 
 	# token und UID
-	if (    ref($decode_json) eq 'HASH'
+	if ( ref($decode_json) eq 'HASH'
 		and defined( $decode_json->{token} )
 		and $decode_json->{token}
 		and defined( $decode_json->{uid} )
@@ -1787,6 +1792,7 @@ sub ResponseProcessing($$)
 	}
 
 	Log3 $name, 3, "GroheOndusSmartBridge ($name) - no Match for processing data";
+	Log3 $name, 5, "GroheOndusSmartBridge ($name) - no Match for processing data JSON: " . $json;
 }
 
 #####################################
@@ -1797,91 +1803,6 @@ sub WriteReadings($$)
 
 	readingsBeginUpdate($hash);
 
-#    if ( defined( $decode_json->{id} )
-#        and $decode_json->{id}
-#        and defined( $decode_json->{name} )
-#        and $decode_json->{name} )
-#    {
-#        if ( $decode_json->{id} eq $hash->{helper}{current_location_id} )
-#        {
-#            readingsBulkUpdateIfChanged( $hash, 'name', $decode_json->{name} );
-#            #readingsBulkUpdateIfChanged( $hash, 'authorized_user_ids', scalar( @{ $decode_json->{authorized_user_ids} } ) );
-#            #readingsBulkUpdateIfChanged( $hash, 'devices', scalar( @{ $decode_json->{devices} } ) );
-#
-#            while ( ( my ( $t, $v ) ) = each %{ $decode_json->{geo_position} } )
-#            {
-#                $v = encode_utf8($v);
-#                readingsBulkUpdateIfChanged( $hash, $t, $v );
-#            }
-#
-#            readingsBulkUpdateIfChanged( $hash, 'zones', scalar( @{ $decode_json->{zones} } ) );
-#        }
-#        elsif ( $decode_json->{id} ne $hash->{helper}{current_location_id}
-#            and ref( $decode_json->{model} ) eq 'ARRAY'
-#            and ref( $decode_json->{model}[0]{properties} ) eq 'ARRAY' )
-#        {
-#            my $properties =
-#              scalar( @{ $decode_json->{model}[0]{properties} } );
-#
-#            do
-#            {
-#                while ( ( my ( $t, $v ) ) =
-#                    each
-#                    %{ $decode_json->{model}[0]{properties}[$properties] } )
-#                {
-#                    next
-#                      if ( ref($v) eq 'ARRAY' );
-#
-#                    #$v = encode_utf8($v);
-#                    readingsBulkUpdateIfChanged(
-#                        $hash,
-#                        $decode_json->{model}[0]{properties}[$properties]
-#                          {name} . '-' . $t,
-#                        $v
-#                      )
-#                      unless (
-#                        $decode_json->{model}[0]{properties}[$properties]
-#                        {name} eq 'ethernet_status'
-#                        or $decode_json->{model}[0]{properties}[$properties]
-#                        {name} eq 'wifi_status' );
-#
-#                    if (
-#                        (
-#                            $decode_json->{model}[0]{properties}
-#                            [$properties]{name} eq 'ethernet_status'
-#                            or $decode_json->{model}[0]{properties}
-#                            [$properties]{name} eq 'wifi_status'
-#                        )
-#                        and ref($v) eq 'HASH'
-#                      )
-#                    {
-#                        if ( $decode_json->{model}[0]{properties}
-#                            [$properties]{name} eq 'ethernet_status' )
-#                        {
-#                            readingsBulkUpdateIfChanged( $hash, 'ethernet_status-mac', $v->{mac} );
-#                            readingsBulkUpdateIfChanged( $hash, 'ethernet_status-ip', $v->{ip} )
-#                              if ( ref( $v->{ip} ) ne 'HASH' );
-#
-#                            readingsBulkUpdateIfChanged( $hash, 'ethernet_status-isconnected', $v->{isconnected} );
-#                        }
-#                        elsif ( $decode_json->{model}[0]{properties}
-#                            [$properties]{name} eq 'wifi_status' )
-#                        {
-#                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-ssid', $v->{ssid} );
-#                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-mac', $v->{mac} );
-#                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-ip', $v->{ip} )
-#                              if ( ref( $v->{ip} ) ne 'HASH' );
-#
-#                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-isconnected', $v->{isconnected} );
-#                            readingsBulkUpdateIfChanged( $hash, 'wifi_status-signal', $v->{signal} );
-#                        }
-#                    }
-#                }
-#                $properties--;
-#
-#            } while ( $properties >= 0 );
-#        }
-#    }
 
 	readingsEndUpdate( $hash, 1 );
 
@@ -2021,15 +1942,16 @@ sub ParseJSON($$)
 	{
 		foreach my $c ( split //, $buffer ) 
 		{
-			if (    $open == $close
+			if ( $open == $close
 				and $open > 0 )
 			{
 				$tail .= $c;
-				Log3 $name, 5, "GroheOndusSmartBridge ($name) - $open == $close and $open > 0";
+				# Log3 $name, 5, "GroheOndusSmartBridge ($name) - $open == $close and $open > 0";
 			}
-			elsif ( ( $open == $close ) and ( $c ne '{' ) ) 
+			elsif ( ( $open == $close ) 
+				and ( $c ne '{' ) ) 
 			{
-				Log3 $name, 5, "GroheOndusSmartBridge ($name) - Garbage character before message: " . $c;
+				# Log3 $name, 5, "GroheOndusSmartBridge ($name) - Garbage character before message: " . $c;
 			}
 			else 
 			{

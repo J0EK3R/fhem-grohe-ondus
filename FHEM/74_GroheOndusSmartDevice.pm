@@ -687,10 +687,10 @@ sub Parse($$)
     my ( $io_hash, $json ) = @_;
 
     my $name = $io_hash->{NAME};
-    my $decode_json = eval { decode_json($json) };
     
     Log3 $name, 4, "GroheOndusSmartDevice ($name) - ParseFn was called";
 
+    my $decode_json = eval { decode_json($json) };
     if ($@) 
     {
         Log3 $name, 3, "GroheOndusSmartDevice ($name) - JSON error while request: $@";
@@ -1177,99 +1177,101 @@ sub WriteReadings($$)
 	#########################################################
     elsif ( $model eq 'sense_guard' )
    	{
-		# config:
-    	#{
-    	#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+   		# config:
+   		#[
+   		#{
+   		#	"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
    		#	"installation_date":"2001-01-30T00:00:00.000+00:00",
-    	#	"name":"KG Vorratsraum - SenseGUARD",
+   		#	"name":"KG Vorratsraum SenseGUARD",
    		#	"serial_number":"123456789012345678901234567890123456789012345678",
-    	#	"type":103,
-   		#	"version":"01.38.Z22.0400.0101",
-    	#	"tdt":"2019-06-30T11:06:40.000+02:00",
-    	#	"timezone":60,
-   		#	"measurement_period":900,
-    	#	"measurement_transmission_intervall":900,
-   		#	"measurement_transmission_intervall_offset":1,
-   		#	"action_on_major_leakage":1,
-    	#	"action_on_minor_leakage":1,
-   		#	"action_on_micro_leakage":0,
-   		#	"monitor_frost_alert":true,
-    	#	"monitor_lower_flow_limit":false,
-   		#	"monitor_upper_flow_limit":true,
-   		#	"monitor_lower_pressure_limit":false,
-    	#	"monitor_upper_pressure_limit":false,
-   		#	"monitor_lower_temperature_limit":false,
-   		#	"monitor_upper_temperature_limit":false,
-    	#	"monitor_major_leakage":true,
-   		#	"monitor_minor_leakage":true,
-   		#	"monitor_micro_leakage":true,
-    	#	"monitor_system_error":false,
-   		#	"monitor_btw_0_1_and_0_8_leakage":true,
-   		#	"monitor_withdrawel_amount_limit_breach":true,
-    	#	"detection_interval":11250,
-   		#	"impulse_ignore":10,
-   		#	"time_ignore":20,
-    	#	"pressure_tolerance_band":10,
-   		#	"pressure_drop":50,
-   		#	"detection_time":30,
-    	#	"action_on_btw_0_1_and_0_8_leakage":1,
-   		#	"action_on_withdrawel_amount_limit_breach":1,
-   		#	"withdrawel_amount_limit":300,
-    	#	"sprinkler_mode_start_time":0,
-   		#	"sprinkler_mode_stop_time":1439,
-   		#	"sprinkler_mode_active_monday":false,
-    	#	"sprinkler_mode_active_tuesday":false,
-   		#	"sprinkler_mode_active_wednesday":false,
-   		#	"sprinkler_mode_active_thursday":false,
-    	#	"sprinkler_mode_active_friday":false,
-   		#	"sprinkler_mode_active_saturday":false,
-   		#	"sprinkler_mode_active_sunday":false},
-    	#	"role":"owner",
+   		#	"type":103,
+   		#	"version":"01.44.Z22.0400.0101",
+   		#	"tdt":"2020-03-22T11:09:57.000+01:00",
+   		#	"timezone":60,
+   		#	"role":"owner",
    		#	"registration_complete":true,
-   		#	"calculate_average_since":"2000-01-30T00:00:00.000Z",
+   		#	"calculate_average_since":"2001-01-01T00:00:00.000Z",
    		#	"config":
-    	#	{
-   		#			"thresholds":
-    	#			[
-   		#				{
-    	#					"quantity":"flowrate",
-   		#					"type":"min",
-   		#					"value":3,
-    	#					"enabled":false
-   		#				},
-   		#				{
-    	#					"quantity":"flowrate",
-   		#					"type":"max",
-   		#					"value":50,
-    	#					"enabled":true
-   		#				},
-   		#				{
-    	#					"quantity":"pressure",
-   		#					"type":"min",
-   		#					"value":2,
-    	#					"enabled":false
-    	#				},
-   		#				{
-   		#					"quantity":"pressure",
-    	#					"type":"max",
-   		#					"value":8,
-   		#					"enabled":false
-    	#				},
-   		#				{
-   		#					"quantity":"temperature_guard",
-    	#					"type":"min",
-   		#					"value":5,
-   		#					"enabled":false
-    	#				},
-   		#				{
-   		#					"quantity":"temperature_guard",
-    	#					"type":"max",
-   		#					"value":45,
-   		#					"enabled":false
-    	#				}
-   		#			],
+   		#	{
+   		#		"measurement_period":900,
+   		#		"measurement_transmission_intervall":900,
+   		#		"measurement_transmission_intervall_offset":1,
+   		#		"action_on_major_leakage":1,
+   		#		"action_on_minor_leakage":1,
+   		#		"action_on_micro_leakage":0,
+   		#		"monitor_frost_alert":true,
+   		#		"monitor_lower_flow_limit":false,
+   		#		"monitor_upper_flow_limit":true,
+   		#		"monitor_lower_pressure_limit":false,
+   		#		"monitor_upper_pressure_limit":false,
+   		#		"monitor_lower_temperature_limit":false,
+   		#		"monitor_upper_temperature_limit":false,
+   		#		"monitor_major_leakage":true,
+   		#		"monitor_minor_leakage":true,
+   		#		"monitor_micro_leakage":true,
+   		#		"monitor_system_error":false,
+   		#		"monitor_btw_0_1_and_0_8_leakage":true,
+   		#		"monitor_withdrawel_amount_limit_breach":true,
+   		#		"detection_interval":11250,
+   		#		"impulse_ignore":10,
+   		#		"time_ignore":20,
+   		#		"pressure_tolerance_band":10,
+   		#		"pressure_drop":50,
+   		#		"detection_time":30,
+   		#		"action_on_btw_0_1_and_0_8_leakage":1,
+   		#		"action_on_withdrawel_amount_limit_breach":1,
+   		#		"withdrawel_amount_limit":300,
+   		#		"sprinkler_mode_start_time":0,
+   		#		"sprinkler_mode_stop_time":1439,
+   		#		"sprinkler_mode_active_monday":false,
+   		#		"sprinkler_mode_active_tuesday":false,
+   		#		"sprinkler_mode_active_wednesday":false,
+   		#		"sprinkler_mode_active_thursday":false,
+   		#		"sprinkler_mode_active_friday":false,
+   		#		"sprinkler_mode_active_saturday":false,
+   		#		"sprinkler_mode_active_sunday":false,
+   		#		"thresholds":
+   		#		[
+   		#		{
+   		#			"quantity":"flowrate",
+   		#			"type":"min",
+   		#			"value":3,
+   		#			"enabled":false
+   		#		},
+   		#		{
+   		#			"quantity":"flowrate",
+   		#			"type":"max",
+   		#			"value":50,
+   		#			"enabled":true
+   		#		},
+   		#		{
+   		#			"quantity":"pressure",
+   		#			"type":"min",
+   		#			"value":2,
+   		#			"enabled":false
+   		#		},
+   		#		{
+   		#			"quantity":"pressure",
+   		#			"type":"max",
+   		#			"value":8,
+   		#			"enabled":false
+   		#		},
+   		#		{
+   		#			"quantity":"temperature_guard",
+   		#			"type":"min",
+   		#			"value":5,
+   		#			"enabled":false
+   		#		},
+   		#		{
+   		#			"quantity":"temperature_guard",
+   		#			"type":"max",
+   		#			"value":45,
+   		#			"enabled":false
    		#		}
-    	#	}
+   		#		],
+   		#	},
+   		#},
+
 	   	if( defined( $decode_json->{config} ) )
 		{
 			foreach my $key (keys %{ $decode_json })
@@ -1318,161 +1320,177 @@ sub WriteReadings($$)
    			  {
 				readingsBulkUpdateIfChanged( $hash, "ApplianceRegistrationComplete", $decode_json->{registration_complete} );
    			  }
-   			  elsif($key eq 'measurement_period')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MeasurementPeriod", $decode_json->{measurement_period} );
-   			  }
-   			  elsif($key eq 'measurement_transmission_intervall')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MeasurementTransmissionIntervall", $decode_json->{measurement_transmission_intervall} );
-   			  }
-   			  elsif($key eq 'measurement_transmission_intervall_offset')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MeasurementTransmissionIntervallOffset", $decode_json->{measurement_transmission_intervall_offset} );
-   			  }
-   			  elsif($key eq 'action_on_major_leakage')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "ActionOnMajorLeakage", $decode_json->{action_on_major_leakage} );
-   			  }
-   			  elsif($key eq 'action_on_minor_leakage')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "ActionOnMinorLeakage", $decode_json->{action_on_minor_leakage} );
-   			  }
-   			  elsif($key eq 'action_on_micro_leakage')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "ActionOnMicroLeakage", $decode_json->{action_on_micro_leakage} );
-   			  }
-   			  elsif($key eq 'monitor_frost_alert')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorFrostAlert", $decode_json->{monitor_frost_alert} );
-   			  }
-   			  elsif($key eq 'monitor_lower_flow_limit')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorLowerFlowLimit", $decode_json->{monitor_lower_flow_limit} );
-   			  }
-   			  elsif($key eq 'monitor_upper_flow_limit')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorUpperFlowLimit", $decode_json->{monitor_upper_flow_limit} );
-   			  }
-   			  elsif($key eq 'monitor_lower_pressure_limit')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorLowerPressureLimit", $decode_json->{monitor_lower_pressure_limit} );
-   			  }
-   			  elsif($key eq 'monitor_upper_pressure_limit')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorUpperPressureLimit", $decode_json->{monitor_upper_pressure_limit} );
-   			  }
-   			  elsif($key eq 'monitor_lower_temperature_limit')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorLowerTemperatureLimit", $decode_json->{monitor_lower_temperature_limit} );
-   			  }
-   			  elsif($key eq 'monitor_upper_temperature_limit')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorUpperTemperatureLimit", $decode_json->{monitor_upper_temperature_limit} );
-   			  }
-   			  elsif($key eq 'monitor_major_leakage')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorMajorLeakage", $decode_json->{monitor_major_leakage} );
-   			  }
-   			  elsif($key eq 'monitor_minor_leakage')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorMinorLeakage", $decode_json->{monitor_minor_leakage} );
-   			  }
-   			  elsif($key eq 'monitor_micro_leakage')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorMicroLeakage", $decode_json->{monitor_micro_leakage} );
-   			  }
-   			  elsif($key eq 'monitor_system_error')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorSystemError", $decode_json->{monitor_system_error} );
-   			  }
-   			  elsif($key eq 'monitor_btw_0_1_and_0_8_leakage')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "Monitor_btw_0_1_and_0_8_leakage", $decode_json->{monitor_btw_0_1_and_0_8_leakage} );
-   			  }
-   			  elsif($key eq 'monitor_withdrawel_amount_limit_breach')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "MonitorWithdrawelAmountLimitBreach", $decode_json->{monitor_withdrawel_amount_limit_breach} );
-   			  }
-   			  elsif($key eq 'detection_interval')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "DetectionInterval", $decode_json->{detection_interval} );
-   			  }
-   			  elsif($key eq 'impulse_ignore')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "DetectionImpulseIgnore", $decode_json->{impulse_ignore} );
-   			  }
-   			  elsif($key eq 'time_ignore')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "DetectionTimeIgnore", $decode_json->{time_ignore} );
-   			  }
-   			  elsif($key eq 'pressure_tolerance_band')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "DetectionPressureToleranceBand", $decode_json->{pressure_tolerance_band} );
-   			  }
-   			  elsif($key eq 'pressure_drop')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "DetectionPressureDrop", $decode_json->{pressure_drop} );
-   			  }
-   			  elsif($key eq 'detection_time')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "DetectionTime", $decode_json->{detection_time} );
-   			  }
-   			  elsif($key eq 'action_on_btw_0_1_and_0_8_leakage')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "Action_on_btw_0_1_and_0_8_leakage", $decode_json->{action_on_btw_0_1_and_0_8_leakage} );
-   			  }
-   			  elsif($key eq 'action_on_withdrawel_amount_limit_breach')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "Action_on_withdrawel_amount_limit_breach", $decode_json->{action_on_withdrawel_amount_limit_breach} );
-   			  }
-   			  elsif($key eq 'withdrawel_amount_limit')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "WithdrawelAmountLimit", $decode_json->{withdrawel_amount_limit} );
-   			  }
-   			  elsif($key eq 'sprinkler_mode_start_time')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "SprinklerModeStartTime", $decode_json->{sprinkler_mode_start_time} );
-   			  }
-   			  elsif($key eq 'sprinkler_mode_stop_time')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "SprinklerModeStopTime", $decode_json->{sprinkler_mode_stop_time} );
-   			  }
-   			  elsif($key eq 'sprinkler_mode_active_monday')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveMonday", $decode_json->{sprinkler_mode_active_monday} );
-   			  }
-   			  elsif($key eq 'sprinkler_mode_active_tuesday')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveTuesday", $decode_json->{sprinkler_mode_active_tuesday} );
-   			  }
-   			  elsif($key eq 'sprinkler_mode_active_wednesday')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveWednesday", $decode_json->{sprinkler_mode_active_wednesday} );
-   			  }
-   			  elsif($key eq 'sprinkler_mode_active_thursday')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveThursday", $decode_json->{sprinkler_mode_active_thursday} );
-   			  }
-   			  elsif($key eq 'sprinkler_mode_active_friday')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveFriday", $decode_json->{sprinkler_mode_active_friday} );
-   			  }
-   			  elsif($key eq 'sprinkler_mode_active_saturday')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveSaturday", $decode_json->{sprinkler_mode_active_saturday} );
-   			  }
-   			  elsif($key eq 'sprinkler_mode_active_sunday')
-   			  {
-				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveSunday", $decode_json->{sprinkler_mode_active_sunday} );
-   			  }
    			  elsif($key eq 'calculate_average_since')
    			  {
 				readingsBulkUpdateIfChanged( $hash, "CalculateAverageSince", $decode_json->{calculate_average_since} );
    			  }
-   			  else
+  			  else
 			  {
     			readingsBulkUpdateIfChanged( $hash, "Unknown_" . $key, $decode_json->{$key} );
+			  }
+    		}
+    		
+    		foreach my $key (keys %{ $decode_json->{config} })
+    		{
+   			  if($key eq 'thresholds')
+   			  {
+   			  	# skipped
+   			  }
+   			  elsif($key eq 'measurement_period')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MeasurementPeriod", $decode_json->{config}->{measurement_period} );
+   			  }
+   			  elsif($key eq 'measurement_transmission_intervall')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MeasurementTransmissionIntervall", $decode_json->{config}->{measurement_transmission_intervall} );
+   			  }
+   			  elsif($key eq 'measurement_transmission_intervall_offset')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MeasurementTransmissionIntervallOffset", $decode_json->{config}->{measurement_transmission_intervall_offset} );
+   			  }
+   			  elsif($key eq 'action_on_major_leakage')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "ActionOnMajorLeakage", $decode_json->{config}->{action_on_major_leakage} );
+   			  }
+   			  elsif($key eq 'action_on_minor_leakage')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "ActionOnMinorLeakage", $decode_json->{config}->{action_on_minor_leakage} );
+   			  }
+   			  elsif($key eq 'action_on_micro_leakage')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "ActionOnMicroLeakage", $decode_json->{config}->{action_on_micro_leakage} );
+   			  }
+   			  elsif($key eq 'monitor_frost_alert')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorFrostAlert", $decode_json->{config}->{monitor_frost_alert} );
+   			  }
+   			  elsif($key eq 'monitor_lower_flow_limit')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorLowerFlowLimit", $decode_json->{config}->{monitor_lower_flow_limit} );
+   			  }
+   			  elsif($key eq 'monitor_upper_flow_limit')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorUpperFlowLimit", $decode_json->{config}->{monitor_upper_flow_limit} );
+   			  }
+   			  elsif($key eq 'monitor_lower_pressure_limit')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorLowerPressureLimit", $decode_json->{config}->{monitor_lower_pressure_limit} );
+   			  }
+   			  elsif($key eq 'monitor_upper_pressure_limit')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorUpperPressureLimit", $decode_json->{config}->{monitor_upper_pressure_limit} );
+   			  }
+   			  elsif($key eq 'monitor_lower_temperature_limit')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorLowerTemperatureLimit", $decode_json->{config}->{monitor_lower_temperature_limit} );
+   			  }
+   			  elsif($key eq 'monitor_upper_temperature_limit')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorUpperTemperatureLimit", $decode_json->{config}->{monitor_upper_temperature_limit} );
+   			  }
+   			  elsif($key eq 'monitor_major_leakage')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorMajorLeakage", $decode_json->{config}->{monitor_major_leakage} );
+   			  }
+   			  elsif($key eq 'monitor_minor_leakage')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorMinorLeakage", $decode_json->{config}->{monitor_minor_leakage} );
+   			  }
+   			  elsif($key eq 'monitor_micro_leakage')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorMicroLeakage", $decode_json->{config}->{monitor_micro_leakage} );
+   			  }
+   			  elsif($key eq 'monitor_system_error')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorSystemError", $decode_json->{config}->{monitor_system_error} );
+   			  }
+   			  elsif($key eq 'monitor_btw_0_1_and_0_8_leakage')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "Monitor_btw_0_1_and_0_8_leakage", $decode_json->{config}->{monitor_btw_0_1_and_0_8_leakage} );
+   			  }
+   			  elsif($key eq 'monitor_withdrawel_amount_limit_breach')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "MonitorWithdrawelAmountLimitBreach", $decode_json->{config}->{monitor_withdrawel_amount_limit_breach} );
+   			  }
+   			  elsif($key eq 'detection_interval')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "DetectionInterval", $decode_json->{config}->{detection_interval} );
+   			  }
+   			  elsif($key eq 'impulse_ignore')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "DetectionImpulseIgnore", $decode_json->{config}->{impulse_ignore} );
+   			  }
+   			  elsif($key eq 'time_ignore')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "DetectionTimeIgnore", $decode_json->{config}->{time_ignore} );
+   			  }
+   			  elsif($key eq 'pressure_tolerance_band')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "DetectionPressureToleranceBand", $decode_json->{config}->{pressure_tolerance_band} );
+   			  }
+   			  elsif($key eq 'pressure_drop')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "DetectionPressureDrop", $decode_json->{config}->{pressure_drop} );
+   			  }
+   			  elsif($key eq 'detection_time')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "DetectionTime", $decode_json->{config}->{detection_time} );
+   			  }
+   			  elsif($key eq 'action_on_btw_0_1_and_0_8_leakage')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "Action_on_btw_0_1_and_0_8_leakage", $decode_json->{config}->{action_on_btw_0_1_and_0_8_leakage} );
+   			  }
+   			  elsif($key eq 'action_on_withdrawel_amount_limit_breach')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "Action_on_withdrawel_amount_limit_breach", $decode_json->{config}->{action_on_withdrawel_amount_limit_breach} );
+   			  }
+   			  elsif($key eq 'withdrawel_amount_limit')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "WithdrawelAmountLimit", $decode_json->{config}->{withdrawel_amount_limit} );
+   			  }
+   			  elsif($key eq 'sprinkler_mode_start_time')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "SprinklerModeStartTime", $decode_json->{config}->{sprinkler_mode_start_time} );
+   			  }
+   			  elsif($key eq 'sprinkler_mode_stop_time')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "SprinklerModeStopTime", $decode_json->{config}->{sprinkler_mode_stop_time} );
+   			  }
+   			  elsif($key eq 'sprinkler_mode_active_monday')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveMonday", $decode_json->{config}->{sprinkler_mode_active_monday} );
+   			  }
+   			  elsif($key eq 'sprinkler_mode_active_tuesday')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveTuesday", $decode_json->{config}->{sprinkler_mode_active_tuesday} );
+   			  }
+   			  elsif($key eq 'sprinkler_mode_active_wednesday')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveWednesday", $decode_json->{config}->{sprinkler_mode_active_wednesday} );
+   			  }
+   			  elsif($key eq 'sprinkler_mode_active_thursday')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveThursday", $decode_json->{config}->{sprinkler_mode_active_thursday} );
+   			  }
+   			  elsif($key eq 'sprinkler_mode_active_friday')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveFriday", $decode_json->{config}->{sprinkler_mode_active_friday} );
+   			  }
+   			  elsif($key eq 'sprinkler_mode_active_saturday')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveSaturday", $decode_json->{config}->{sprinkler_mode_active_saturday} );
+   			  }
+   			  elsif($key eq 'sprinkler_mode_active_sunday')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "SprinklerModeActiveSunday", $decode_json->{config}->{sprinkler_mode_active_sunday} );
+   			  }
+   			  elsif($key eq 'calculate_average_since')
+   			  {
+				readingsBulkUpdateIfChanged( $hash, "CalculateAverageSince", $decode_json->{config}->{calculate_average_since} );
+   			  }
+   			  else
+			  {
+    			readingsBulkUpdateIfChanged( $hash, "Unknown_" . $key, $decode_json->{config}->{$key} );
 			  }
     		}
     		
