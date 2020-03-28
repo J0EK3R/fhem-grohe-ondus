@@ -1,3 +1,3 @@
 FHEM Grohe Ondus last changes:
-2020-03-27
- - Formatted
+2020-03-28
+ - Bugfix "Get" -> "GET"
