@@ -241,14 +241,9 @@ sub Define($$)
   my $deviceId = $a[2];
   my $model    = $a[3];
 
-  $hash->{DEVICEID}               = $deviceId;
-  $hash->{VERSION}                = $VERSION;
-  $hash->{NOTIFYDEV}              = "global,$name";
-
-  $hash->{TELEGRAMCONFIGCOUNTER}  = 0;
-  $hash->{TELEGRAMSTATUSCOUNTER}  = 0;
-  $hash->{TELEGRAMDATACOUNTER}    = 0;
-  $hash->{TELEGRAMCOMMANDCOUNTER} = 0;
+  $hash->{DEVICEID}  = $deviceId;
+  $hash->{VERSION}   = $VERSION;
+  $hash->{NOTIFYDEV} = "global,$name";
 
   # set model depending defaults
   ### sense_guard
@@ -256,12 +251,21 @@ sub Define($$)
   {
     # the SenseGuard devices update every 15 minutes
     $hash->{INTERVAL} = 60;
+
+    $hash->{TELEGRAMCONFIGCOUNTER}  = 0;
+    $hash->{TELEGRAMSTATUSCOUNTER}  = 0;
+    $hash->{TELEGRAMDATACOUNTER}    = 0;
+    $hash->{TELEGRAMCOMMANDCOUNTER} = 0;
   }
   ### sense
   elsif ( $model eq 'sense' )
   {
     # the Sense devices update just once a day
     $hash->{INTERVAL} = 600;
+
+    $hash->{TELEGRAMCONFIGCOUNTER} = 0;
+    $hash->{TELEGRAMSTATUSCOUNTER} = 0;
+    $hash->{TELEGRAMDATACOUNTER}   = 0;
   }
 
   CommandAttr( undef, "$name IODev $modules{GroheOndusSmartBridge}{defptr}{BRIDGE}->{NAME}" )
@@ -501,7 +505,7 @@ sub Set($@)
     {
       # playload
       $payload = {
-        'method'  => 'Get',
+        'method'  => 'GET',
         'URI'     => '/command',
         'payload' => ""
       };
@@ -606,7 +610,7 @@ sub Set($@)
 
       # playload
       $payload = {
-        'method'  => 'Get',
+        'method'  => 'GET',
         'URI'     => '/data?from=' . $requestFromTimestamp,
         'payload' => ""
       };
@@ -616,7 +620,7 @@ sub Set($@)
     {
       # playload
       $payload = {
-        'method'  => 'Get',
+        'method'  => 'GET',
         'URI'     => '/status',
         'payload' => ""
       };
