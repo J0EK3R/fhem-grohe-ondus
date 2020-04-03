@@ -53,23 +53,25 @@
 ##
 
 package FHEM::GroheOndusSmartBridge;
-use GPUtils qw(GP_Import);    # wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+
+# wird für den Import der FHEM Funktionen aus der fhem.pl benötigt
+use GPUtils qw(GP_Import);
 
 use strict;
 use warnings;
 use POSIX;
 use FHEM::Meta;
 use HTML::Entities;
-
 use HttpUtils;
-our $VERSION = '2.0.0';
 
+our $VERSION = '2.0.1';
 my $missingModul = '';
+
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
   or $missingModul .= "Encode ";
 
-# eval "use JSON;1"            or $missingModul .= 'JSON ';
-eval "use IO::Socket::SSL;1" or $missingModul .= 'IO::Socket::SSL ';
+eval "use IO::Socket::SSL;1"
+  or $missingModul .= 'IO::Socket::SSL ';
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
@@ -232,6 +234,7 @@ sub Initialize($)
 }
 
 #####################################
+# Define( $hash, $def )
 sub Define($$)
 {
   my ( $hash, $def ) = @_;
@@ -391,6 +394,7 @@ sub Attr(@)
 }
 
 #####################################
+# Notify( $hash, $dev )
 sub Notify($$)
 {
   my ( $hash, $dev ) = @_;
@@ -493,6 +497,7 @@ sub Set($@)
 }
 
 #####################################
+# getToken( $hash )
 sub getToken($)
 {
   my $hash = shift;
@@ -573,6 +578,7 @@ sub WebFormLogin($@)
 }
 
 #####################################
+# WebFormErrorHandling( $param, $err, $data )
 sub WebFormErrorHandling($$$)
 {
   my ( $param, $err, $data ) = @_;
@@ -719,6 +725,7 @@ sub WebFormErrorHandling($$$)
 }
 
 #####################################
+# WebFormResponseProcessing( $param, $data )
 sub WebFormResponseProcessing($$)
 {
   my ( $param, $data ) = @_;
@@ -1017,9 +1024,10 @@ sub createHttpValueStrings($@)
   my $device_roomId;
 
   # get locationId and roomId for the device from table
-  if (  defined($deviceId)
-    and defined( $hash->{helper}{appliance_list} )
-    and defined( $hash->{helper}{appliance_list}{$deviceId} ) )
+  if (
+    defined($deviceId)
+    and defined( $hash->{helper}{appliance_list} ) and defined( $hash->{helper}{appliance_list}{$deviceId} )
+    )
   {
     my $record = $hash->{helper}{appliance_list}{$deviceId};
     $device_locationId = $record->{location_id};
@@ -1143,6 +1151,7 @@ sub createHttpValueStrings($@)
 }
 
 #####################################
+# ErrorHandling( $param, $err, $data )
 sub ErrorHandling($$$)
 {
   my ( $param, $err, $data ) = @_;

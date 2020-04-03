@@ -55,9 +55,8 @@
 ## unserer packagename
 package FHEM::GroheOndusSmartDevice;
 
-use GPUtils qw(GP_Import);    # wird für den Import der FHEM Funktionen aus der fhem.pl benÃ¶tigt
-
-my $missingModul = "";
+# wird für den Import der FHEM Funktionen aus der fhem.pl benÃ¶tigt
+use GPUtils qw(GP_Import);    
 
 use strict;
 use warnings;
@@ -65,7 +64,9 @@ use POSIX;
 use FHEM::Meta;
 use Time::Local;
 use Time::HiRes qw(gettimeofday);
-our $VERSION = '2.0.0';
+
+our $VERSION = '2.0.1';
+my $missingModul = "";
 
 # try to use JSON::MaybeXS wrapper
 #   for chance of better performance + open code
