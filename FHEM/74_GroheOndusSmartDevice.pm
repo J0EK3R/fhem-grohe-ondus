@@ -27,7 +27,7 @@
 #  GNU General Public License for more details.
 #
 #
-# $Id: 74_GroheOndusSmartDevice.pm 19641 2019-06-18 14:47:13Z CoolTux $
+# $Id: 74_GroheOndusSmartDevice.pm 201 2020-04-04 06:14:00Z J0EK3R $
 #
 ###############################################################################
 ##
@@ -55,7 +55,7 @@
 ## unserer packagename
 package FHEM::GroheOndusSmartDevice;
 
-# wird für den Import der FHEM Funktionen aus der fhem.pl benÃ¶tigt
+# is needed to import the FHEM functions from fhem.pl
 use GPUtils qw(GP_Import);    
 
 use strict;
