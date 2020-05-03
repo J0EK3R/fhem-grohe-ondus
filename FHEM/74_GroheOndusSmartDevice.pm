@@ -522,8 +522,8 @@ sub Set($@)
           #	  'measure_now' => $measure_now,
           #	  'buzzer_on' => $buzzer_on,
           #	  'buzzer_sound_profile' => $buzzer_sound_profile,
-          'valve_open' => 1    #$valve_open,
-                               #	  'temp_user_unlock_on' => $temp_user_unlock_on
+          'valve_open' => "true"  #$valve_open,
+                                  #	  'temp_user_unlock_on' => $temp_user_unlock_on
         }
       };
 
@@ -545,8 +545,8 @@ sub Set($@)
           #	  'measure_now' => $measure_now,
           #	  'buzzer_on' => $buzzer_on,
           #	  'buzzer_sound_profile' => $buzzer_sound_profile,
-          'valve_open' => 0    #$valve_open,
-                               #	  'temp_user_unlock_on' => $temp_user_unlock_on
+          'valve_open' => "false" #$valve_open,
+                                  #	  'temp_user_unlock_on' => $temp_user_unlock_on
         }
       };
 
