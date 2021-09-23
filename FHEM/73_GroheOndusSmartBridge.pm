@@ -64,7 +64,7 @@ use FHEM::Meta;
 use HTML::Entities;
 use HttpUtils;
 
-our $VERSION = '2.0.1';
+our $VERSION = '2.0.2';
 my $missingModul = '';
 
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
