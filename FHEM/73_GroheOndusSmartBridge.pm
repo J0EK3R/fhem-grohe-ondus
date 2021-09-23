@@ -686,6 +686,12 @@ sub WebFormErrorHandling($$$)
     {
       readingsBulkUpdate( $dhash, "lastRequestState", "Error 400 Bad Request", 1 );
       Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 400 Bad Request";
+    } elsif ( $param->{code} == 401 )
+    {
+      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 401 Unauthorized - The token was not validated by the Identity Provider";
+      readingsBulkUpdate( $dhash, "state",            "Unauthorized - The token was not validated by the Identity Provider",           1 );
+      readingsBulkUpdate( $dhash, "lastRequestState", "Error 401 Unauthorized - The token was not validated by the Identity Provider", 1 );
+
     } elsif ( $param->{code} == 503 )
     {
       Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 503 Service Unavailable";
@@ -810,6 +816,10 @@ sub WebFormResponseProcessing($$)
 
       my $jsondata = { 'refresh_token' => $hash->{helper}{token} };
 
+      # find all "Set-Cookie" lines and create cookie header
+      #ProcessSetCookies($hash, $param->{httpheader}, "AWSALB");
+      ProcessSetCookies( $hash, $param->{httpheader}, undef );
+
       my $method = 'POST';
       my $uri    = $hash->{URL} . '/iot/oidc/refresh';
       my $header = "Content-Type: application/json; charset=utf-8";
@@ -846,8 +856,8 @@ sub WebFormResponseProcessing($$)
       $hash->{helper}{ondusaddress} = $location;
 
       # find all "Set-Cookie" lines and create cookie header
-      # ProcessSetCookies($hash, $param->{httpheader}, "AWSALB");
-      ProcessSetCookies( $hash, $param->{httpheader}, undef );
+      ProcessSetCookies($hash, $param->{httpheader}, "AWSALB");
+      #ProcessSetCookies( $hash, $param->{httpheader}, undef );
 
       my $method = 'GET';
       my $uri    = $hash->{helper}{ondusaddress};
