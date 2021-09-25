@@ -64,7 +64,7 @@ use FHEM::Meta;
 use HTML::Entities;
 use HttpUtils;
 
-our $VERSION = '2.0.2';
+our $VERSION = '2.0.3';
 my $missingModul = '';
 
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
@@ -427,7 +427,8 @@ sub Notify($$)
     and $init_done
     and ( grep /^DELETEATTR.$name.disable$/, @{$events} or grep /^ATTR.$name.disable.0$/, @{$events} or grep /^DELETEATTR.$name.interval$/, @{$events} or grep /^ATTR.$name.interval.[0-9]+/, @{$events} ) )
   {
-    getDevices($hash);
+#    getDevices($hash);
+    getToken($hash);
   }
 
   # process internal events
@@ -436,7 +437,7 @@ sub Notify($$)
   {
     # initial load of the timer on state changed to "connected to cloud"
     # after interval
-    InternalTimer( gettimeofday() + $hash->{INTERVAL}, "FHEM::GroheOndusSmartBridge::getDevices", $hash );
+    InternalTimer( gettimeofday() + $hash->{INTERVAL}, \&timer, $hash );
   }
 
   return;
@@ -461,7 +462,7 @@ sub Set($@)
       if ( not defined( ReadPassword($hash) ) );
 
     #return "token is up to date"
-    #  if ( defined( $hash->{helper}{token} ) );
+    #  if ( defined( $hash->{helper}{access_token} ) );
 
     getToken($hash);
   } elsif ( lc $cmd eq 'groheondusaccountpassword' )
@@ -512,9 +513,9 @@ sub getToken($)
   readingsSingleUpdate( $hash, 'state', 'get token', 1 );
 
   # clear $hash->{helper} to reset statemachines
-  delete $hash->{helper}{token}
-    if ( defined( $hash->{helper}{token} )
-    and $hash->{helper}{token} );
+  delete $hash->{helper}{access_token}
+    if ( defined( $hash->{helper}{access_token} )
+    and $hash->{helper}{access_token} );
 
   delete $hash->{helper}{user_id}
     if ( defined( $hash->{helper}{user_id} )
@@ -657,7 +658,7 @@ sub WebFormErrorHandling($$$)
     {
       readingsBulkUpdate( $dhash, "state", "the command is processed", 1 );
 
-      InternalTimer( gettimeofday() + 5, "FHEM::GroheOndusSmartBridge::getDevices", $hash, 1 );
+      InternalTimer( gettimeofday() + 5, \&timer, $hash, 1 );
     } elsif ( $param->{code} != 200 )
     {
       Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: " . $param->{code};
@@ -749,7 +750,7 @@ sub WebFormResponseProcessing($$)
   # The State-Machine is resetted in methode getToken bei deleting the entries.
 
   # response of: POST /v3/iot/oidc/refresh HTTP/1.1
-  if ( defined( $hash->{helper}{token} ) )
+  if ( defined( $hash->{helper}{access_token} ) )
   {
     # get json-structure from data-string
     my $decode_json = eval { decode_json($data) };
@@ -771,11 +772,11 @@ sub WebFormResponseProcessing($$)
     if ( ref($decode_json) eq 'HASH'
       and defined( $decode_json->{access_token} ) )
     {
-      $hash->{helper}{token} = $decode_json->{access_token};
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - AccessToken\n$hash->{helper}{token}";
+      $hash->{helper}{access_token} = $decode_json->{access_token};
+      Log3 $name, 5, "GroheOndusSmartBridge ($name) - AccessToken\n$hash->{helper}{access_token}";
 
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "token", $hash->{helper}{token}, 1 );
+      readingsBulkUpdateIfChanged( $hash, "token", $hash->{helper}{access_token}, 1 );
       readingsEndUpdate( $hash, 1 );
 
       getDevices($hash);
@@ -810,26 +811,32 @@ sub WebFormResponseProcessing($$)
     if ( ref($decode_json) eq 'HASH'
       and defined( $decode_json->{refresh_token} ) )
     {
-      $hash->{helper}{token} = $decode_json->{refresh_token};
+      $hash->{helper}{refresh_token} = $decode_json->{refresh_token};
+      $hash->{helper}{access_token} = $decode_json->{access_token};
 
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - RefreshToken\n$hash->{helper}{token}";
+      Log3 $name, 5, "GroheOndusSmartBridge ($name) - RefreshToken\n$hash->{helper}{access_token}";
 
-      my $jsondata = { 'refresh_token' => $hash->{helper}{token} };
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, "token", $hash->{helper}{access_token}, 1 );
+      readingsEndUpdate( $hash, 1 );
 
       # find all "Set-Cookie" lines and create cookie header
       #ProcessSetCookies($hash, $param->{httpheader}, "AWSALB");
       ProcessSetCookies( $hash, $param->{httpheader}, undef );
 
-      my $method = 'POST';
-      my $uri    = $hash->{URL} . '/iot/oidc/refresh';
-      my $header = "Content-Type: application/json; charset=utf-8";
-      $header .= "\r\n$hash->{helper}{cookie}"
-        if ( defined( $hash->{helper}{cookie} ) );
+      getDevices($hash);
 
-      my $payload = encode_json($jsondata);
+#      my $jsondata = { 'refresh_token' => $hash->{helper}{refresh_token} };
+#      my $method = 'POST';
+#      my $uri    = $hash->{URL} . '/iot/oidc/refresh';
+#      my $header = "Content-Type: application/json; charset=utf-8";
+#      $header .= "\r\n$hash->{helper}{cookie}"
+#        if ( defined( $hash->{helper}{cookie} ) );
+
+#      my $payload = encode_json($jsondata);
 
       # WebFormLogin( $hash, $ignoreredirects, $keepalive, $uri, $method, $header, $payload )
-      WebFormLogin( $hash, 0, 1, $uri, $method, $header, $payload );
+#      WebFormLogin( $hash, 0, 1, $uri, $method, $header, $payload );
     } else
     {
       Log3 $name, 3, "GroheOndusSmartBridge ($name) - Error getting RefreshToken";
@@ -1024,7 +1031,7 @@ sub createHttpValueStrings($@)
 {
   my ( $hash, $payload, $deviceId, $model ) = @_;
 
-  my $session_id = $hash->{helper}{token};
+  my $session_id = $hash->{helper}{access_token};
   my $name       = $hash->{NAME};
   my $header     = "Content-Type: application/json";
   my $uri        = '';
@@ -1047,7 +1054,7 @@ sub createHttpValueStrings($@)
   }
 
   # if there is a token, put it in header
-  if ( defined( $hash->{helper}{token} ) )
+  if ( defined( $hash->{helper}{access_token} ) )
   {
     $header .= "\nAuthorization: Bearer $session_id";
   }
@@ -1247,7 +1254,7 @@ sub ErrorHandling($$$)
     {
       readingsBulkUpdate( $dhash, "state", "the command is processed", 1 );
 
-      InternalTimer( gettimeofday() + 5, "FHEM::GroheOndusSmartBridge::getDevices", $hash, 1 );
+      InternalTimer( gettimeofday() + 5, \&timer, $hash, 1 );
     } elsif ( $param->{code} != 200 )
     {
       Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: " . $param->{code};
@@ -1333,7 +1340,7 @@ sub ErrorHandling($$$)
   # errorhandling:
   if (  exists( $param->{code} )
     and $param->{code} == 401
-    and defined( $hash->{helper}{token} ) )
+    and defined( $hash->{helper}{access_token} ) )
   {
     Log3 $dname, 3, "GroheOndusSmartBridge ($dname) - reconnect";
 
@@ -1392,11 +1399,11 @@ sub ResponseProcessing($$)
     and $decode_json->{uid} )
   {
     # save values in helper
-    $hash->{helper}{token}   = $decode_json->{token};
+    $hash->{helper}{access_token}   = $decode_json->{token};
     $hash->{helper}{user_id} = $decode_json->{uid};
 
     # write values to readings
-    readingsSingleUpdate( $hash, 'token', $hash->{helper}{token},   1 );
+    readingsSingleUpdate( $hash, 'token', $hash->{helper}{access_token},   1 );
     readingsSingleUpdate( $hash, 'uid',   $hash->{helper}{user_id}, 1 );
 
     # fetch locations
@@ -1734,6 +1741,15 @@ sub WriteReadings($$)
 }
 
 #####################################
+sub timer($)
+{
+  my $hash = shift;
+  my $name = $hash->{NAME};
+
+  getToken($hash);
+}
+
+#####################################
 sub getDevices($)
 {
   my $hash = shift;
@@ -1753,7 +1769,7 @@ sub getDevices($)
     Write( $hash, undef, undef, 'smartbridge' );
 
     # reload timer
-    InternalTimer( gettimeofday() + $hash->{INTERVAL}, "FHEM::GroheOndusSmartBridge::getDevices", $hash );
+    InternalTimer( gettimeofday() + $hash->{INTERVAL}, \&timer, $hash );
   } else
   {
     readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
