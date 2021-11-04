@@ -1,3 +1,5 @@
 FHEM Grohe Ondus last changes:
-2021-09-25
- - bad fix: complete login
+2021-11-04
+ - V2.0.3 -> V3.0.0
+
+completely reworked that mess
