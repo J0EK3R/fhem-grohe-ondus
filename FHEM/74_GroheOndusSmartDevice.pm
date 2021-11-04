@@ -330,9 +330,12 @@ sub GroheOndusSmartDevice_Define($$)
       $d->{NAME} ne $name );
 
   # ensure attribute room is present
-  CommandAttr( undef, $name . ' room GroheOndusSmart' )
-    if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
-
+  if ( AttrVal( $name, 'room', 'none' ) eq 'none' )
+  {
+    my $room = AttrVal( $iodev, 'room', 'GroheOndusSmart' );
+    CommandAttr( undef, $name . ' room ' . $room );
+  }
+  
   # ensure attribute inerval is present
   CommandAttr( undef, $name . ' interval ' . $hash->{INTERVAL} )
     if ( AttrVal( $name, 'interval', 'none' ) eq 'none' );
