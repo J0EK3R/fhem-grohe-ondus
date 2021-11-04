@@ -98,7 +98,7 @@ sub GroheOndusSmartBridge_Header_AddCookies($$);
 sub GroheOndusSmartBridge_Rename(@);
 
 
-my $VERSION = '3.0.1';
+my $VERSION = '3.0.2';
 my $DefaultRetries = 3;                                # default number of retries
 my $DefaultInterval = 60;                              # default value for the polling interval in seconds
 my $DefaultRetryInterval = 60;                         # default value for the retry interval in seconds
@@ -262,7 +262,8 @@ sub GroheOndusSmartBridge_Define($$)
   $hash->{helper}{access_token}          = 'none';
   $hash->{helper}{LoginCounter}          = 0;
   $hash->{helper}{LoginErrCounter}       = 0;
-
+  $hash->{helper}{DEBUG}                 = '0';
+  
   # set default Attributes
   CommandAttr( undef, $name . ' room GroheOndusSmart' )
     if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
@@ -370,7 +371,7 @@ sub GroheOndusSmartBridge_Attr(@)
     {
       Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - debugging enabled";
 
-      $hash->{helper}{DEBUG} = $attrVal;
+      $hash->{helper}{DEBUG} = '$attrVal';
       GroheOndusSmartBridge_Debug_Update($hash);
     } 
     elsif ( $cmd eq 'del' )
@@ -531,7 +532,7 @@ sub GroheOndusSmartBridge_Set($@)
       if ( $isPasswordSet );
 
     $list .= "getDevicesState:noArg login:noArg "
-      if ( $isPasswordSet and $hash->{helper}{DEBUG} != 0);
+      if ( $isPasswordSet and $hash->{helper}{DEBUG} ne '0');
 
     $list .= "groheOndusAccountPassword "
       if ( not $isPasswordSet );
