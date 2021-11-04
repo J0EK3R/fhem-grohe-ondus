@@ -52,19 +52,65 @@
 ##
 ##
 
-package FHEM::GroheOndusSmartBridge;
-
-# is needed to import the FHEM functions from fhem.pl
-use GPUtils qw(GP_Import);
+package main;
 
 use strict;
 use warnings;
-use POSIX;
 use FHEM::Meta;
 use HTML::Entities;
-use HttpUtils;
+#use HttpUtils;
 
-our $VERSION = '2.0.3';
+#########################
+# Forward declaration
+sub GroheOndusSmartBridge_Initialize($);
+sub GroheOndusSmartBridge_Define($$);
+sub GroheOndusSmartBridge_Undef($$);
+sub GroheOndusSmartBridge_Delete($$);
+sub GroheOndusSmartBridge_Attr(@);
+sub GroheOndusSmartBridge_Notify($$);
+sub GroheOndusSmartBridge_Set($@);
+sub GroheOndusSmartBridge_TimerExecute($);
+sub GroheOndusSmartBridge_TimerRemove($);
+sub GroheOndusSmartBridge_Debug_Update($);
+sub GroheOndusSmartBridge_Connect($;$$);
+sub GroheOndusSmartBridge_ClearLogin($);
+sub GroheOndusSmartBridge_Login($;$$);
+sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$);
+sub GroheOndusSmartBridge_Login_PostAddress($;$$);
+sub GroheOndusSmartBridge_Login_GetToken($;$$);
+sub GroheOndusSmartBridge_Login_Refresh($;$$);
+sub GroheOndusSmartBridge_GetDevices($;$$);
+sub GroheOndusSmartBridge_GetLocations($;$$);
+sub GroheOndusSmartBridge_GetRooms($$;$$);
+sub GroheOndusSmartBridge_GetAppliances($$$;$$);
+
+sub GroheOndusSmartBridge_RequestParam($$);
+sub GroheOndusSmartBridge_RequestErrorHandling($$$);
+
+sub GroheOndusSmartBridge_StorePassword($$);
+sub GroheOndusSmartBridge_ReadPassword($);
+sub GroheOndusSmartBridge_DeletePassword($);
+
+sub GroheOndusSmartBridge_ProcessSetCookies($@);
+sub GroheOndusSmartBridge_Write($$);
+sub GroheOndusSmartBridge_Header_AddAuthorization($$);
+sub GroheOndusSmartBridge_Header_AddCookies($$);
+sub GroheOndusSmartBridge_Rename(@);
+
+
+my $VERSION = '3.0.0';
+my $DefaultRetries = 3;                                # default number of retries
+my $DefaultInterval = 60;                              # default value for the polling interval in seconds
+my $DefaultRetryInterval = 60;                         # default value for the retry interval in seconds
+my $DefaultTimeout = 5;                                # default value for response timeout in seconds
+my $DefaultAPIVersion = '/v3';                         # default API-Version
+my $DefaultURL = 'https://idp2-apigw.cloud.grohe.com'; # default URL
+
+my $LoginURL = '/iot/oidc/login';
+my $TimeStampFormat = '%Y-%m-%dT%I:%M:%S';
+my $ReloginOffset_s = -60;                             # (negative) timespan in seconds to add "expires_in" timespan to relogin
+
+
 my $missingModul = '';
 
 eval "use Encode qw(encode encode_utf8 decode_utf8);1"
@@ -147,82 +193,32 @@ if ($@)
   }
 }
 
-## Import der FHEM Funktionen
-#-- Run before package compilation
-BEGIN
-{
-  # Import from main context
-  GP_Import(
-    qw(readingsSingleUpdate
-      readingsBulkUpdate
-      readingsBulkUpdateIfChanged
-      readingsBeginUpdate
-      readingsEndUpdate
-      Log3
-      CommandAttr
-      AttrVal
-      ReadingsVal
-      CommandDefMod
-      modules
-      setKeyValue
-      getKeyValue
-      getUniqueId
-      RemoveInternalTimer
-      readingFnAttributes
-      InternalTimer
-      defs
-      init_done
-      IsDisabled
-      deviceEvents
-      HttpUtils_NonblockingGet
-      urlEncode
-      gettimeofday
-      Dispatch)
-  );
-}
-
 #####################################
-# _Export - Export references to main context using a different naming schema
-sub _Export
-{
-  no strict qw/refs/;    ## no critic
-  my $pkg  = caller(0);
-  my $main = $pkg;
-  $main =~ s/^(?:.+::)?([^:]+)$/main::$1\_/g;
-  foreach (@_)
-  {
-    *{ $main . $_ } = *{ $pkg . '::' . $_ };
-  }
-}
-
-#####################################
-#-- Export to main context with different name
-_Export(
-  qw(
-    Initialize
-    )
-);
-
-#####################################
-sub Initialize($)
+sub GroheOndusSmartBridge_Initialize($)
 {
   my ($hash) = @_;
 
   # Provider
-  $hash->{WriteFn}   = 'FHEM::GroheOndusSmartBridge::Write';
+  $hash->{WriteFn}   = \&GroheOndusSmartBridge_Write;
   $hash->{Clients}   = 'GroheOndusSmartDevice';
-  $hash->{MatchList} = { '1:GroheOndusSmartDevice' => '"appliance_id":".*' };
+  $hash->{MatchList} = { '1:GroheOndusSmartDevice' => 'GROHEONDUSSMARTDEVICE_.*' };
 
   # Consumer
-  $hash->{SetFn}    = 'FHEM::GroheOndusSmartBridge::Set';
-  $hash->{DefFn}    = 'FHEM::GroheOndusSmartBridge::Define';
-  $hash->{UndefFn}  = 'FHEM::GroheOndusSmartBridge::Undef';
-  $hash->{DeleteFn} = 'FHEM::GroheOndusSmartBridge::Delete';
-  $hash->{RenameFn} = 'FHEM::GroheOndusSmartBridge::Rename';
-  $hash->{NotifyFn} = 'FHEM::GroheOndusSmartBridge::Notify';
+  $hash->{SetFn}    = \&GroheOndusSmartBridge_Set;
+  $hash->{DefFn}    = \&GroheOndusSmartBridge_Define;
+  $hash->{UndefFn}  = \&GroheOndusSmartBridge_Undef;
+  $hash->{DeleteFn} = \&GroheOndusSmartBridge_Delete;
+  $hash->{RenameFn} = \&GroheOndusSmartBridge_Rename;
+  $hash->{NotifyFn} = \&GroheOndusSmartBridge_Notify;
 
-  $hash->{AttrFn}   = 'FHEM::GroheOndusSmartBridge::Attr';
-  $hash->{AttrList} = 'debugJSON:0,1 ' . 'disable:1 ' . 'interval ' . 'disabledForIntervals ' . 'groheOndusAccountEmail ' . 'groheOndusBaseURL ' . 'groheOndusApiVersion ' . $readingFnAttributes;
+  $hash->{AttrFn}   = \&GroheOndusSmartBridge_Attr;
+  $hash->{AttrList} = 
+    'debugJSON:0,1 ' . 
+    'debug:0,1 ' . 
+    'disable:0,1 ' . 
+    'interval ' . 
+    'groheOndusAccountEmail ' . 
+    $readingFnAttributes;
 
   foreach my $d ( sort keys %{ $modules{GroheOndusSmartBridge}{defptr} } )
   {
@@ -235,7 +231,7 @@ sub Initialize($)
 
 #####################################
 # Define( $hash, $def )
-sub Define($$)
+sub GroheOndusSmartBridge_Define($$)
 {
   my ( $hash, $def ) = @_;
 
@@ -251,21 +247,29 @@ sub Define($$)
     if ($missingModul);
 
   my $name = $a[0];
-  $hash->{BRIDGE}     = 1;
-  $hash->{APIVERSION} = AttrVal( $name, 'groheOndusApiVersion', '/v3' );
-  $hash->{BASEURL}    = AttrVal( $name, 'groheOndusBaseURL', 'https://idp2-apigw.cloud.grohe.com' );
-  $hash->{URL}        = $hash->{BASEURL} . $hash->{APIVERSION};
-  $hash->{VERSION}    = $VERSION;
-  $hash->{INTERVAL}   = 60;
-  $hash->{NOTIFYDEV}  = "global,$name";
+  $hash->{VERSION}                       = $VERSION;
+  $hash->{NOTIFYDEV}                     = "global,$name";
+  $hash->{URL}                           = $DefaultURL . $DefaultAPIVersion;
+  $hash->{INTERVAL}                      = $DefaultInterval;
+  $hash->{TIMEOUT}                       = $DefaultTimeout;
+  $hash->{RETRIES}                       = $DefaultRetries;
+  $hash->{REQUESTID}                     = 0;
 
+  $hash->{helper}{RESPONSECOUNT_ERROR}   = 0;
+  $hash->{helper}{RESPONSESUCCESSCOUNT}  = 0; # statistics
+  $hash->{helper}{RESPONSEERRORCOUNT}    = 0; # statistics
+  $hash->{helper}{RESPONSETOTALTIMESPAN} = 0; # statistics
+  $hash->{helper}{access_token}          = 'none';
+  $hash->{helper}{LoginCounter}          = 0;
+  $hash->{helper}{LoginErrCounter}       = 0;
+
+  # set default Attributes
   CommandAttr( undef, $name . ' room GroheOndusSmart' )
     if ( AttrVal( $name, 'room', 'none' ) eq 'none' );
 
-  readingsSingleUpdate( $hash, 'token', 'none',        1 );
   readingsSingleUpdate( $hash, 'state', 'initialized', 1 );
 
-  Log3 $name, 3, "GroheOndusSmartBridge ($name) - defined GroheOndusSmartBridge";
+  Log3 $name, 3, "GroheOndusSmartBridge_Define($name) - defined GroheOndusSmartBridge";
 
   $modules{GroheOndusSmartBridge}{defptr}{BRIDGE} = $hash;
 
@@ -274,11 +278,11 @@ sub Define($$)
 
 #####################################
 # Undef( $hash, $name )
-sub Undef($$)
+sub GroheOndusSmartBridge_Undef($$)
 {
   my ( $hash, $name ) = @_;
 
-  RemoveInternalTimer($hash);
+  GroheOndusSmartBridge_TimerRemove($hash);
 
   delete $modules{GroheOndusSmartBridge}{defptr}{BRIDGE}
     if ( defined( $modules{GroheOndusSmartBridge}{defptr}{BRIDGE} ) );
@@ -288,7 +292,7 @@ sub Undef($$)
 
 #####################################
 # Delete( $hash, $name )
-sub Delete($$)
+sub GroheOndusSmartBridge_Delete($$)
 {
   my ( $hash, $name ) = @_;
 
@@ -298,41 +302,36 @@ sub Delete($$)
 
 #####################################
 # ATTR($cmd, $name, $attrName, $attrVal)
-sub Attr(@)
+sub GroheOndusSmartBridge_Attr(@)
 {
   my ( $cmd, $name, $attrName, $attrVal ) = @_;
   my $hash = $defs{$name};
 
-  Log3 $name, 4, "GroheOndusSmartBridge ($name) - Attr was called";
+  Log3 $name, 4, "GroheOndusSmartBridge_Attr($name) - AttrName \'$attrName\' : \'$attrVal\'";
 
   # Attribute "disable"
   if ( $attrName eq 'disable' )
   {
-    if ( $cmd eq 'set' and $attrVal eq '1' )
+    if ( $cmd eq 'set' and 
+      $attrVal eq '1' )
     {
-      RemoveInternalTimer($hash);
-      readingsSingleUpdate( $hash, 'state', 'inactive', 1 );
       Log3 $name, 3, "GroheOndusSmartBridge ($name) - disabled";
-    } elsif ( $cmd eq 'del' )
-    {
-      readingsSingleUpdate( $hash, 'state', 'active', 1 );
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - enabled";
-    }
-  }
 
-  # Attribute "disabledForIntervals"
-  elsif ( $attrName eq 'disabledForIntervals' )
-  {
-    if ( $cmd eq 'set' )
-    {
-      return "check disabledForIntervals Syntax HH:MM-HH:MM or 'HH:MM-HH:MM HH:MM-HH:MM ...'"
-        unless ( $attrVal =~ /^((\d{2}:\d{2})-(\d{2}:\d{2})\s?)+$/ );
+      GroheOndusSmartBridge_TimerRemove($hash);
 
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - disabledForIntervals";
-    } elsif ( $cmd eq 'del' )
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', 'inactive', 1 );
+      readingsEndUpdate( $hash, 1 );
+    } 
+    else #elsif ( $cmd eq 'del' )
     {
-      readingsSingleUpdate( $hash, 'state', 'active', 1 );
       Log3 $name, 3, "GroheOndusSmartBridge ($name) - enabled";
+
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', 'active', 1 );
+      readingsEndUpdate( $hash, 1 );
+      
+      GroheOndusSmartBridge_TimerExecute($hash);      
     }
   }
 
@@ -341,52 +340,62 @@ sub Attr(@)
   {
     if ( $cmd eq 'set' )
     {
-      RemoveInternalTimer($hash);
-
       return 'Interval must be greater than 0'
         unless ( $attrVal > 0 );
 
+      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - set interval: $attrVal";
+
+      GroheOndusSmartBridge_TimerRemove($hash);
+
       $hash->{INTERVAL} = $attrVal;
 
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - set interval: $attrVal";
-    } elsif ( $cmd eq 'del' )
+      GroheOndusSmartBridge_TimerExecute($hash);      
+    } 
+    elsif ( $cmd eq 'del' )
     {
-      RemoveInternalTimer($hash);
-      $hash->{INTERVAL} = 60;
+      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - delete User interval and set default: $DefaultInterval";
 
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - delete User interval and set default: 60";
+      GroheOndusSmartBridge_TimerRemove($hash);
+    
+      $hash->{INTERVAL} = $DefaultInterval;
+
+      GroheOndusSmartBridge_TimerExecute($hash);      
     }
   }
 
-  # Attribute "groheOndusBaseURL"
-  elsif ( $attrName eq 'groheOndusBaseURL' )
+  # Attribute "debug"
+  elsif ( $attrName eq 'debug' )
   {
-    if ( $cmd eq 'set' )
+    if ( $cmd eq 'set')
     {
-      $hash->{BASEURL} = $attrVal;
-      $hash->{URL}     = $hash->{BASEURL} . $hash->{APIVERSION};
+      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - debugging enabled";
 
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - set groheOndusBaseURL to: $attrVal";
-    } elsif ( $cmd eq 'del' )
+      $hash->{helper}{DEBUG} = $attrVal;
+      GroheOndusSmartBridge_Debug_Update($hash);
+    } 
+    elsif ( $cmd eq 'del' )
     {
-      $hash->{BASEURL} = 'https://idp2-apigw.cloud.grohe.com';
-      $hash->{URL}     = $hash->{BASEURL} . $hash->{APIVERSION};
+      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - debugging disabled";
+
+      $hash->{helper}{DEBUG} = '0';
+      GroheOndusSmartBridge_Debug_Update($hash);
     }
   }
 
-  # Attribute "groheOndusApiVersion"
-  elsif ( $attrName eq 'groheOndusApiVersion' )
+  # Attribute "groheOndusAccountEmail"
+  elsif ( $attrName eq 'groheOndusAccountEmail' )
   {
-    if ( $cmd eq 'set' )
+    if ( $cmd eq 'set')
     {
-      $hash->{APIVERSION} = $attrVal;
-      $hash->{URL}        = $hash->{BASEURL} . $hash->{APIVERSION};
+      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - AccountEmail set to \'$attrVal\'";
 
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - set groheOndusApiVersion to: $attrVal";
-    } elsif ( $cmd eq 'del' )
+      GroheOndusSmartBridge_TimerExecute($hash);      
+    } 
+    elsif ( $cmd eq 'del' )
     {
-      $hash->{APIVERSION} = '/v3';
-      $hash->{URL}        = $hash->{BASEURL} . $hash->{APIVERSION};
+      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - AccountEmail deleted";
+
+      GroheOndusSmartBridge_TimerRemove($hash);
     }
   }
 
@@ -395,7 +404,7 @@ sub Attr(@)
 
 #####################################
 # Notify( $hash, $dev )
-sub Notify($$)
+sub GroheOndusSmartBridge_Notify($$)
 {
   my ( $hash, $dev ) = @_;
   my $name = $hash->{NAME};
@@ -410,62 +419,86 @@ sub Notify($$)
   return
     if ( !$events );
 
-  Log3 $name, 4, "GroheOndusSmartBridge ($name) - Notify";
+  Log3 $name, 4, "GroheOndusSmartBridge_Notify($name) - DevType: \'$devtype\'";
 
   # process 'global' events
-  if (
-    ( $devtype eq 'Global' and ( grep /^INITIALIZED$/, @{$events} or grep /^REREADCFG$/, @{$events} or grep /^DEFINED.$name$/, @{$events} or grep /^MODIFIED.$name$/, @{$events} or grep /^ATTR.$name.groheOndusAccountEmail.+/, @{$events} ) )
-    or ( $devtype eq 'GroheOndusSmartBridge'
-      and ( grep /^groheOndusAccountPassword.+/, @{$events} or ReadingsVal( '$devname', 'token', '' ) eq 'none' ) )
-    )
-  {
-    getToken($hash);
-  }
+  if ( $devtype eq 'Global')
+  { 
+    if ( grep /^INITIALIZED$/, @{$events} )
+    {
+      # this is the initial call after fhem has startet
+      Log3 $name, 3, "GroheOndusSmartBridge_Notify($name) - INITIALIZED";
 
-  # process 'global' events
-  if (  $devtype eq 'Global'
-    and $init_done
-    and ( grep /^DELETEATTR.$name.disable$/, @{$events} or grep /^ATTR.$name.disable.0$/, @{$events} or grep /^DELETEATTR.$name.interval$/, @{$events} or grep /^ATTR.$name.interval.[0-9]+/, @{$events} ) )
-  {
-#    getDevices($hash);
-    getToken($hash);
-  }
+      GroheOndusSmartBridge_TimerExecute( $hash );
+    }
 
+    elsif ( grep /^REREADCFG$/, @{$events} )
+    {
+      Log3 $name, 3, "GroheOndusSmartBridge_Notify($name) - REREADCFG";
+
+      GroheOndusSmartBridge_TimerExecute( $hash );
+    }
+
+    elsif ( grep /^DEFINED.$name$/, @{$events} )
+    {
+      Log3 $name, 3, "GroheOndusSmartBridge_Notify($name) - DEFINED";
+
+      GroheOndusSmartBridge_TimerExecute( $hash );
+    }
+
+    elsif ( grep /^MODIFIED.$name$/, @{$events} )
+    {
+      Log3 $name, 3, "GroheOndusSmartBridge_Notify($name) - MODIFIED";
+
+      GroheOndusSmartBridge_TimerExecute( $hash );
+    }
+
+    if ($init_done)
+    {
+    }
+  }
+  
   # process internal events
-  if ( $devtype eq 'GroheOndusSmartBridge'
-    and ( grep /^state:.connected.to.cloud$/, @{$events} or grep /^lastRequestState:.request_error$/, @{$events} ) )
+  elsif ( $devtype eq 'GroheOndusSmartBridge' ) 
   {
-    # initial load of the timer on state changed to "connected to cloud"
-    # after interval
-    InternalTimer( gettimeofday() + $hash->{INTERVAL}, \&timer, $hash );
   }
-
+  
   return;
 }
 
 #####################################
-sub Set($@)
+sub GroheOndusSmartBridge_Set($@)
 {
   my ( $hash, $name, $cmd, @args ) = @_;
 
-  Log3 $name, 4, "GroheOndusSmartBridge ($name) - Set was called cmd: $cmd";
+  Log3 $name, 4, "GroheOndusSmartBridge_Set($name) - Set was called cmd: >>$cmd<<";
 
-  if ( lc $cmd eq 'getdevicesstate' )
+  ### Command 'getdevicesstate'
+  if ( lc $cmd eq 'update' )
   {
-    getDevices($hash);
-  } elsif ( lc $cmd eq 'gettoken' )
+    GroheOndusSmartBridge_GetDevices($hash);
+  }
+  ### Command 'getdevicesstate'
+  elsif ( lc $cmd eq 'getdevicesstate' )
+  {
+    GroheOndusSmartBridge_GetDevices($hash);
+  }
+  ### Command 'login'
+  elsif ( lc $cmd eq 'login' )
   {
     return "please set Attribut groheOndusAccountEmail first"
       if ( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) eq 'none' );
 
     return "please set groheOndusAccountPassword first"
-      if ( not defined( ReadPassword($hash) ) );
+      if ( not defined( GroheOndusSmartBridge_ReadPassword($hash) ) );
 
     #return "token is up to date"
-    #  if ( defined( $hash->{helper}{access_token} ) );
+    #  if ( defined( $hash->{helper}{refresh_token} ) );
 
-    getToken($hash);
-  } elsif ( lc $cmd eq 'groheondusaccountpassword' )
+    GroheOndusSmartBridge_Login($hash);
+  }
+  ###  Command 'groheondusaccountpassword'
+  elsif ( lc $cmd eq 'groheondusaccountpassword' )
   {
     return "please set Attribut groheOndusAccountEmail first"
       if ( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) eq 'none' );
@@ -474,23 +507,39 @@ sub Set($@)
       if ( @args != 1 );
 
     my $passwd = join( ' ', @args );
-    StorePassword( $hash, $passwd );
-  } elsif ( lc $cmd eq 'deleteaccountpassword' )
+    GroheOndusSmartBridge_StorePassword( $hash, $passwd );
+  } 
+  ### Command 'deleteaccountpassword'
+  elsif ( lc $cmd eq 'deleteaccountpassword' )
   {
     return "usage: $cmd <password>"
       if ( @args != 0 );
 
-    DeletePassword($hash);
-  } else
+    GroheOndusSmartBridge_DeletePassword($hash);
+  } 
+  ### Command 'clearreadings'
+  elsif ( lc $cmd eq 'clearreadings' )
   {
-    my $list = "getDevicesState:noArg getToken:noArg"
-      if ( defined( ReadPassword($hash) ) );
+    fhem("deletereading $name .*", 1);
+  }
+  else
+  {
+  	my $isPasswordSet = defined( GroheOndusSmartBridge_ReadPassword($hash) );
+  	my $list = "";
+  	
+    $list .= "update:noArg "
+      if ( $isPasswordSet );
 
-    $list .= " groheOndusAccountPassword"
-      if ( not defined( ReadPassword($hash) ) );
+    $list .= "getDevicesState:noArg login:noArg "
+      if ( $isPasswordSet and $hash->{helper}{DEBUG} != 0);
 
-    $list .= " deleteAccountPassword:noArg"
-      if ( defined( ReadPassword($hash) ) );
+    $list .= "groheOndusAccountPassword "
+      if ( not $isPasswordSet );
+
+    $list .= "deleteAccountPassword:noArg "
+      if ( $isPasswordSet );
+
+    $list .= 'clearreadings:noArg ';
 
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -498,91 +547,1245 @@ sub Set($@)
 }
 
 #####################################
-# getToken( $hash )
-sub getToken($)
+sub GroheOndusSmartBridge_TimerExecute($)
 {
-  my $hash = shift;
+  my ( $hash ) = @_;
   my $name = $hash->{NAME};
 
-  return readingsSingleUpdate( $hash, 'state', 'please set Attribut groheOndusAccountEmail first', 1 )
-    if ( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) eq 'none' );
+  return
+    if(!$init_done);
 
-  return readingsSingleUpdate( $hash, 'state', 'please set grohe account password first', 1 )
-    if ( not defined( ReadPassword($hash) ) );
+  GroheOndusSmartBridge_TimerRemove($hash);
 
-  readingsSingleUpdate( $hash, 'state', 'get token', 1 );
+  Log3 $name, 4, "GroheOndusSmartBridge_TimerExecute($name)";
+  
+  if ( not IsDisabled($name) )
+  {
+    GroheOndusSmartBridge_GetDevices($hash);
+
+    # reload timer
+    my $nextTimer = gettimeofday() + $hash->{INTERVAL};
+    $hash->{NEXTTIMER} = strftime($TimeStampFormat, localtime($nextTimer));
+    InternalTimer( $nextTimer, \&GroheOndusSmartBridge_TimerExecute, $hash );
+  }
+}
+
+#####################################
+sub GroheOndusSmartBridge_TimerRemove($)
+{
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  
+  return
+    if(!$init_done);
+
+  Log3 $name, 4, "GroheOndusSmartBridge_TimerRemove($name)";
+  
+  $hash->{NEXTTIMER} = "none";
+  RemoveInternalTimer($hash);
+}
+
+#####################################
+#
+sub GroheOndusSmartBridge_Debug_Update($)
+{
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 5, "GroheOndusSmartBridge_Debug_Update($name)";
+  
+  if( $hash->{helper}{DEBUG} eq '1')
+  {
+    $hash->{DEBUG_WRITEMETHOD} = $hash->{helper}{WRITEMETHOD};
+    $hash->{DEBUG_WRITEURL} = $hash->{helper}{WRITEURL};
+    $hash->{DEBUG_WRITEHEADER} = $hash->{helper}{WRITEHEADER};
+    $hash->{DEBUG_WRITEPAYLOAD} = $hash->{helper}{WRITEPAYLOAD};
+    $hash->{DEBUG_WRITEHTTPVERSION} = $hash->{helper}{WRITEHTTPVERSION};
+    $hash->{DEBUG_WRITEIGNOREREDIRECTS} = $hash->{helper}{WRITEIGNOREREDIRECTS};
+    $hash->{DEBUG_WRITEKEEPALIVE} = $hash->{helper}{WRITEKEEPALIVE};
+  	
+    $hash->{DEBUG_refresh_token} = $hash->{helper}{refresh_token};
+    $hash->{DEBUG_access_token} = $hash->{helper}{access_token};
+    $hash->{DEBUG_expires_in} = $hash->{helper}{expires_in};
+    $hash->{DEBUG_token_type} = $hash->{helper}{token_type};
+    $hash->{DEBUG_id_token} = $hash->{helper}{id_token};
+    $hash->{"DEBUG_not-before-policy"} = $hash->{helper}{"not-before-policy"};
+    $hash->{DEBUG_session_state} = $hash->{helper}{session_state};
+    $hash->{DEBUG_scope} = $hash->{helper}{scope};
+    $hash->{DEBUG_tandc_accepted} = $hash->{helper}{tandc_accepted};
+    $hash->{DEBUG_partialLogin} = $hash->{helper}{partialLogin};
+    
+    $hash->{DEBUG_LOGIN_NEXTTIMESTAMP} = $hash->{helper}{LoginNextTimeStamp};
+    $hash->{DEBUG_LOGIN_NEXTTIMESTAMPAT} = $hash->{helper}{LoginNextTimeStampAt};
+    $hash->{DEBUG_LOGIN_COUNTER} = $hash->{helper}{LoginCounter};
+    $hash->{DEBUG_LOGIN_COUNTER_ERROR} = $hash->{helper}{LoginErrCounter};
+  }
+  else
+  {
+    delete $hash->{DEBUG_WRITEMETHOD};
+    delete $hash->{DEBUG_WRITEURL};
+    delete $hash->{DEBUG_WRITEHEADER};
+    delete $hash->{DEBUG_WRITEPAYLOAD};
+    delete $hash->{DEBUG_WRITEHTTPVERSION};
+    delete $hash->{DEBUG_WRITEIGNOREREDIRECTS};
+    delete $hash->{DEBUG_WRITEKEEPALIVE};
+
+    delete $hash->{DEBUG_refresh_token};
+    delete $hash->{DEBUG_access_token};
+    delete $hash->{DEBUG_expires_in};
+    delete $hash->{DEBUG_token_type};
+    delete $hash->{DEBUG_id_token};
+    delete $hash->{"DEBUG_not-before-policy"};
+    delete $hash->{DEBUG_session_state};
+    delete $hash->{DEBUG_scope};
+    delete $hash->{DEBUG_tandc_accepted};
+    delete $hash->{DEBUG_partialLogin};
+
+    delete $hash->{DEBUG_LOGIN_NEXTTIMESTAMP};
+    delete $hash->{DEBUG_LOGIN_NEXTTIMESTAMPAT};
+    delete $hash->{DEBUG_LOGIN_COUNTER};
+    delete $hash->{DEBUG_LOGIN_COUNTER_ERROR};
+  }
+}
+
+#####################################
+# Login( $hash )
+sub GroheOndusSmartBridge_Connect($;$$)
+{
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+  my $now = gettimeofday();
+  my $message = "";
+  
+  Log3 $name, 4, "GroheOndusSmartBridge_Connect($name)";
+
+  # no valid AccessToken
+  if( !defined( $hash->{helper}{access_token}) or
+    $hash->{helper}{access_token} eq "none" )
+  {
+  	$message = "No valid AccessToken";
+  }
+  # token has expired
+  elsif(!defined($hash->{helper}{LoginNextTimeStamp}) or
+    $now >= $hash->{helper}{LoginNextTimeStamp})
+  {
+    $message = "AccessToken expired - Relogin needed";
+  }
+  
+  if( $message eq "")
+  {
+    # if there is a callback then call it
+    if( defined($callbackSuccess) )
+    {
+      Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - callbackSuccess";
+      $callbackSuccess->();
+    }
+  }
+  else
+  {
+  	Log3 $name, 3, "GroheOndusSmartBridge_Connect($name) - $message";
+  	
+    GroheOndusSmartBridge_Login($hash, $callbackSuccess, $callbackFail);
+  }
+}
+
+#####################################
+# Login( $hash )
+sub GroheOndusSmartBridge_ClearLogin($)
+{
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "GroheOndusSmartBridge_ClearLogin($name)";
+
+  readingsBeginUpdate($hash);
+  readingsBulkUpdateIfChanged( $hash, 'state', 'login cleared', 1 );
+  readingsEndUpdate( $hash, 1 );
 
   # clear $hash->{helper} to reset statemachines
-  delete $hash->{helper}{access_token}
-    if ( defined( $hash->{helper}{access_token} )
-    and $hash->{helper}{access_token} );
+  delete $hash->{helper}{refresh_token};
+  delete $hash->{helper}{access_token};
+  delete $hash->{helper}{expires_in};
+  delete $hash->{helper}{user_id};
+  delete $hash->{helper}{loginaddress};
+  delete $hash->{helper}{ondusaddress};
+  
+  delete $hash->{helper}{LoginNextTimeStamp};
+}
 
-  delete $hash->{helper}{user_id}
-    if ( defined( $hash->{helper}{user_id} )
-    and $hash->{helper}{user_id} );
+#####################################
+# Login( $hash )
+sub GroheOndusSmartBridge_Login($;$$)
+{
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+  my $errorMsg = "";
 
-  delete $hash->{helper}{current_location_id}
-    if ( defined( $hash->{helper}{current_location_id} )
-    and $hash->{helper}{current_location_id} );
+  Log3 $name, 4, "GroheOndusSmartBridge_Login($name)";
 
-  delete $hash->{helper}{loginaddress}
-    if ( defined( $hash->{helper}{loginaddress} )
-    and $hash->{helper}{loginaddress} );
+  # Check for AccountEmail
+  if ( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) eq 'none' )
+  {
+    $errorMsg = 'please set Attribut groheOndusAccountEmail first';
+  }
+  # Check for Password
+  elsif(not defined( GroheOndusSmartBridge_ReadPassword($hash) ))
+  {
+    $errorMsg = 'please set grohe account password first';
+  }
 
-  delete $hash->{helper}{redirect}
-    if ( defined( $hash->{helper}{redirect} )
-    and $hash->{helper}{redirect} );
+  GroheOndusSmartBridge_ClearLogin($hash);
 
-  delete $hash->{helper}{ondusaddress}
-    if ( defined( $hash->{helper}{ondusaddress} )
-    and $hash->{helper}{ondusaddress} );
+  if($errorMsg eq "")
+  {
+  
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged( $hash, 'state', 'logging in', 1 );
+    readingsEndUpdate( $hash, 1 );
 
-  Log3 $name, 3, "GroheOndusSmartBridge ($name) - send credentials to fetch Token";
+    my $login_PostOndusAddress = sub { GroheOndusSmartBridge_Login_GetToken($hash, $callbackSuccess, $callbackFail); };
+    my $login_PostLoginAddress = sub { GroheOndusSmartBridge_Login_PostAddress($hash, $login_PostOndusAddress, $callbackFail); };
+    my $login_GetLoginAddress = sub { GroheOndusSmartBridge_Login_GetLoginAddress($hash, $login_PostLoginAddress, $callbackFail); };
+  
+    $login_GetLoginAddress->();
+  }
+  else
+  {
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
+    readingsEndUpdate( $hash, 1 );
+    
+    # if there is a callback then call it
+    if( defined($callbackFail) )
+    {
+      Log3 $name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail";
+      $callbackFail->();
+    }
+  }
+}
+
+#####################################
+# Login_GetLoginAddress( $hash )
+#####################################
+sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
+{
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name)";
+
+  # definition of the lambda function wich is called to process received data
+  my $resultCallback = sub 
+  {
+    my ( $callbackparam, $data, $errorMsg ) = @_;
+
+    if( $errorMsg eq "")
+    {
+      if ( $data =~ m/action=\"([^\"]*)\"/ )
+      {
+        # take first match
+        # -> action="https://idp2-apigw.cloud.grohe.com/v1/sso/auth/realms/idm-apigw/login-actions/authenticate?code=XXX;execution=XXX;client_id=iot&amp;tab_id=XXX
+        my $formTargetOf = decode_entities($1);
+        $hash->{helper}{loginaddress} = $formTargetOf;
+
+        Log3 $name, 5, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - Action\n$formTargetOf";
+
+        # find all "Set-Cookie" lines and create cookie header
+        GroheOndusSmartBridge_ProcessSetCookies( $hash, $callbackparam->{httpheader}, undef );
+      }
+      else
+      {
+        $hash->{helper}{loginaddress} = undef;
+
+        $errorMsg = "LOGIN_GETLOGINADDRESS: WRONG ADDRESS";
+      }
+    }
+
+    if( $errorMsg eq "" )
+    {
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - callbackSuccess";
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
+      readingsEndUpdate( $hash, 1 );
+
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - callbackFail";
+        $callbackFail->();
+      }
+    }
+  }; 
 
   # GET https://idp2-apigw.cloud.grohe.com/v3/iot/oidc/login HTTP/1.1
   # -> request is being redirected to:
   # GET https://idp2-apigw.cloud.grohe.com/v1/sso/auth/realms/idm-apigw/protocol/openid-connect/auth?redirect_uri=ondus://idp2-apigw.cloud.grohe.com/v3/iot/oidc/token&scope=openid&response_type=code&client_id=iot&state=f425421e-c03c-44d1-ae43-275c5ee94f81 HTTP/1.1
 
-  my $method = 'GET';
-  my $uri    = $hash->{URL} . '/iot/oidc/login';
-  my $header = "";
+  my $param = {};
+  $param->{method} = 'GET';
+  $param->{url} = $hash->{URL} . $LoginURL;
+  $param->{header} = "";
+  $param->{data} = "";
+  $param->{httpversion} = "1.1";
+  $param->{ignoreredirects} = 0;
+  $param->{keepalive} = 1;
 
-  # WebFormLogin( $hash, $ignoreredirects, $keepalive, $uri, $method, $header, $payload )
-  WebFormLogin( $hash, 0, 1, $uri, $method, $header, "" );
+  $param->{hash} = $hash;
+  $param->{resultCallback} = $resultCallback;
+
+  GroheOndusSmartBridge_RequestParam( $hash, $param );
 }
 
 #####################################
-# WebFormLogin( $hash, $ignoreredirects, $keepalive, $uri, $method, $header, $payload )
-sub WebFormLogin($@)
+# Login_PostAddress( $hash )
+#####################################
+sub GroheOndusSmartBridge_Login_PostAddress($;$$)
 {
-  my ( $hash, $ignoreredirects, $keepalive, $uri, $method, $header, $payload ) = @_;
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge ($name) - Send with\nURL: \"$uri\"\nMETHOD: $method\nHEADER:\n$header\nDATA:\n$payload\n";
+  Log3 $name, 4, "GroheOndusSmartBridge_Login_PostAddress($name)";
 
-  HttpUtils_NonblockingGet(
+  # definition of the lambda function wich is called to process received data
+  my $resultCallback = sub 
+  {
+    my ( $callbackparam, $data, $errorMsg ) = @_;
+
+    Log3 $name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login\n$callbackparam->{httpheader}";
+
+    if( $errorMsg eq "" )
     {
-      url             => $uri,
-      timeout         => 15,
-      hash            => $hash,
-      data            => $payload,
-      method          => $method,
-      header          => $header,
-      ignoreredirects => $ignoreredirects,
-      keepalive       => $keepalive,
-      httpversion     => "1.1",
-      compress        => 0,
-      doTrigger       => 1,
-      callback        => \&WebFormErrorHandling
+      # find Location-entry in header
+      if ( $callbackparam->{httpheader} =~ m/Location: ondus:([^\"]*)\n/ )
+      {
+        # take first match and replace "Location: ondus:" with "https:"
+        my $location = "https:" . $1;
+
+        # remove last trailing newline
+        $location =~ s/\r|\n//g;
+
+        Log3 $name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login Location\n\"$location\"";
+        $hash->{helper}{ondusaddress} = $location;
+
+        # find all "Set-Cookie" lines and create cookie header
+        GroheOndusSmartBridge_ProcessSetCookies($hash, $callbackparam->{httpheader}, "AWSALB");
+        #GroheOndusSmartBridge_ProcessSetCookies( $hash, $callbackparam->{httpheader}, undef );
+      }
+      else
+      {
+        $hash->{helper}{ondusaddress} = undef;
+
+        $errorMsg = "LOGIN_POSTADDRESS: WRONG ADDRESS";
+      }
     }
-  );
+
+    if( $errorMsg eq "" )
+    {
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login_PostAddress($name) - callbackSuccess";
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
+      readingsEndUpdate( $hash, 1 );
+
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login_PostAddress($name) - callbackFail";
+        $callbackFail->();
+      }
+    }
+  }; 
+
+  my $param = {};
+  $param->{method} = 'POST';
+  $param->{url}    = $hash->{helper}{loginaddress};
+  $param->{header} = "Content-Type: application/x-www-form-urlencoded";
+  $param->{data} = "username=" . urlEncode( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) ) . "&password=" . urlEncode( GroheOndusSmartBridge_ReadPassword($hash) );
+  $param->{httpversion} = "1.1";
+  $param->{ignoreredirects} = 1;
+  $param->{keepalive} = 1;
+
+  $param->{hash} = $hash;
+  $param->{resultCallback} = $resultCallback;
+
+  GroheOndusSmartBridge_Header_AddCookies( $hash, $param );
+  GroheOndusSmartBridge_RequestParam( $hash, $param );
 }
 
 #####################################
-# WebFormErrorHandling( $param, $err, $data )
-sub WebFormErrorHandling($$$)
+# Login_GetToken( $hash )
+#####################################
+sub GroheOndusSmartBridge_Login_GetToken($;$$)
+{
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+
+  my $now = gettimeofday();
+  Log3 $name, 4, "GroheOndusSmartBridge_Login_GetToken($name)";
+
+  # definition of the lambda function wich is called to process received data
+  my $resultCallback = sub 
+  {
+    my ( $callbackparam, $data, $errorMsg ) = @_;
+
+    if( $errorMsg eq "" )
+    {
+      # {
+      #   "access_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      #   "expires_in":3600,
+      #   "refresh_expires_in":15552000,
+      #   "refresh_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      #   "token_type":"bearer",
+      #   "id_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      #   "not-before-policy":0,
+      #   "session_state":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      #   "scope":"",
+      #   "tandc_accepted":true,
+      #   "partialLogin":false
+      # }
+
+      # get json-structure from data-string
+      my $decode_json = eval { decode_json($data) };
+      if ($@)
+      {
+        Log3 $name, 3, "GroheOndusSmartBridge_Login_GetToken($name) - JSON error while request: $@";
+
+        if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
+        {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate( $hash, 'JSON_ERROR', $@, 1 );
+          readingsBulkUpdate( $hash, 'JSON_ERROR_STRING', '\'' . $data . '\'', 1 );
+          readingsEndUpdate( $hash, 1 );
+        }
+
+        $errorMsg = "JSON_ERROR";
+      }
+      elsif ( ref($decode_json) eq 'HASH' and
+        defined( $decode_json->{refresh_token} ) )
+      {
+        $hash->{helper}{refresh_token} = $decode_json->{refresh_token};
+        $hash->{helper}{access_token} = $decode_json->{access_token};
+        $hash->{helper}{expires_in} = $decode_json->{expires_in};
+        $hash->{helper}{token_type} = $decode_json->{token_type};
+        $hash->{helper}{id_token} = $decode_json->{id_token};
+        $hash->{helper}{"not-before-policy"} = $decode_json->{"not-before-policy"};
+        $hash->{helper}{session_state} = $decode_json->{session_state};
+        $hash->{helper}{scope} = $decode_json->{scope};
+        $hash->{helper}{tandc_accepted} = $decode_json->{tandc_accepted};
+        $hash->{helper}{partialLogin} = $decode_json->{partialLogin};
+
+        my $loginNextTimeStamp = $now + $decode_json->{expires_in} + $ReloginOffset_s;
+        $hash->{helper}{LoginNextTimeStamp} = $loginNextTimeStamp; 
+        $hash->{helper}{LoginNextTimeStampAt} = strftime($TimeStampFormat, localtime($loginNextTimeStamp));
+        $hash->{helper}{LoginCounter}++;
+        
+        Log3 $name, 5, "GroheOndusSmartBridge_Login_GetToken($name) - RefreshToken\n$hash->{helper}{refresh_token}";
+
+        # find all "Set-Cookie" lines and create cookie header
+        #ProcessSetCookies($hash, $param->{httpheader}, "AWSALB");
+        GroheOndusSmartBridge_ProcessSetCookies( $hash, $callbackparam->{httpheader}, undef );
+      }
+      else
+      {
+        $hash->{helper}{refresh_token} = undef;
+        $hash->{helper}{access_token} = undef;
+        $hash->{helper}{expires_in} = undef;
+        $hash->{helper}{token_type} = undef;
+        $hash->{helper}{id_token} = undef;
+        $hash->{helper}{"not-before-policy"} = undef;
+        $hash->{helper}{session_state} = undef;
+        $hash->{helper}{scope} = undef;
+        $hash->{helper}{tandc_accepted} = undef;
+        $hash->{helper}{partialLogin} = undef;
+
+        my $loginNextTimeStamp = $now;
+        $hash->{helper}{LoginNextTimeStamp} = $loginNextTimeStamp; 
+        $hash->{helper}{LoginNextTimeStampAt} = strftime($TimeStampFormat, localtime($loginNextTimeStamp));
+        $hash->{helper}{LoginErrCounter}++;
+
+        $errorMsg = "LOGIN_GETTOKEN: WRONG JSON STRUCTURE";
+      }
+
+      GroheOndusSmartBridge_Debug_Update($hash);
+    }
+
+    if( $errorMsg eq "" )
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', 'logged in', 1 );
+      readingsEndUpdate( $hash, 1 );
+
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login_GetToken($name) - callbackSuccess";
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
+      readingsEndUpdate( $hash, 1 );
+      
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login_GetToken($name) - callbackFail";
+        $callbackFail->();
+      }
+    }
+  }; 
+
+  my $param = {};
+  $param->{method} = 'GET';
+  $param->{url}    = $hash->{helper}{ondusaddress};
+  $param->{header} = "";
+  $param->{httpversion} = "1.1";
+  $param->{ignoreredirects} = 0;
+  $param->{keepalive} = 1;
+
+  $param->{hash} = $hash;
+  $param->{resultCallback} = $resultCallback;
+
+  GroheOndusSmartBridge_Header_AddCookies( $hash, $param );
+  GroheOndusSmartBridge_RequestParam( $hash, $param );
+}
+
+#####################################
+# Login_Refresh( $hash )
+#####################################
+sub GroheOndusSmartBridge_Login_Refresh($;$$)
+{
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "GroheOndusSmartBridge_Login_Refresh($name)";
+
+  # definition of the lambda function wich is called to process received data
+  my $resultCallback = sub 
+  {
+    my ( $callbackparam, $data, $errorMsg ) = @_;
+
+    if( $errorMsg eq "" )
+    {
+      # {
+      #   "access_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      #   "expires_in":3600,
+      #   "refresh_expires_in":15552000,
+      #   "refresh_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      #   "token_type":"bearer",
+      #   "id_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      #   "not-before-policy":0,
+      #   "session_state":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      #   "scope":"",
+      #   "tandc_accepted":true
+      # }
+
+      # get json-structure from data-string
+      my $decode_json = eval { decode_json($data) };
+      if ($@)
+      {
+        Log3 $name, 3, "GroheOndusSmartBridge_Login_Refresh($name) - JSON error while request: $@";
+
+        if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
+        {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate( $hash, 'JSON_ERROR', $@, 1 );
+          readingsBulkUpdate( $hash, 'JSON_ERROR_STRING', '\'' . $data . '\'', 1 );
+          readingsEndUpdate( $hash, 1 );
+        }
+        $errorMsg = "JSON_ERROR";
+      }
+      elsif ( ref($decode_json) eq 'HASH' and
+        defined( $decode_json->{access_token} ) )
+      {
+        $hash->{helper}{access_token} = $decode_json->{access_token};
+        $hash->{helper}{expires_in} = $decode_json->{expires_in};
+        $hash->{helper}{refresh_expires_in} = $decode_json->{refresh_expires_in};
+        $hash->{helper}{refresh_token} = $decode_json->{refresh_token};
+        $hash->{helper}{token_type} = $decode_json->{token_type};
+        $hash->{helper}{id_token} = $decode_json->{id_token};
+        $hash->{helper}{"not-before-policy"} = $decode_json->{"not-before-policy"};
+        $hash->{helper}{session_state} = $decode_json->{session_state};
+        $hash->{helper}{scope} = $decode_json->{scope};
+        $hash->{helper}{tandc_accepted} = $decode_json->{tandc_accepted};
+
+        Log3 $name, 5, "GroheOndusSmartBridge_Login_Refresh($name) - RefreshToken\n$hash->{helper}{refresh_token}";
+
+        # find all "Set-Cookie" lines and create cookie header
+        #ProcessSetCookies($hash, $callbackparam->{httpheader}, "AWSALB");
+        ProcessSetCookies( $hash, $callbackparam->{httpheader}, undef );
+      }
+      else
+      {
+        $hash->{helper}{access_token} = undef;
+        $hash->{helper}{expires_in} = undef;
+        $hash->{helper}{refresh_expires_in} = undef;
+        $hash->{helper}{refresh_token} = undef;
+        $hash->{helper}{token_type} = undef;
+        $hash->{helper}{id_token} = undef;
+        $hash->{helper}{"not-before-policy"} = undef;
+        $hash->{helper}{session_state} = undef;
+        $hash->{helper}{scope} = undef;
+        $hash->{helper}{tandc_accepted} = undef;
+
+        $errorMsg = "LOGIN_REFRESH: WRONG JSON STRUCTURE";
+      }
+
+      GroheOndusSmartBridge_Debug_Update( $hash );
+    }
+
+    if( $errorMsg eq "" )
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', 'logged in', 1 );
+      readingsEndUpdate( $hash, 1 );
+
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login_Refresh($name) - callbackSuccess";
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
+      readingsEndUpdate( $hash, 1 );
+      
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login_Refresh($name) - callbackFail";
+        $callbackFail->();
+      }
+    }
+  }; 
+
+  my $jsondata = { 'refresh_token' => $hash->{helper}{refresh_token} };
+
+  my $param = {};
+  $param->{method} = 'POST';
+  $param->{url}    = $hash->{URL} . '/iot/oidc/refresh';
+  $param->{header} = "Content-Type: application/json; charset=utf-8";
+  $param->{data} = encode_json($jsondata);
+  $param->{httpversion} = "1.1";
+  $param->{ignoreredirects} = 0;
+  $param->{keepalive} = 1;
+
+  $param->{hash} = $hash;
+  $param->{resultCallback} = $resultCallback;
+
+  GroheOndusSmartBridge_Header_AddCookies( $hash, $param );
+  GroheOndusSmartBridge_RequestParam( $hash, $param );
+}
+
+#####################################
+sub GroheOndusSmartBridge_GetDevices($;$$)
+{
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "GroheOndusSmartBridge_GetDevices($name) - fetch device list and device states";
+
+  $hash->{helper}{CountAppliances} = 0;
+  $hash->{helper}{CountRooms} = 0;
+  $hash->{helper}{CountLocations} = 0;
+
+  my $getAppliances = sub { GroheOndusSmartBridge_GetAppliances($hash, $_[0], $_[1], $callbackSuccess, $callbackFail); };
+  my $getRooms = sub { GroheOndusSmartBridge_GetRooms($hash, $_[0], $getAppliances, $callbackFail); };
+  my $getLocations = sub { GroheOndusSmartBridge_GetLocations($hash, $getRooms, $callbackFail); };
+  my $connect = sub { GroheOndusSmartBridge_Connect($hash, $getLocations, $callbackFail); };
+  $connect->();
+}
+
+#####################################
+# GetLocations( $hash )
+#####################################
+sub GroheOndusSmartBridge_GetLocations($;$$)
+{
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "GroheOndusSmartBridge_GetLocations($name)";
+
+  # definition of the lambda function wich is called to process received data
+  my $resultCallback = sub 
+  {
+    my ( $callbackparam, $data, $errorMsg ) = @_;
+
+    if( $errorMsg eq "")
+    {
+      my $decode_json = eval { decode_json($data) };
+      if ($@)
+      {
+        Log3 $name, 3, "GroheOndusSmartBridge_GetLocations($name) - JSON error while request: $@";
+
+        if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
+        {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate( $hash, 'JSON_ERROR', $@, 1 );
+          readingsBulkUpdate( $hash, 'JSON_ERROR_STRING', '\'' . $data . '\'', 1 );
+          readingsEndUpdate( $hash, 1 );
+        }
+        $errorMsg = "GETLOCATIONS: JSON_ERROR";
+      }
+      # locations
+      elsif ( ref($decode_json) eq "ARRAY"
+        and scalar( @{$decode_json} ))
+      {
+        #[
+        #   {
+        #       "id":48434,
+        #       "name":"Haus",
+        #       "type":2,
+        #       "role":"owner",
+        #       "timezone":"Europe/Berlin",
+        #       "water_cost":-1,
+        #       "energy_cost":-1,
+        #       "heating_type":-1,
+        #       "currency":"EUR",
+        #       "default_water_cost":0.004256,
+        #       "default_energy_cost":0.003977,
+        #       "default_heating_type":2,
+        #       "emergency_shutdown_enable":true,
+        #       "address":
+        #       {
+        #           "street":"Straße 5",
+        #           "city":"Dorf",
+        #           "zipcode":"123456",
+        #           "housenumber":"",
+        #           "country":"Deutschland",
+        #           "country_code":"DE",
+        #           "additionalInfo":""
+        #       }
+        #   }
+        #]
+
+        foreach my $location ( @{$decode_json} )
+        {
+          $hash->{helper}{CountLocations}++;
+
+          # fetch rooms within current location
+          #Write( $hash, undef, undef, 'smartbridge' );
+
+          # if there is a callback then call it
+          if( defined($callbackSuccess) )
+          {
+            Log3 $name, 4, "GroheOndusSmartBridge_GetLocations($name) - callbackSuccess";
+            $callbackSuccess->($location->{id});
+          }
+        }
+
+        Log3 $name, 5, "GroheOndusSmartBridge_GetLocations($name) - locations count " . $hash->{helper}{CountLocations};
+
+        # update reading
+        readingsSingleUpdate( $hash, 'count_locations', $hash->{helper}{CountLocations}, 0 );
+      }
+      else
+      {
+        $errorMsg = "GETLOCATIONS: WRONG JSON STRUCTURE";
+      }
+    }
+    
+    if( $errorMsg eq "" )
+    {
+    }
+    else
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
+      readingsEndUpdate( $hash, 1 );
+      
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_GetLocations($name) - callbackFail";
+        $callbackFail->();
+      }
+    }
+  }; 
+
+  my $param = {};
+  $param->{method} = 'GET';
+  $param->{url}    = $hash->{URL} . '/iot/locations';
+  $param->{header} = "Content-Type: application/json";
+  $param->{data} = '{}';
+  $param->{httpversion} = "1.0";
+  $param->{ignoreredirects} = 0;
+  $param->{keepalive} = 1;
+
+  $param->{hash} = $hash;
+  $param->{resultCallback} = $resultCallback;
+
+  GroheOndusSmartBridge_Header_AddAuthorization( $hash, $param );
+  GroheOndusSmartBridge_RequestParam( $hash, $param );
+}
+
+#####################################
+# GetRooms( $hash )
+#####################################
+sub GroheOndusSmartBridge_GetRooms($$;$$)
+{
+  my ( $hash, $current_location_id, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "GroheOndusSmartBridge_GetRooms($name)";
+
+  # definition of the lambda function wich is called to process received data
+  my $resultCallback = sub 
+  {
+    my ( $callbackparam, $data, $errorMsg ) = @_;
+
+    if( $errorMsg eq "" )
+    {
+      my $decode_json = eval { decode_json($data) };
+      if ($@)
+      {
+        Log3 $name, 3, "GroheOndusSmartBridge_GetRooms($name) - JSON error while request: $@";
+
+        if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
+        {
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate( $hash, 'JSON_ERROR', $@, 1 );
+          readingsBulkUpdate( $hash, 'JSON_ERROR_STRING', '\'' . $data . '\'', 1 );
+          readingsEndUpdate( $hash, 1 );
+        }
+        $errorMsg = "GETROOMS: JSON_ERROR";
+      }
+      # rooms
+      elsif ( ref($decode_json) eq "ARRAY" and
+        scalar( @{$decode_json} ) > 0)
+      {
+        #[
+        #   {
+        #       "id":12345,
+        #       "name":"EG Küche",
+        #       "type":0,
+        #       "room_type":15,
+        #       "role":"owner"
+        #   }
+        #]
+
+        foreach my $room ( @{$decode_json} )
+        {
+          $hash->{helper}{CountRooms}++;
+
+          # fetch appliances within current room
+          #  Write( $hash, undef, undef, 'smartbridge' );
+
+          # if there is a callback then call it
+          if( defined($callbackSuccess) )
+          {
+            Log3 $name, 4, "GroheOndusSmartBridge_GetRooms($name) - GetLocations callbackSuccess";
+            $callbackSuccess->($current_location_id, $room->{id});
+          }
+        }
+
+        Log3 $name, 5, "GroheOndusSmartBridge ($name) - rooms count " . $hash->{helper}{CountRooms};
+
+        # update reading
+        readingsSingleUpdate( $hash, 'count_rooms', $hash->{helper}{CountRooms}, 0 );
+      }
+    }
+
+    if( $errorMsg eq "" )
+    {
+    }
+    else
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
+      readingsEndUpdate( $hash, 1 );
+      
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_GetRooms($name) - callbackFail";
+        $callbackFail->();
+      }
+    }
+  }; 
+
+  my $param = {};
+  $param->{method} = 'GET';
+  $param->{url}    = $hash->{URL} . '/iot/locations/' . $current_location_id . '/rooms';
+  $param->{header} = "Content-Type: application/json";
+  $param->{data} = '{}';
+  $param->{httpversion} = "1.0";
+  $param->{ignoreredirects} = 0;
+  $param->{keepalive} = 1;
+
+  $param->{hash} = $hash;
+  $param->{resultCallback} = $resultCallback;
+
+  GroheOndusSmartBridge_Header_AddAuthorization( $hash, $param );
+  GroheOndusSmartBridge_RequestParam( $hash, $param );
+}
+
+#####################################
+# GetAppliances( $hash )
+#####################################
+sub GroheOndusSmartBridge_GetAppliances($$$;$$)
+{
+  my ( $hash, $current_location_id, $current_room_id, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "GroheOndusSmartBridge_GetAppliances($name)";
+
+  # definition of the lambda function wich is called to process received data
+  my $resultCallback = sub 
+  {
+    my ( $callbackparam, $data, $errorMsg ) = @_;
+
+    my $decode_json = eval { decode_json($data) };
+    if ($@)
+    {
+      Log3 $name, 3, "GroheOndusSmartBridge_GetAppliances($name) - JSON error while request: $@";
+
+      if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
+      {
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate( $hash, 'JSON_ERROR', $@, 1 );
+        readingsBulkUpdate( $hash, 'JSON_ERROR_STRING', '\'' . $data . '\'', 1 );
+        readingsEndUpdate( $hash, 1 );
+      }
+      $errorMsg = "GETAPPLIANCES: JSON_ERROR";
+    }
+    # appliances
+    elsif ( ref($decode_json) eq "ARRAY"
+      and scalar( @{$decode_json} ) > 0 )
+    {
+      #[
+      #   {
+      #       "appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      #       "installation_date":"2001-01-30T00:00:00.000+00:00",
+      #       "name":"KG Vorratsraum - SenseGUARD",
+      #       "serial_number":"123456789012345678901234567890123456789012345678",
+      #       "type":103,
+      #       "version":"01.38.Z22.0400.0101",
+      #       "tdt":"2019-06-30T11:06:40.000+02:00",
+      #       "timezone":60,
+      #       "config":
+      #       {
+      #           "thresholds":
+      #           [
+      #               {
+      #                   "quantity":"flowrate",
+      #                   "type":"min",
+      #                   "value":3,
+      #                   "enabled":false
+      #               },
+      #               {
+      #                   "quantity":"flowrate",
+      #                   "type":"max",
+      #                   "value":50,
+      #                   "enabled":true
+      #               },
+      #               {
+      #                   "quantity":"pressure",
+      #                   "type":"min",
+      #                   "value":2,
+      #                   "enabled":false
+      #               },
+      #               {
+      #                   "quantity":"pressure",
+      #                   "type":"max",
+      #                   "value":8,
+      #                   "enabled":false
+      #               },
+      #               {
+      #                   "quantity":"temperature_guard",
+      #                   "type":"min",
+      #                   "value":5,
+      #                   "enabled":false
+      #               },
+      #               {
+      #                   "quantity":"temperature_guard",
+      #                   "type":"max",
+      #                   "value":45,
+      #                   "enabled":false
+      #               }
+      #           ],
+      #       "measurement_period":900,
+      #       "measurement_transmission_intervall":900,
+      #       "measurement_transmission_intervall_offset":1,
+      #       "action_on_major_leakage":1,
+      #       "action_on_minor_leakage":1,
+      #       "action_on_micro_leakage":0,
+      #       "monitor_frost_alert":true,
+      #       "monitor_lower_flow_limit":false,
+      #       "monitor_upper_flow_limit":true,
+      #       "monitor_lower_pressure_limit":false,
+      #       "monitor_upper_pressure_limit":false,
+      #       "monitor_lower_temperature_limit":false,
+      #       "monitor_upper_temperature_limit":false,
+      #       "monitor_major_leakage":true,
+      #       "monitor_minor_leakage":true,
+      #       "monitor_micro_leakage":true,
+      #       "monitor_system_error":false,
+      #       "monitor_btw_0_1_and_0_8_leakage":true,
+      #       "monitor_withdrawel_amount_limit_breach":true,
+      #       "detection_interval":11250,
+      #       "impulse_ignore":10,
+      #       "time_ignore":20,
+      #       "pressure_tolerance_band":10,
+      #       "pressure_drop":50,
+      #       "detection_time":30,
+      #       "action_on_btw_0_1_and_0_8_leakage":1,
+      #       "action_on_withdrawel_amount_limit_breach":1,
+      #       "withdrawel_amount_limit":300,
+      #       "sprinkler_mode_start_time":0,
+      #       "sprinkler_mode_stop_time":1439,
+      #       "sprinkler_mode_active_monday":false,
+      #       "sprinkler_mode_active_tuesday":false,
+      #       "sprinkler_mode_active_wednesday":false,
+      #       "sprinkler_mode_active_thursday":false,
+      #       "sprinkler_mode_active_friday":false,
+      #       "sprinkler_mode_active_saturday":false,
+      #       "sprinkler_mode_active_sunday":false},
+      #       "role":"owner",
+      #       "registration_complete":true,
+      #       "calculate_average_since":"2000-01-30T00:00:00.000Z"
+      #   },
+      #   {
+      #       "appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      #       "installation_date":"2001-01-30T00:00:00.000+00:00",
+      #       "name":"KG Vorratsraum Sense",
+      #       "serial_number":"123456789012345678901234567890123456789012345678",
+      #       "type":101,
+      #       "version":"1547",
+      #       "tdt":"2019-06-30T05:15:38.000+02:00",
+      #       "timezone":60,
+      #       "config":
+      #       {
+      #           "thresholds":
+      #           [
+      #               {
+      #                   "quantity":"temperature",
+      #                   "type":"min",
+      #                   "value":10,
+      #                   "enabled":true
+      #               },
+      #               {
+      #                   "quantity":"temperature",
+      #                   "type":"max",
+      #                   "value":35,
+      #                   "enabled":true
+      #               },
+      #               {
+      #                   "quantity":"humidity",
+      #                   "type":"min",
+      #                   "value":30,
+      #                   "enabled":true
+      #               },
+      #               {
+      #                   "quantity":"humidity",
+      #                   "type":"max",
+      #                   "value":65,
+      #                   "enabled":true
+      #               }
+      #           ]
+      #       },
+      #       "role":"owner",
+      #       "registration_complete":true
+      #   }
+      #]
+
+      foreach my $appliance ( @{$decode_json} )
+      {
+        $hash->{helper}{CountAppliances}++;
+
+        my $current_appliance_id = $appliance->{appliance_id};
+        my $current_type_id = $appliance->{type};
+        my $current_name = $appliance->{name};
+        
+        # save current appliance in list
+        $hash->{helper}{appliance_list}{ $current_appliance_id } = 
+        {
+          appliance_id => $current_appliance_id,
+          type_id => $current_type_id,
+          name     => $current_name,
+          location_id => $current_location_id,
+          room_id     => $current_room_id,
+          appliance   => encode_json($appliance),
+        };
+        
+        # to pass parameters to the underlying logical device
+        # the hash 'currentAppliance' is set for the moment
+        $hash->{currentAppliance} = 
+        {
+          appliance_id => $current_appliance_id,
+          type_id => $current_type_id,
+          name     => $current_name,
+          location_id => $current_location_id,
+          room_id     => $current_room_id,
+        };
+        
+        # dispatch to GroheOndusSmartDevice::Parse()
+        Dispatch( $hash, 'GROHEONDUSSMARTDEVICE_' . $current_appliance_id, undef );
+
+        # delete it again
+        delete $hash->{currentAppliance}; 
+      }
+
+      Log3 $name, 5, "GroheOndusSmartBridge_GetAppliances($name) - appliances count " . $hash->{helper}{CountAppliances};
+
+      readingsSingleUpdate( $hash, 'count_appliance', $hash->{helper}{CountAppliances}, 0 );
+    }
+    else
+    {
+      $errorMsg = "GETAPPLIANCES: WRONG JSON STRUCTURE";
+    }
+     
+    if( $errorMsg eq "" )
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', 'connected to cloud', 1 );
+      readingsEndUpdate( $hash, 1 );
+
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_GetAppliances($name) - callbackSuccess";
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      readingsBeginUpdate($hash);
+      readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
+      readingsEndUpdate( $hash, 1 );
+      
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_GetAppliances($name) - callbackFail";
+        $callbackFail->();
+      }
+    }
+  };
+  
+  my $param = {};
+  $param->{method} = 'GET';
+  $param->{url}    = $hash->{URL} . '/iot/locations/' . $current_location_id . '/rooms/' . $current_room_id . '/appliances';
+  $param->{header} = "Content-Type: application/json";
+  $param->{data} = '{}';
+  $param->{httpversion} = "1.0";
+  $param->{ignoreredirects} = 0;
+  $param->{keepalive} = 1;
+
+  $param->{hash} = $hash;
+  $param->{resultCallback} = $resultCallback;
+
+  GroheOndusSmartBridge_Header_AddAuthorization( $hash, $param );
+  GroheOndusSmartBridge_RequestParam( $hash, $param );
+}
+
+
+#####################################
+# Request( $hash, $resultCallback, $uri, $method, $header, $payload, $httpversion, $ignoreredirects, $keepalive )
+#####################################
+sub GroheOndusSmartBridge_RequestParam($$)
+{
+  my ( $hash, $param ) = @_;
+  my $name = $hash->{NAME};
+
+  Log3 $name, 4, "GroheOndusSmartBridge_RequestParam($name)";
+
+  my $sendReceive = undef; 
+  $sendReceive = sub ($;$)
+  {
+    my ( $leftRetries, $retryCallback ) = @_;
+    
+    my $request_id = ++$hash->{REQUESTID};
+    
+    ### limit request id
+    if($request_id >= 65536)
+    {
+      $hash->{REQUESTID} = 0;
+      $request_id = 0;
+    }
+
+    $param->{request_id} = $request_id;
+    $param->{request_timestamp} = gettimeofday();
+    $param->{leftRetries} = $leftRetries--;
+    $param->{retryCallback} = $sendReceive;
+
+    #{
+    #  hash            => $hash,
+    #  url             => $uri,
+    #  timeout         => $hash->{TIMEOUT},
+    #  data            => $payload,
+    #  method          => $method,
+    #  header          => $header,
+    #  ignoreredirects => $ignoreredirects,
+    #  keepalive       => $keepalive,
+    #  httpversion     => $httpversion, #"1.1",
+    #  compress        => 0,
+    #  doTrigger       => 1,
+    #  callback        => \&GroheOndusSmartBridge_RequestErrorHandling,
+
+    #  request_id => $request_id,
+    #  request_timestamp => $request_timestamp,
+          
+    #  leftRetries => $leftRetries,
+    #  retryCallback => $retryCallback,
+    #  resultCallback => $resultCallback,
+    #}
+    
+    HttpUtils_NonblockingGet($param);
+  };
+
+  $param->{compress} = 0;
+  $param->{doTrigger} = 1;
+  $param->{callback} = \&GroheOndusSmartBridge_RequestErrorHandling;
+
+  $hash->{helper}{WRITEMETHOD} = $param->{method};
+  $hash->{helper}{WRITEURL} = $param->{url};
+  $hash->{helper}{WRITEHEADER} = $param->{header};
+  $hash->{helper}{WRITEPAYLOAD} = $param->{payload};
+  $hash->{helper}{WRITEHTTPVERSION} = $param->{httpversion};
+  $hash->{helper}{WRITEIGNOREREDIRECTS} = $param->{ignoreredirects};
+  $hash->{helper}{WRITEKEEPALIVE} = $param->{keepalive};
+  
+  GroheOndusSmartBridge_Debug_Update($hash);
+  
+  $sendReceive->($hash->{RETRIES}, $sendReceive);
+}
+
+#####################################
+# RequestErrorHandling( $param, $err, $data )
+sub GroheOndusSmartBridge_RequestErrorHandling($$$)
 {
   my ( $param, $err, $data ) = @_;
+
+  my $request_id  = $param->{request_id};
+  my $leftRetries = $param->{leftRetries};
+  my $retryCallback = $param->{retryCallback};
+  my $resultCallback = $param->{resultCallback};
+
+  my $response_timestamp = gettimeofday();
+  my $request_timestamp = $param->{request_timestamp};
+  my $requestResponse_timespan = $response_timestamp - $request_timestamp;
+  my $errorMsg = "";
 
   my $hash  = $param->{hash};
   my $name  = $hash->{NAME};
@@ -593,323 +1796,86 @@ sub WebFormErrorHandling($$$)
 
   my $dname = $dhash->{NAME};
 
-  # Log3($name, 5, "GroheOndusSmartBridge ($name) - Result with CODE: $param->{code} DATA: $data");
+  Log3 $name, 4, "GroheOndusSmartBridge_RequestErrorHandling($name)";
 
-  # error
-  if ( defined($err) )
+  ### check error variable
+  if ( defined($err) and 
+    $err ne "" )
   {
-    if ( $err ne "" )
+    Log3 $name, 3, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: Error: " . $err . " data: \"" . $data . "\"";
+    
+    $errorMsg = 'error ' . $err;
+  }
+
+  ### check code
+  if ( $data eq "" and
+    exists( $param->{code} ) )
+  {
+    if( $param->{code} == 200 ) ###
     {
-      readingsBeginUpdate($dhash);
-
-      readingsBulkUpdate( $dhash, "state", "$err" )
-        if ( ReadingsVal( $dname, "state", 1 ) ne "initialized" );
-
-      readingsBulkUpdate( $dhash, "lastRequestState", "request_error", 1 );
-
-      if ( $err =~ /timed out/ )
-      {
-        Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: connect to grohe cloud is timed out. check network";
-      } elsif ( $err =~ /Keine Route zum Zielrechner/
-        or $err =~ /no route to target/ )
-      {
-        Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: no route to target. bad network configuration or network is down";
-      } else
-      {
-        Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: $err";
-      }
-
-      readingsEndUpdate( $dhash, 1 );
-
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: GroheOndusSmartBridge RequestErrorHandling: error while requesting grohe cloud: $err";
-
-      delete $dhash->{helper}{deviceAction}
-        if ( defined( $dhash->{helper}{deviceAction} ) );
-
-      return;
+    }
+    elsif( $param->{code} == 302 ) ###
+    {
+    }
+    elsif( $param->{code} == 403 ) ### Forbidden
+    {
+      $errorMsg = 'wrong password';
+      $leftRetries = 0; # no retry
+    }
+    elsif( $param->{code} == 503 ) ### Service Unavailable
+    {
+      $errorMsg = 'error ' . $param->{code};
+    }
+    else
+    {
+      $errorMsg = 'error ' . $param->{code};
     }
   }
 
-  # errorhandling
-  if (  $data eq ""
-    and exists( $param->{code} )
-    and $param->{code} != 200
-    and $param->{code} != 302 )
+  Log3 $name, 5, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: Code: " . $param->{code} . " data: \"" . $data . "\"";
+
+  ### no error: process response
+  if($errorMsg eq "")
   {
-    readingsBeginUpdate($dhash);
-    readingsBulkUpdate( $dhash, "state", $param->{code}, 1 )
-      if ( ReadingsVal( $dname, "state", 1 ) ne "initialized" );
+    my $retrystring = 'RESPONSECOUNT_RETRY_' . ($hash->{RETRIES} - $leftRetries);
+    $hash->{helper}{RESPONSECOUNT_SUCCESS}++;
+    $hash->{helper}{RESPONSETOTALTIMESPAN} += $requestResponse_timespan;
+    $hash->{helper}{RESPONSEAVERAGETIMESPAN} = $hash->{helper}{RESPONSETOTALTIMESPAN} / $hash->{helper}{RESPONSECOUNT_SUCCESS};
+    $hash->{helper}{$retrystring}++;
 
-    readingsBulkUpdateIfChanged( $dhash, "lastRequestState", "request_error", 1 );
-
-    if (  $param->{code} == 401
-      and $hash eq $dhash )
-    {
-      if ( ReadingsVal( $dname, 'token', 'none' ) eq 'none' )
-      {
-        readingsBulkUpdate( $dhash, "state", "no token available", 1 );
-        readingsBulkUpdateIfChanged( $dhash, "lastRequestState", "no token available", 1 );
-      }
-
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: " . $param->{code};
-    } elsif ( $param->{code} == 204
-      and $dhash ne $hash
-      and defined( $dhash->{helper}{deviceAction} ) )
-    {
-      readingsBulkUpdate( $dhash, "state", "the command is processed", 1 );
-
-      InternalTimer( gettimeofday() + 5, \&timer, $hash, 1 );
-    } elsif ( $param->{code} != 200 )
-    {
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: " . $param->{code};
-    }
-
-    readingsEndUpdate( $dhash, 1 );
-
-    Log3 $dname, 3, "GroheOndusSmartBridge ($dname) - RequestERROR: received http code " . $param->{code} . " without any data after requesting grohe cloud";
-
-    delete $dhash->{helper}{deviceAction}
-      if ( defined( $dhash->{helper}{deviceAction} ) );
-
-    return;
+    ### just copy from helper
+    $hash->{RESPONSECOUNT_SUCCESS} = $hash->{helper}{RESPONSECOUNT_SUCCESS};
+    $hash->{RESPONSEAVERAGETIMESPAN} = $hash->{helper}{RESPONSEAVERAGETIMESPAN};
+    $hash->{$retrystring} = $hash->{helper}{$retrystring};
   }
-
-  if ( $data =~ /Error/ )
+  ### error: retries left
+  elsif(defined($retryCallback) and # is retryCallbeck defined
+    $leftRetries > 0)               # are there any left retries
   {
-    readingsBeginUpdate($dhash);
+    Log3 $name, 5, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: retry " . $leftRetries . " Error: " . $errorMsg;
 
-    readingsBulkUpdate( $dhash, "state", $param->{code}, 1 )
-      if ( ReadingsVal( $dname, "state", 0 ) ne "initialized" );
-
-    readingsBulkUpdate( $dhash, "lastRequestState", "request_error", 1 );
-
-    if ( $param->{code} == 400 )
-    {
-      readingsBulkUpdate( $dhash, "lastRequestState", "Error 400 Bad Request", 1 );
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 400 Bad Request";
-    } elsif ( $param->{code} == 401 )
-    {
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 401 Unauthorized - The token was not validated by the Identity Provider";
-      readingsBulkUpdate( $dhash, "state",            "Unauthorized - The token was not validated by the Identity Provider",           1 );
-      readingsBulkUpdate( $dhash, "lastRequestState", "Error 401 Unauthorized - The token was not validated by the Identity Provider", 1 );
-
-    } elsif ( $param->{code} == 503 )
-    {
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 503 Service Unavailable";
-      readingsBulkUpdate( $dhash, "state",            "Service Unavailable",           1 );
-      readingsBulkUpdate( $dhash, "lastRequestState", "Error 503 Service Unavailable", 1 );
-
-    } elsif ( $param->{code} == 404 )
-    {
-      if ( defined( $dhash->{helper}{deviceAction} )
-        and $dhash ne $hash )
-      {
-        readingsBulkUpdate( $dhash, "state",            "device Id not found", 1 );
-        readingsBulkUpdate( $dhash, "lastRequestState", "device id not found", 1 );
-      }
-
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 404 Not Found";
-    } elsif ( $param->{code} == 500 )
-    {
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: check the ???";
-    } else
-    {
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: http error " . $param->{code};
-    }
-
-    readingsEndUpdate( $dhash, 1 );
-
-    Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: received http code " . $param->{code} . " receive Error after requesting grohe cloud";
-
-    delete $dhash->{helper}{deviceAction}
-      if ( defined( $dhash->{helper}{deviceAction} ) );
-
-    return;
+    ### call retryCallback with decremented number of left retries
+    $retryCallback->($leftRetries - 1, $retryCallback);
+    return; # resultCallback is handled in retry 
   }
-
-  # no error: process response
-  WebFormResponseProcessing( $param, $data );
-}
-
-#####################################
-# WebFormResponseProcessing( $param, $data )
-sub WebFormResponseProcessing($$)
-{
-  my ( $param, $data ) = @_;
-
-  my $hash = $param->{hash};
-  my $name = $hash->{NAME};
-
-  if ($@)
+  else
   {
-    Log3 $name, 3, "GroheOndusSmartBridge ($name) - error while request: $@";
+    Log3 $name, 3, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: no retries left Error: " . $errorMsg;
+
+    $hash->{helper}{RESPONSECOUNT_ERROR}++;
+    $hash->{RESPONSECOUNT_ERROR} = $hash->{helper}{RESPONSECOUNT_ERROR};
+
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
+    readingsEndUpdate( $hash, 1 );
   }
-
-  # State-Machine WebFormLogin
-  # The different states are set by defined entries in $hash->{helper}.
-  # The State-Machine is resetted in methode getToken bei deleting the entries.
-
-  # response of: POST /v3/iot/oidc/refresh HTTP/1.1
-  if ( defined( $hash->{helper}{access_token} ) )
+  
+    # is there a callback function?
+  if(defined($resultCallback))
   {
-    # get json-structure from data-string
-    my $decode_json = eval { decode_json($data) };
-
-    # {
-    #	"access_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    #	"expires_in":3600,
-    #	"refresh_expires_in":15552000,
-    #	"refresh_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    #	"token_type":"bearer",
-    #	"id_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    #	"not-before-policy":0,
-    #	"session_state":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    #	"scope":"",
-    #	"tandc_accepted":true
-    # }
-
-    # check json-structure:
-    if ( ref($decode_json) eq 'HASH'
-      and defined( $decode_json->{access_token} ) )
-    {
-      $hash->{helper}{access_token} = $decode_json->{access_token};
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - AccessToken\n$hash->{helper}{access_token}";
-
-      readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "token", $hash->{helper}{access_token}, 1 );
-      readingsEndUpdate( $hash, 1 );
-
-      getDevices($hash);
-    } else
-    {
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - Error getting AccessToken";
-
-      # ToDo: error reaction
-    }
-  }
-
-  # response of: GET /v3/iot/oidc/token?state=xxx&session_state=xxx&code=xxx HTTP/1.1
-  elsif ( defined( $hash->{helper}{ondusaddress} ) )
-  {
-    # get json-structure from data-string
-    my $decode_json = eval { decode_json($data) };
-
-    # {
-    #	"access_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    #   "expires_in":3600,
-    #   "refresh_expires_in":15552000,
-    #   "refresh_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    #   "token_type":"bearer",
-    #   "id_token":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-    #   "not-before-policy":0,
-    #   "session_state":"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    #   "scope":"",
-    #   "tandc_accepted":true,
-    #   "partialLogin":false
-    # }
-
-    if ( ref($decode_json) eq 'HASH'
-      and defined( $decode_json->{refresh_token} ) )
-    {
-      $hash->{helper}{refresh_token} = $decode_json->{refresh_token};
-      $hash->{helper}{access_token} = $decode_json->{access_token};
-
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - RefreshToken\n$hash->{helper}{access_token}";
-
-      readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "token", $hash->{helper}{access_token}, 1 );
-      readingsEndUpdate( $hash, 1 );
-
-      # find all "Set-Cookie" lines and create cookie header
-      #ProcessSetCookies($hash, $param->{httpheader}, "AWSALB");
-      ProcessSetCookies( $hash, $param->{httpheader}, undef );
-
-      getDevices($hash);
-
-#      my $jsondata = { 'refresh_token' => $hash->{helper}{refresh_token} };
-#      my $method = 'POST';
-#      my $uri    = $hash->{URL} . '/iot/oidc/refresh';
-#      my $header = "Content-Type: application/json; charset=utf-8";
-#      $header .= "\r\n$hash->{helper}{cookie}"
-#        if ( defined( $hash->{helper}{cookie} ) );
-
-#      my $payload = encode_json($jsondata);
-
-      # WebFormLogin( $hash, $ignoreredirects, $keepalive, $uri, $method, $header, $payload )
-#      WebFormLogin( $hash, 0, 1, $uri, $method, $header, $payload );
-    } else
-    {
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - Error getting RefreshToken";
-
-      # ToDo: error reaction
-    }
-  }
-
-  # response of: POST /v1/sso/auth/realms/idm-apigw/login-actions/authenticate?code=xxx&execution=xxx&client_id=iot&tab_id=xxx HTTP/1.1
-  elsif ( defined( $hash->{helper}{loginaddress} ) )
-  {
-    Log3 $name, 5, "GroheOndusSmartBridge ($name) - Login\n$param->{httpheader}";
-
-    # find Location-entry in header
-    if ( $param->{httpheader} =~ m/Location: ondus:([^\"]*)\n/ )
-    {
-      # take first match and replace "Location: ondus:" with "https:"
-      my $location = "https:" . $1;
-
-      # remove last trailing newline
-      $location =~ s/\r|\n//g;
-
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - Login Location\n\"$location\"";
-      $hash->{helper}{ondusaddress} = $location;
-
-      # find all "Set-Cookie" lines and create cookie header
-      ProcessSetCookies($hash, $param->{httpheader}, "AWSALB");
-      #ProcessSetCookies( $hash, $param->{httpheader}, undef );
-
-      my $method = 'GET';
-      my $uri    = $hash->{helper}{ondusaddress};
-      my $header = "";
-      $header = "$hash->{helper}{cookie}"
-        if ( defined( $hash->{helper}{cookie} ) );
-
-      # WebFormLogin( $hash, $ignoreredirects, $keepalive, $uri, $method, $header, $payload )
-      WebFormLogin( $hash, 0, 1, $uri, $method, $header, "" );
-    } else
-    {
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - Error getting RefreshToken";
-
-      # ToDo: error reaction
-    }
-  }
-
-  # response of: GET /v3/iot/oidc/login HTTP/1.1
-  # redirected to: GET /v1/sso/auth/realms/idm-apigw/protocol/openid-connect/auth?redirect_uri=ondus://idp2-apigw.cloud.grohe.com/v3/iot/oidc/token&scope=openid&response_type=code&client_id=iot&state=xxx HTTP/1.1
-  # check if $data contains action="..."
-  elsif ( $data =~ m/action=\"([^\"]*)\"/ )
-  {
-    # take first match
-    # -> action="https://idp2-apigw.cloud.grohe.com/v1/sso/auth/realms/idm-apigw/login-actions/authenticate?code=XXX;execution=XXX;client_id=iot&amp;tab_id=XXX
-    my $formTargetOf = decode_entities($1);
-    $hash->{helper}{loginaddress} = $formTargetOf;
-
-    Log3 $name, 5, "GroheOndusSmartBridge ($name) - Action\n$formTargetOf";
-
-    # find all "Set-Cookie" lines and create cookie header
-    ProcessSetCookies( $hash, $param->{httpheader}, undef );
-
-    my $method = 'POST';
-    my $uri    = $hash->{helper}{loginaddress};
-    my $header = "Content-Type: application/x-www-form-urlencoded";
-    $header .= "\r\n$hash->{helper}{cookie}"
-      if ( defined( $hash->{helper}{cookie} ) );
-
-    my $payload = "username=" . urlEncode( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) ) . "&password=" . urlEncode( ReadPassword($hash) );
-
-    # WebFormLogin( $hash, $ignoreredirects, $keepalive, $uri, $method, $header, $payload )
-    WebFormLogin( $hash, 1, 1, $uri, $method, $header, $payload );
-  } else
-  {
-    Log3 $name, 3, "GroheOndusSmartBridge ($name) - Error - no matching case";
+    Log3 $name, 4, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: calling lambda function";
+    
+    $resultCallback->($param, $data, $errorMsg);
   }
 }
 
@@ -917,7 +1883,7 @@ sub WebFormResponseProcessing($$)
 # ProcessSetCookies( $hash, $header, $regex )
 # find all "Set-Cookie" entries in header and put them as "Cookie:" entry in $hash->{helper}{cookie}.
 # So cookies can easily added to new outgoing telegrams.
-sub ProcessSetCookies($@)
+sub GroheOndusSmartBridge_ProcessSetCookies($@)
 {
   my ( $hash, $header, $regex ) = @_;
 
@@ -995,796 +1961,79 @@ sub ProcessSetCookies($@)
 
 #####################################
 # Write($hash, $payload, $deviceId, $model)
-sub Write($@)
+sub GroheOndusSmartBridge_Write($$)
 {
-  my ( $hash, $payload, $deviceId, $model ) = @_;
+  my ( $hash, $param ) = @_;
   my $name = $hash->{NAME};
 
-  my ( $session_id, $header, $uri, $method );
+  Log3 $name, 4, "GroheOndusSmartBridge_Write($name)";
 
-  ( $payload, $session_id, $header, $uri, $method, $deviceId, $model ) = createHttpValueStrings( $hash, $payload, $deviceId, $model );
-
-  HttpUtils_NonblockingGet(
-    {
-      url       => $uri,
-      timeout   => 15,
-      hash      => $hash,
-      data      => $payload,
-      method    => $method,
-      header    => $header,
-      doTrigger => 1,
-      callback  => \&ErrorHandling,
-
-      device_id   => $deviceId,
-      location_id => $hash->{helper}{current_location_id},
-      room_id     => $hash->{helper}{current_room_id}
-    }
-  );
-
-  Log3( $name, 4, "GroheOndusSmartBridge ($name) - Send with URL: $uri, HEADER: $header, DATA: $payload, METHOD: $method" );
+  my $callbackSuccess = sub
+  {
+    # Add Authorization to Header
+    GroheOndusSmartBridge_Header_AddAuthorization( $hash, $param );
+  
+    $param->{hash} = $hash;
+  
+    GroheOndusSmartBridge_RequestParam( $hash, $param );
+  };
+  
+  GroheOndusSmartBridge_Connect($hash, $callbackSuccess);
 }
 
 #####################################
-# createHttpValueStrings($hash, $payload, $deviceId, $model)
-# return ($payload, $session_id, $header, $uri, $method, $deviceId, $model)
-sub createHttpValueStrings($@)
+# Write($hash, $payload, $deviceId, $model)
+sub GroheOndusSmartBridge_Header_AddAuthorization($$)
 {
-  my ( $hash, $payload, $deviceId, $model ) = @_;
+  my ( $hash, $param ) = @_;
 
-  my $session_id = $hash->{helper}{access_token};
-  my $name       = $hash->{NAME};
-  my $header     = "Content-Type: application/json";
-  my $uri        = '';
-  my $method     = 'POST';
-
-  my $device_locationId;
-  my $device_roomId;
-
-  # get locationId and roomId for the device from table
-  if (
-    defined($deviceId)
-    and defined( $hash->{helper}{appliance_list} ) and defined( $hash->{helper}{appliance_list}{$deviceId} )
-    )
-  {
-    my $record = $hash->{helper}{appliance_list}{$deviceId};
-    $device_locationId = $record->{location_id};
-    $device_roomId     = $record->{room_id};
-
-    Log3 $name, 5, "GroheOndusSmartBridge ($name) - got LocationId " . $device_locationId . " RoomId " . $device_roomId;
-  }
-
+  my $header = $param->{header};
+  
   # if there is a token, put it in header
   if ( defined( $hash->{helper}{access_token} ) )
   {
-    $header .= "\nAuthorization: Bearer $session_id";
+    # newline needed?
+    $header .= "\n"
+      if($header ne "");
+
+    $header .= "Authorization: Bearer " . $hash->{helper}{access_token};
+    
+    $param->{header} = $header;
   }
-
-  # set default value for payload
-  if ( not defined($payload) )
-  {
-    # empty payload
-    $payload = '{}';
-  }
-
-  if ( defined($model) )
-  {
-    ### smartbridge
-    if ( $model eq 'smartbridge' )
-    {
-      # empty payload -> get location, get rooms, get devices
-      if ( $payload eq '{}' )
-      {
-        $method = 'GET';
-
-        # current_location_id not defined yet -> extend URL
-        if ( not defined( $hash->{helper}{current_location_id} ) )
-        {
-          $uri = $hash->{URL} . '/iot/locations';
-
-          # update state
-          readingsSingleUpdate( $hash, 'state', 'fetch locations', 1 );
-
-          # clear hash for fetching rooms
-          if ( defined( $hash->{helper}{current_room_id} ) )
-          {
-            delete $hash->{helper}{current_room_id};
-          }
-
-          return ( $payload, $session_id, $header, $uri, $method, $deviceId, $model );
-        }
-
-        # current_room_id not defined yet -> extend URL
-        elsif ( defined( $hash->{helper}{current_location_id} )
-          and not defined( $hash->{helper}{current_room_id} ) )
-        {
-          $uri = $hash->{URL} . '/iot/locations/' . $hash->{helper}{current_location_id} . '/rooms';
-
-          # update state
-          readingsSingleUpdate( $hash, 'state', 'fetch rooms', 1 );
-
-          # clear hash for fetching appliances
-          if ( defined( $hash->{helper}{current_appliance_id} ) )
-          {
-            delete $hash->{helper}{current_appliance_id};
-          }
-
-          return ( $payload, $session_id, $header, $uri, $method, $deviceId, $model );
-        }
-
-        # current_appliance_id not defined yet -> extend URL
-        elsif ( defined( $hash->{helper}{current_location_id} )
-          and defined( $hash->{helper}{current_room_id} )
-          and not defined( $hash->{helper}{current_appliance_id} ) )
-        {
-          $uri = $hash->{URL} . '/iot/locations/' . $hash->{helper}{current_location_id} . '/rooms/' . $hash->{helper}{current_room_id} . '/appliances';
-
-          # update state
-          readingsSingleUpdate( $hash, 'state', 'fetch appliances', 1 );
-
-          return ( $payload, $session_id, $header, $uri, $method, $deviceId, $model );
-        }
-      }
-    }
-    ### sense_guard
-    elsif ( $model eq 'sense_guard'
-      and defined($device_locationId)
-      and defined($device_roomId) )
-    {
-      my $dhash = $modules{GroheOndusSmartDevice}{defptr}{$deviceId};
-
-      my $currentPayload = $payload;
-
-      $method  = $currentPayload->{method};
-      $payload = $currentPayload->{payload};
-
-      $uri = $hash->{URL} . '/iot/locations/' . $device_locationId . '/rooms/' . $device_roomId . '/appliances/' . $deviceId . $currentPayload->{URI};
-
-      return ( $payload, $session_id, $header, $uri, $method, $deviceId, $model );
-    }
-    ### sense
-    elsif ( $model eq 'sense'
-      and defined($device_locationId)
-      and defined($device_roomId) )
-    {
-      my $dhash = $modules{GroheOndusSmartDevice}{defptr}{$deviceId};
-
-      my $currentPayload = $payload;
-
-      $method  = $currentPayload->{method};
-      $payload = $currentPayload->{payload};
-
-      $uri = $hash->{URL} . '/iot/locations/' . $device_locationId . '/rooms/' . $device_roomId . '/appliances/' . $deviceId . $currentPayload->{URI};
-
-      return ( $payload, $session_id, $header, $uri, $method, $deviceId, $model );
-    }
-  } else
-  {
-    $model = "unknown";
-  }
-
-  Log3 $name, 3, "GroheOndusSmartBridge ($name) - no match - Model: " . $model . " URI " . $uri;
-
-  return ( $payload, $session_id, $header, $uri, $method, $deviceId, $model );
 }
 
 #####################################
-# ErrorHandling( $param, $err, $data )
-sub ErrorHandling($$$)
+# Write($hash, $payload, $deviceId, $model)
+sub GroheOndusSmartBridge_Header_AddCookies($$)
 {
-  my ( $param, $err, $data ) = @_;
+  my ( $hash, $param ) = @_;
+  #my $hash = $param->{hash};
 
-  my $hash  = $param->{hash};
-  my $name  = $hash->{NAME};
-  my $dhash = $hash;
-
-  $dhash = $modules{GroheOndusSmartDevice}{defptr}{ $param->{'device_id'} }
-    unless ( not defined( $param->{'device_id'} ) );
-
-  my $dname = $dhash->{NAME};
-
-  my $decode_json = eval { decode_json($data) };
-
-  # check result of parsing json
-  if ($@)
+  my $header = $param->{header};
+  
+  # if there is a token, put it in header
+  if ( defined( $hash->{helper}{cookie}) )
   {
-    Log3 $name, 3, "GroheOndusSmartBridge ($name) - JSON error while request";
-  }
-
-  Log3( $name, 5, "GroheOndusSmartBridge ($name) - Result with CODE: $param->{code} JSON: $data" );
-
-  # error
-  if ( defined($err) )
-  {
-    if ( $err ne "" )
-    {
-      readingsBeginUpdate($dhash);
-
-      readingsBulkUpdate( $dhash, "state", "$err" )
-        if ( ReadingsVal( $dname, "state", 1 ) ne "initialized" );
-
-      readingsBulkUpdate( $dhash, "lastRequestState", "request_error", 1 );
-
-      if ( $err =~ /timed out/ )
-      {
-        Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: connect to grohe cloud is timed out. check network";
-      } elsif ( $err =~ /Keine Route zum Zielrechner/
-        or $err =~ /no route to target/ )
-      {
-        Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: no route to target. bad network configuration or network is down";
-      } else
-      {
-        Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: $err";
-      }
-
-      readingsEndUpdate( $dhash, 1 );
-
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: GroheOndusSmartBridge RequestErrorHandling: error while requesting grohe cloud: $err";
-
-      delete $dhash->{helper}{deviceAction}
-        if ( defined( $dhash->{helper}{deviceAction} ) );
-
-      return;
-    }
-  }
-
-  # errorhandling
-  if (  $data eq ""
-    and exists( $param->{code} )
-    and $param->{code} != 200 )
-  {
-    readingsBeginUpdate($dhash);
-    readingsBulkUpdate( $dhash, "state", $param->{code}, 1 )
-      if ( ReadingsVal( $dname, "state", 1 ) ne "initialized" );
-
-    readingsBulkUpdateIfChanged( $dhash, "lastRequestState", "request_error", 1 );
-
-    if (  $param->{code} == 401
-      and $hash eq $dhash )
-    {
-      if ( ReadingsVal( $dname, 'token', 'none' ) eq 'none' )
-      {
-        readingsBulkUpdate( $dhash, "state", "no token available", 1 );
-        readingsBulkUpdateIfChanged( $dhash, "lastRequestState", "no token available", 1 );
-      }
-
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: " . $param->{code};
-    } elsif ( $param->{code} == 204
-      and $dhash ne $hash
-      and defined( $dhash->{helper}{deviceAction} ) )
-    {
-      readingsBulkUpdate( $dhash, "state", "the command is processed", 1 );
-
-      InternalTimer( gettimeofday() + 5, \&timer, $hash, 1 );
-    } elsif ( $param->{code} != 200 )
-    {
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: " . $param->{code};
-    }
-
-    readingsEndUpdate( $dhash, 1 );
-
-    Log3 $dname, 3, "GroheOndusSmartBridge ($dname) - RequestERROR: received http code " . $param->{code} . " without any data after requesting grohe cloud";
-
-    delete $dhash->{helper}{deviceAction}
-      if ( defined( $dhash->{helper}{deviceAction} ) );
-
-    return;
-  }
-
-  if (
-    $data =~ /Error/
-    or (  defined($decode_json)
-      and ref($decode_json) eq 'HASH'
-      and defined( $decode_json->{codes} ) )
-    )
-  {
-    readingsBeginUpdate($dhash);
-
-    readingsBulkUpdate( $dhash, "state", $param->{code}, 1 )
-      if ( ReadingsVal( $dname, "state", 0 ) ne "initialized" );
-
-    readingsBulkUpdate( $dhash, "lastRequestState", "request_error", 1 );
-
-    if ( $param->{code} == 400 )
-    {
-      if ($decode_json)
-      {
-        if ( ref( $decode_json->{errors} ) eq "ARRAY"
-          and defined( $decode_json->{errors} ) )
-        {
-          readingsBulkUpdate( $dhash, "state", $decode_json->{errors}[0]{error} . ' ' . $decode_json->{errors}[0]{attribute}, 1 );
-
-          readingsBulkUpdate( $dhash, "lastRequestState", $decode_json->{errors}[0]{error} . ' ' . $decode_json->{errors}[0]{attribute}, 1 );
-
-          Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: " . $decode_json->{errors}[0]{error} . " " . $decode_json->{errors}[0]{attribute};
-        }
-      } else
-      {
-        readingsBulkUpdate( $dhash, "lastRequestState", "Error 400 Bad Request", 1 );
-        Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 400 Bad Request";
-      }
-    } elsif ( $param->{code} == 503 )
-    {
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 503 Service Unavailable";
-      readingsBulkUpdate( $dhash, "state",            "Service Unavailable",           1 );
-      readingsBulkUpdate( $dhash, "lastRequestState", "Error 503 Service Unavailable", 1 );
-
-    } elsif ( $param->{code} == 404 )
-    {
-      if ( defined( $dhash->{helper}{deviceAction} )
-        and $dhash ne $hash )
-      {
-        readingsBulkUpdate( $dhash, "state",            "device Id not found", 1 );
-        readingsBulkUpdate( $dhash, "lastRequestState", "device id not found", 1 );
-      }
-
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: Error 404 Not Found";
-    } elsif ( $param->{code} == 500 )
-    {
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: check the ???";
-
-    } else
-    {
-      Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: http error " . $param->{code};
-    }
-
-    readingsEndUpdate( $dhash, 1 );
-
-    Log3 $dname, 5, "GroheOndusSmartBridge ($dname) - RequestERROR: received http code " . $param->{code} . " receive Error after requesting grohe cloud";
-
-    delete $dhash->{helper}{deviceAction}
-      if ( defined( $dhash->{helper}{deviceAction} ) );
-
-    return;
-  }
-
-  # errorhandling:
-  if (  exists( $param->{code} )
-    and $param->{code} == 401
-    and defined( $hash->{helper}{access_token} ) )
-  {
-    Log3 $dname, 3, "GroheOndusSmartBridge ($dname) - reconnect";
-
-    getToken($hash);
-    return;
-  }
-
-  # update state -> in sub "Notify" timer is reloaded
-  if ( defined( $hash->{helper}{current_location_id} ) )
-  {
-    # change state to "connected to cloud" -> Notify -> load timer
-    readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged( $hash, 'state', 'connected to cloud', 1 );
-    readingsEndUpdate( $hash, 1 );
-  }
-
-  # no error: process response
-  ResponseProcessing( $param, $data );
-}
-
-#####################################
-sub ResponseProcessing($$)
-{
-  my ( $param, $json ) = @_;
-
-  my $hash = $param->{hash};
-  my $name = $hash->{NAME};
-
-  my $dhash = $hash;
-
-  # get caller device: SmartBridge (me) or SmartDevice
-  $dhash = $modules{GroheOndusSmartDevice}{defptr}{ $param->{'device_id'} }
-    unless ( not defined( $param->{'device_id'} ) );
-
-  my $dname = $dhash->{NAME};
-
-  my $decode_json = eval { decode_json($json) };
-  if ($@)
-  {
-    Log3 $name, 3, "GroheOndusSmartBridge ($name) - JSON error while request: $@";
-
-    if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
-    {
-      readingsBeginUpdate($hash);
-      readingsBulkUpdate( $hash, 'JSON_ERROR',        $@,    1 );
-      readingsBulkUpdate( $hash, 'JSON_ERROR_STRING', $json, 1 );
-      readingsEndUpdate( $hash, 1 );
-    }
-  }
-
-  # token und UID
-  if (  ref($decode_json) eq 'HASH'
-    and defined( $decode_json->{token} )
-    and $decode_json->{token}
-    and defined( $decode_json->{uid} )
-    and $decode_json->{uid} )
-  {
-    # save values in helper
-    $hash->{helper}{access_token}   = $decode_json->{token};
-    $hash->{helper}{user_id} = $decode_json->{uid};
-
-    # write values to readings
-    readingsSingleUpdate( $hash, 'token', $hash->{helper}{access_token},   1 );
-    readingsSingleUpdate( $hash, 'uid',   $hash->{helper}{user_id}, 1 );
-
-    # fetch locations
-    Log3 $name, 3, "GroheOndusSmartBridge ($name) - fetch locations";
-    Write( $hash, undef, undef, 'smartbridge' );
-
-    return;
-  }
-
-  # locations
-  elsif ( ref($decode_json) eq "ARRAY"
-    and scalar( @{$decode_json} ) > 0
-    and ref( @{$decode_json}[0] ) eq "HASH"
-    and defined( @{$decode_json}[0]->{address} ) )
-  {
-    #[
-    #	{
-    #		"id":48434,
-    #		"name":"Haus",
-    #		"type":2,
-    #		"role":"owner",
-    #		"timezone":"Europe/Berlin",
-    #		"water_cost":-1,
-    #		"energy_cost":-1,
-    #		"heating_type":-1,
-    #		"currency":"EUR",
-    #		"default_water_cost":0.004256,
-    #		"default_energy_cost":0.003977,
-    #		"default_heating_type":2,
-    #		"emergency_shutdown_enable":true,
-    #		"address":
-    #		{
-    #			"street":"Straße 5",
-    #			"city":"Dorf",
-    #			"zipcode":"123456",
-    #			"housenumber":"",
-    #			"country":"Deutschland",
-    #			"country_code":"DE",
-    #			"additionalInfo":""
-    #		}
-    #	}
-    #]
-
-    Log3 $name, 5, "GroheOndusSmartBridge ($name) - locations count " . scalar( @{$decode_json} );
-
-    foreach my $location ( @{$decode_json} )
-    {
-      # save current location in list
-      $hash->{helper}{location_list}{ $location->{id} } = { 'location' => encode_json($location) };
-
-      $hash->{helper}{current_location_id} = $location->{id};
-
-      WriteReadings( $hash, $location );
-
-      Log3 $name, 4, "GroheOndusSmartBridge ($name) - processed location with ID " . $hash->{helper}{current_location_id};
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - processed location's DATA is " . encode_json( $hash->{helper}{location_list}{ $location->{id} } );
-
-      # fetch rooms within current location
-      Write( $hash, undef, undef, 'smartbridge' );
-    }
-
-    # update reading
-    readingsSingleUpdate( $hash, 'count_locations', scalar( keys %{ $hash->{helper}{location_list} } ), 0 );
-
-    return;
-  }
-
-  # rooms
-  elsif ( ref($decode_json) eq "ARRAY"
-    and scalar( @{$decode_json} ) > 0
-    and ref( @{$decode_json}[0] ) eq "HASH"
-    and defined( @{$decode_json}[0]->{room_type} ) )
-  {
-    #[
-    #	{
-    #		"id":12345,
-    #		"name":"EG Küche",
-    #		"type":0,
-    #		"room_type":15,
-    #		"role":"owner"
-    #	}
-    #]
-
-    Log3 $name, 5, "GroheOndusSmartBridge ($name) - rooms count " . scalar( @{$decode_json} );
-
-    foreach my $room ( @{$decode_json} )
-    {
-      # save current room in list
-      $hash->{helper}{room_list}{ $room->{id} } = {
-        'location_id' => $param->{'location_id'},
-        'room'        => encode_json($room)
-      };
-
-      $hash->{helper}{current_room_id} = $room->{id};
-
-      WriteReadings( $hash, $room );
-
-      Log3 $name, 4, "GroheOndusSmartBridge ($name) - processed room with ID " . $hash->{helper}{current_room_id};
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - processed room DATA is " . encode_json( $hash->{helper}{room_list}{ $room->{id} } );
-
-      # fetch appliances within current room
-      Write( $hash, undef, undef, 'smartbridge' );
-    }
-
-    # update reading
-    readingsSingleUpdate( $hash, 'count_rooms', scalar( keys %{ $hash->{helper}{room_list} } ), 0 );
-
-    return;
-  }
-
-  # appliances
-  elsif ( ref($decode_json) eq "ARRAY"
-    and scalar( @{$decode_json} ) > 0
-    and ref( @{$decode_json}[0] ) eq "HASH"
-    and defined( @{$decode_json}[0]->{appliance_id} ) )
-  {
-    #[
-    #	{
-    #		"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-    #		"installation_date":"2001-01-30T00:00:00.000+00:00",
-    #		"name":"KG Vorratsraum - SenseGUARD",
-    #		"serial_number":"123456789012345678901234567890123456789012345678",
-    #		"type":103,
-    #		"version":"01.38.Z22.0400.0101",
-    #		"tdt":"2019-06-30T11:06:40.000+02:00",
-    #		"timezone":60,
-    #		"config":
-    #		{
-    #			"thresholds":
-    #			[
-    #				{
-    #					"quantity":"flowrate",
-    #					"type":"min",
-    #					"value":3,
-    #					"enabled":false
-    #				},
-    #				{
-    #					"quantity":"flowrate",
-    #					"type":"max",
-    #					"value":50,
-    #					"enabled":true
-    #				},
-    #				{
-    #					"quantity":"pressure",
-    #					"type":"min",
-    #					"value":2,
-    #					"enabled":false
-    #				},
-    #				{
-    #					"quantity":"pressure",
-    #					"type":"max",
-    #					"value":8,
-    #					"enabled":false
-    #				},
-    #				{
-    #					"quantity":"temperature_guard",
-    #					"type":"min",
-    #					"value":5,
-    #					"enabled":false
-    #				},
-    #				{
-    #					"quantity":"temperature_guard",
-    #					"type":"max",
-    #					"value":45,
-    #					"enabled":false
-    #				}
-    #			],
-    #		"measurement_period":900,
-    #		"measurement_transmission_intervall":900,
-    #		"measurement_transmission_intervall_offset":1,
-    #		"action_on_major_leakage":1,
-    #		"action_on_minor_leakage":1,
-    #		"action_on_micro_leakage":0,
-    #		"monitor_frost_alert":true,
-    #		"monitor_lower_flow_limit":false,
-    #		"monitor_upper_flow_limit":true,
-    #		"monitor_lower_pressure_limit":false,
-    #		"monitor_upper_pressure_limit":false,
-    #		"monitor_lower_temperature_limit":false,
-    #		"monitor_upper_temperature_limit":false,
-    #		"monitor_major_leakage":true,
-    #		"monitor_minor_leakage":true,
-    #		"monitor_micro_leakage":true,
-    #		"monitor_system_error":false,
-    #		"monitor_btw_0_1_and_0_8_leakage":true,
-    #		"monitor_withdrawel_amount_limit_breach":true,
-    #		"detection_interval":11250,
-    #		"impulse_ignore":10,
-    #		"time_ignore":20,
-    #		"pressure_tolerance_band":10,
-    #		"pressure_drop":50,
-    #		"detection_time":30,
-    #		"action_on_btw_0_1_and_0_8_leakage":1,
-    #		"action_on_withdrawel_amount_limit_breach":1,
-    #		"withdrawel_amount_limit":300,
-    #		"sprinkler_mode_start_time":0,
-    #		"sprinkler_mode_stop_time":1439,
-    #		"sprinkler_mode_active_monday":false,
-    #		"sprinkler_mode_active_tuesday":false,
-    #		"sprinkler_mode_active_wednesday":false,
-    #		"sprinkler_mode_active_thursday":false,
-    #		"sprinkler_mode_active_friday":false,
-    #		"sprinkler_mode_active_saturday":false,
-    #		"sprinkler_mode_active_sunday":false},
-    #		"role":"owner",
-    #		"registration_complete":true,
-    #		"calculate_average_since":"2000-01-30T00:00:00.000Z"
-    #	},
-    #	{
-    #		"appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-    #		"installation_date":"2001-01-30T00:00:00.000+00:00",
-    #		"name":"KG Vorratsraum Sense",
-    #		"serial_number":"123456789012345678901234567890123456789012345678",
-    #		"type":101,
-    #		"version":"1547",
-    #		"tdt":"2019-06-30T05:15:38.000+02:00",
-    #		"timezone":60,
-    #		"config":
-    #		{
-    #			"thresholds":
-    #			[
-    #				{
-    #					"quantity":"temperature",
-    #					"type":"min",
-    #					"value":10,
-    #					"enabled":true
-    #				},
-    #				{
-    #					"quantity":"temperature",
-    #					"type":"max",
-    #					"value":35,
-    #					"enabled":true
-    #				},
-    #				{
-    #					"quantity":"humidity",
-    #					"type":"min",
-    #					"value":30,
-    #					"enabled":true
-    #				},
-    #				{
-    #					"quantity":"humidity",
-    #					"type":"max",
-    #					"value":65,
-    #					"enabled":true
-    #				}
-    #			]
-    #		},
-    #		"role":"owner",
-    #		"registration_complete":true
-    #	}
-    #]
-
-    Log3 $name, 5, "GroheOndusSmartBridge ($name) - appliances count " . scalar( @{$decode_json} );
-
-    foreach my $appliance ( @{$decode_json} )
-    {
-      # save current appliance in list
-      $hash->{helper}{appliance_list}{ $appliance->{appliance_id} } = {
-        location_id => $param->{'location_id'},
-        room_id     => $param->{'room_id'},
-        appliance   => encode_json($appliance)
-      };
-
-      $hash->{helper}{current_appliance_id} = $appliance->{appliance_id};
-
-      WriteReadings( $hash, $appliance );
-
-      Log3 $name, 4, "GroheOndusSmartBridge ($name) - processed appliance with ID " . $hash->{helper}{current_appliance_id};
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - processed appliance DATA is " . encode_json( $hash->{helper}{appliance_list}{ $appliance->{appliance_id} } );
-    }
-
-    readingsSingleUpdate( $hash, 'count_appliance', scalar( keys %{ $hash->{helper}{appliance_list} } ), 0 );
-
-    # autocreate of the devices
-    my ( $json, $tail ) = ParseJSON( $hash, $json );
-
-    while ($json)
-    {
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - Decoding JSON message. Length: " . length($json) . " Content: " . $json;
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - Vor Sub: Laenge JSON: " . length($json) . " Content: " . $json . " Tail: " . $tail;
-
-      unless ( not defined($tail) and not($tail) )
-      {
-        $decode_json = eval { decode_json($json) };
-
-        if ($@)
-        {
-          Log3 $name, 3, "GroheOndusSmartBridge ($name) - JSON error while request: $@";
-        }
-
-        # dispatch to GroheOndusSmartDevice::Parse()
-        Dispatch( $hash, $json, undef );
-      }
-
-      ( $json, $tail ) = ParseJSON( $hash, $tail );
-
-      Log3 $name, 5, "GroheOndusSmartBridge ($name) - Nach Sub: Laenge JSON: " . length($json) . " Content: " . $json . " Tail: " . $tail;
-    }
-
-    return;
-  }
-
-  # caller is not this SmartBridge, so dispatch to SmartDevices
-  elsif ( not $hash eq $dhash )
-  {
-    Log3 $name, 5, "GroheOndusSmartBridge ($name) - DISPATCHING ($dname)";
-
-    # create data structure matching regex entry in matchlist
-    my $applianceId = encode_json(
-      {
-        'appliance_id' => $dhash->{DEVICEID},
-        'data'         => $decode_json
-      }
-    );
-
-    Dispatch( $hash, $applianceId, undef );
-    return;
-  }
-
-  Log3 $name, 3, "GroheOndusSmartBridge ($name) - no Match for processing data";
-  Log3 $name, 5, "GroheOndusSmartBridge ($name) - no Match for processing data JSON: " . $json;
-}
-
-#####################################
-sub WriteReadings($$)
-{
-  my ( $hash, $decode_json ) = @_;
-  my $name = $hash->{NAME};
-
-  readingsBeginUpdate($hash);
-
-  readingsEndUpdate( $hash, 1 );
-
-  Log3 $name, 4, "GroheOndusSmartBridge ($name) - readings would be written";
-}
-
-#####################################
-sub timer($)
-{
-  my $hash = shift;
-  my $name = $hash->{NAME};
-
-  getToken($hash);
-}
-
-#####################################
-sub getDevices($)
-{
-  my $hash = shift;
-  my $name = $hash->{NAME};
-
-  RemoveInternalTimer($hash);
-
-  if ( not IsDisabled($name) )
-  {
-    Log3 $name, 4, "GroheOndusSmartBridge ($name) - fetch device list and device states";
-
-    # clear hash for start new fetching
-    delete $hash->{helper}{current_location_id}
-      if ( defined( $hash->{helper}{current_location_id} )
-      and $hash->{helper}{current_location_id} );
-
-    Write( $hash, undef, undef, 'smartbridge' );
-
-    # reload timer
-    InternalTimer( gettimeofday() + $hash->{INTERVAL}, \&timer, $hash );
-  } else
-  {
-    readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
-
-    Log3 $name, 3, "GroheOndusSmartBridge ($name) - device is disabled";
+    # newline needed?
+    $header .= "\n"
+      if($header ne "");
+
+    $header .= "$hash->{helper}{cookie}";
+    
+    $param->{header} = $header;
   }
 }
 
 #####################################
-sub StorePassword($$)
+sub GroheOndusSmartBridge_StorePassword($$)
 {
   my ( $hash, $password ) = @_;
+  my $name = $hash->{NAME};
   my $index   = $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd";
   my $key     = getUniqueId() . $index;
   my $enc_pwd = "";
+
+  Log3 $name, 5, "GroheOndusSmartBridge_StorePassword($name)";
 
   if ( eval "use Digest::MD5;1" )
   {
@@ -1808,7 +2057,7 @@ sub StorePassword($$)
 }
 
 #####################################
-sub ReadPassword($)
+sub GroheOndusSmartBridge_ReadPassword($)
 {
   my ($hash) = @_;
   my $name   = $hash->{NAME};
@@ -1816,13 +2065,13 @@ sub ReadPassword($)
   my $key    = getUniqueId() . $index;
   my ( $password, $err );
 
-  Log3 $name, 5, "GroheOndusSmartBridge ($name) - Read password from file";
+  Log3 $name, 5, "GroheOndusSmartBridge_ReadPassword($name)";
 
   ( $err, $password ) = getKeyValue($index);
 
   if ( defined($err) )
   {
-    Log3 $name, 3, "GroheOndusSmartBridge ($name) - unable to read password from file: $err";
+    Log3 $name, 3, "GroheOndusSmartBridge_ReadPassword($name) - unable to read password from file: $err";
     return undef;
   }
 
@@ -1844,85 +2093,37 @@ sub ReadPassword($)
     }
 
     return $dec_pwd;
-
-  } else
+  } 
+  else
   {
-    Log3 $name, 3, "GroheOndusSmartBridge ($name) - No password in file";
+    Log3 $name, 3, "GroheOndusSmartBridge_ReadPassword($name) - No password in file";
     return undef;
   }
 }
 
 #####################################
-sub Rename(@)
-{
-  my ( $new, $old ) = @_;
-  my $hash = $defs{$new};
-
-  StorePassword( $hash, ReadPassword($hash) );
-  setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
-
-  return undef;
-}
-
-#####################################
-sub ParseJSON($$)
-{
-  my ( $hash, $buffer ) = @_;
-
-  my $name  = $hash->{NAME};
-  my $open  = 0;
-  my $close = 0;
-  my $msg   = '';
-  my $tail  = '';
-
-  if ($buffer)
-  {
-    foreach my $c ( split //, $buffer )
-    {
-      if (  $open == $close
-        and $open > 0 )
-      {
-        $tail .= $c;
-
-        # Log3 $name, 5, "GroheOndusSmartBridge ($name) - $open == $close and $open > 0";
-      } elsif ( ( $open == $close )
-        and ( $c ne '{' ) )
-      {
-        # Log3 $name, 5, "GroheOndusSmartBridge ($name) - Garbage character before message: " . $c;
-      } else
-      {
-        if ( $c eq '{' )
-        {
-          $open++;
-        } elsif ( $c eq '}' )
-        {
-          $close++;
-        }
-
-        $msg .= $c;
-      }
-    }
-
-    if ( $open != $close )
-    {
-      $tail = $msg;
-      $msg  = '';
-    }
-  }
-
-  Log3 $name, 5, "GroheOndusSmartBridge ($name) - return msg: $msg and tail: $tail";
-  return ( $msg, $tail );
-}
-
-#####################################
-sub DeletePassword($)
+sub GroheOndusSmartBridge_DeletePassword($)
 {
   my $hash = shift;
+  my $name   = $hash->{NAME};
 
   setKeyValue( $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd", undef );
 
   return undef;
 }
+
+#####################################
+sub GroheOndusSmartBridge_Rename(@)
+{
+  my ( $new, $old ) = @_;
+  my $hash = $defs{$new};
+
+  GroheOndusSmartBridge_StorePassword( $hash, GroheOndusSmartBridge_ReadPassword($hash) );
+  setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
+
+  return undef;
+}
+
 
 1;
 
@@ -1968,7 +2169,7 @@ sub DeletePassword($)
   <b>set</b>
   <ul>
     <li>getDeviceState - Starts a Datarequest</li>
-    <li>getToken - Gets a new Session-ID</li>
+    <li>login - Gets a new Session-ID</li>
     <li>groheOndusAccountPassword - Passwort which was used in the GroheOndusAPP</li>
     <li>deleteAccountPassword - delete the password from store</li>
   </ul>
@@ -2021,7 +2222,7 @@ sub DeletePassword($)
   <b>set</b>
   <ul>
     <li>getDeviceState - Startet eine Abfrage der Daten.</li>
-    <li>getToken - Holt eine neue Session-ID</li>
+    <li>login - Holt eine neue Session-ID</li>
     <li>groheOndusAccountPassword - Passwort, welches in der GroheOndusApp verwendet wurde</li>
     <li>deleteAccountPassword - l&oml;scht das Passwort aus dem Passwortstore</li>
   </ul>
