@@ -1807,10 +1807,14 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     $errorMsg = 'error ' . $err;
   }
 
+  my $code = "none";
+  
   ### check code
   if ( $data eq "" and
     exists( $param->{code} ) )
   {
+  	$code = "$param->{code}";
+  	
     if( $param->{code} == 200 ) ###
     {
     }
@@ -1832,7 +1836,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     }
   }
 
-  Log3 $name, 5, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: Code: " . $param->{code} . " data: \"" . $data . "\"";
+  Log3 $name, 5, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: Code: " . $code . " data: \"" . $data . "\"";
 
   ### no error: process response
   if($errorMsg eq "")
