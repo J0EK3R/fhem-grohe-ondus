@@ -52,6 +52,8 @@
 ##
 ##
 
+my $VERSION = '3.0.5';
+
 package main;
 
 use strict;
@@ -92,8 +94,6 @@ sub GroheOndusSmartDevice_Sense_Set($@);
 sub GroheOndusSmartDevice_GetGMTOffset();
 sub GroheOndusSmartDevice_GetGMTMidnightDate();
 
-
-my $VERSION = '3.0.4';
 my $missingModul = "";
 
 my $SenseGuard_DefaultInterval = 60; # default value for the polling interval in seconds
@@ -671,6 +671,7 @@ sub GroheOndusSmartDevice_Parse($$)
       readingsBulkUpdateIfChanged( $hash, 'state', 'connected over bridge to cloud', 1 );
       readingsEndUpdate( $hash, 1 );
 
+      # if not timer is running then start one
       if( not defined( $hash->{NEXTTIMER} ) or
         $hash->{NEXTTIMER} eq "none")
       {
