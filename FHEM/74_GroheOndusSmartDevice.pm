@@ -130,9 +130,14 @@ my $GroheOndusSmartDevice_Sense_AttrList =
     $GroheOndusSmartDevice_AttrList .
     ""; 
 
-# AttributeList with all Attributes
-my $GroheOndusSmartDevice_AttrList_Define = 
+# AttributeList with all Attributes for module init
+my $GroheOndusSmartDevice_AttrList_Init = 
     $GroheOndusSmartDevice_AttrList_Deprecated .
+    $GroheOndusSmartDevice_SenseGuard_AttrList .
+    $GroheOndusSmartDevice_Sense_AttrList; 
+
+# AttributeList with all Attributes except deprecated for Upgrade
+my $GroheOndusSmartDevice_AttrList_Upgrade = 
     $GroheOndusSmartDevice_SenseGuard_AttrList .
     $GroheOndusSmartDevice_Sense_AttrList; 
 
@@ -238,7 +243,7 @@ sub GroheOndusSmartDevice_Initialize($)
   # old attribute list is set to be able to get the deprecated attribute values
   # on global event "INITIALIZED" the new attribute list is set 
   $hash->{AttrList} = 
-    $GroheOndusSmartDevice_AttrList_Define . 
+    $GroheOndusSmartDevice_AttrList_Init . 
     $readingFnAttributes;
 
   foreach my $d ( sort keys %{ $modules{GroheOndusSmartDevice}{defptr} } )
@@ -705,6 +710,15 @@ sub GroheOndusSmartDevice_Upgrade($)
 {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
+
+  my $newAttrList = $GroheOndusSmartDevice_AttrList_Upgrade . $readingFnAttributes;
+  
+  if($GroheOndusSmartDeviceDefinition->{AttrList} ne $newAttrList)
+  {
+    Log3 $name, 3, "GroheOndusSmartDevice_Upgrade($name) - patching GroheOndusSmartDevice.AttrList";
+    # change list of attributes
+    $GroheOndusSmartDeviceDefinition->{AttrList} = $newAttrList;
+  } 
 
   if ( AttrVal( $name, 'IODev', 'none' ) ne 'none' )
   {

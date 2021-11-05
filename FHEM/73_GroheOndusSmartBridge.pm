@@ -1811,8 +1811,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
   my $code = "none";
   
   ### check code
-  if ( $data eq "" and
-    exists( $param->{code} ) )
+  if (exists( $param->{code} ) )
   {
   	$code = "$param->{code}";
   	
@@ -1836,9 +1835,13 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     {
       $errorMsg = 'error ' . $param->{code};
     }
-    else
+    elsif( $data eq "" )
     {
       $errorMsg = 'error ' . $param->{code};
+    }
+    else
+    {
+      # no error
     }
   }
 
