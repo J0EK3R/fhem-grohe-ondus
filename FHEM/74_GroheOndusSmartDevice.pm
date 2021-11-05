@@ -80,6 +80,7 @@ sub GroheOndusSmartDevice_TimerRemove($);
 sub GroheOndusSmartDevice_SenseGuard_GetState($;$$);
 sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$);
 sub GroheOndusSmartDevice_SenseGuard_GetData($;$$);
+sub GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($);
 sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$);
 sub GroheOndusSmartDevice_SenseGuard_Set($@);
 
@@ -92,11 +93,11 @@ sub GroheOndusSmartDevice_GetGMTOffset();
 sub GroheOndusSmartDevice_GetGMTMidnightDate();
 
 
-my $VERSION = '3.0.3';
+my $VERSION = '3.0.4';
 my $missingModul = "";
 
 my $SenseGuard_DefaultInterval = 60; # default value for the polling interval in seconds
-my $Sense_DefaultInterval = 60;      # default value for the polling interval in seconds
+my $Sense_DefaultInterval = 600;     # default value for the polling interval in seconds
 
 my $SenseGuard_DefaultStateFormat = "State: state<br/>Valve: CmdValveState<br/>Consumption: TodayWaterConsumption l<br/>Temperature: LastTemperature Grad C<br/>Pressure: LastPressure bar";
 my $Sense_DefaultStateFormat =      "State: state<br/>Temperature: LastTemperature Grad C<br/>Humidity: LastHumidity %";
@@ -105,17 +106,35 @@ my $SenseGuard_DefaultWebCmdFormat = "valve on:valve off";
 
 my $TimeStampFormat = '%Y-%m-%dT%I:%M:%S';
 
-my $GroheOndusSmartDevice_AttrList_V2 = 
-    "model:sense,sense_guard " . 
-    "IODev " . 
+# AttributeList for all types of GroheOndusSmartDevice 
+my $GroheOndusSmartDevice_AttrList = 
     "debugJSON:0,1 " . 
     "disable:0,1 " . 
-    "interval "; 
+    "interval ";
 
-my $GroheOndusSmartDevice_AttrList_V3 = 
-    "debugJSON:0,1 " . 
-    "disable:0,1 " . 
-    "interval "; 
+# AttributeList with deprecated attributes
+my $GroheOndusSmartDevice_AttrList_Deprecated = 
+    "model:sense,sense_guard " . 
+    "IODev "; 
+
+# AttributeList for SenseGuard
+my $GroheOndusSmartDevice_SenseGuard_AttrList = 
+    $GroheOndusSmartDevice_AttrList .
+    "offsetEnergyCost " . 
+    "offsetWaterCost " . 
+    "offsetWaterConsumption " . 
+    "offsetHotWaterShare "; 
+
+# AttributeList for Sense
+my $GroheOndusSmartDevice_Sense_AttrList = 
+    $GroheOndusSmartDevice_AttrList .
+    ""; 
+
+# AttributeList with all Attributes
+my $GroheOndusSmartDevice_AttrList_Define = 
+    $GroheOndusSmartDevice_AttrList_Deprecated .
+    $GroheOndusSmartDevice_SenseGuard_AttrList .
+    $GroheOndusSmartDevice_Sense_AttrList; 
 
 # global Reference to module definition hash
 my $GroheOndusSmartDeviceDefinition;
@@ -219,7 +238,7 @@ sub GroheOndusSmartDevice_Initialize($)
   # old attribute list is set to be able to get the deprecated attribute values
   # on global event "INITIALIZED" the new attribute list is set 
   $hash->{AttrList} = 
-    $GroheOndusSmartDevice_AttrList_V2 . 
+    $GroheOndusSmartDevice_AttrList_Define . 
     $readingFnAttributes;
 
   foreach my $d ( sort keys %{ $modules{GroheOndusSmartDevice}{defptr} } )
@@ -285,14 +304,18 @@ sub GroheOndusSmartDevice_Define($$)
   if ( $model eq 'sense_guard' )
   {
     # the SenseGuard devices update every 15 minutes
-    $hash->{DEFAULTINTERVAL} = $SenseGuard_DefaultInterval;
-    $hash->{INTERVAL} = $hash->{DEFAULTINTERVAL};
+    $hash->{'.DEFAULTINTERVAL'} = $SenseGuard_DefaultInterval;
+    
+    $hash->{INTERVAL} = $hash->{'.DEFAULTINTERVAL'};
 
     $hash->{TELEGRAMCONFIGCOUNTER}  = 0;
     $hash->{TELEGRAMSTATUSCOUNTER}  = 0;
     $hash->{TELEGRAMDATACOUNTER}    = 0;
     $hash->{TELEGRAMCOMMANDCOUNTER} = 0;
-    
+
+    # overrides the shown AttributeList of module-definition
+    addToDevAttrList($name, $GroheOndusSmartDevice_SenseGuard_AttrList);
+
     CommandAttr( undef, $name . ' stateFormat ' . $SenseGuard_DefaultStateFormat )
       if ( AttrVal( $name, 'stateFormat', 'none' ) eq 'none' );
 
@@ -303,12 +326,16 @@ sub GroheOndusSmartDevice_Define($$)
   elsif ( $model eq 'sense' )
   {
     # the Sense devices update just once a day
-    $hash->{DEFAULTINTERVAL} = $Sense_DefaultInterval;
-    $hash->{INTERVAL} = $hash->{DEFAULTINTERVAL};
+    $hash->{'.DEFAULTINTERVAL'} = $Sense_DefaultInterval;
+
+    $hash->{INTERVAL} = $hash->{'.DEFAULTINTERVAL'};
 
     $hash->{TELEGRAMCONFIGCOUNTER} = 0;
     $hash->{TELEGRAMSTATUSCOUNTER} = 0;
     $hash->{TELEGRAMDATACOUNTER}   = 0;
+
+    # overrides the shown AttributeList of module-definition
+    addToDevAttrList($name, $GroheOndusSmartDevice_Sense_AttrList);
 
     CommandAttr( undef, $name . ' stateFormat ' . $Sense_DefaultStateFormat )
       if ( AttrVal( $name, 'stateFormat', 'none' ) eq 'none' );
@@ -422,7 +449,7 @@ sub GroheOndusSmartDevice_Attr(@)
     {
       GroheOndusSmartDevice_TimerRemove($hash);
     
-    $hash->{INTERVAL} = $hash->{DEFAULTINTERVAL};
+    $hash->{INTERVAL} = $hash->{'.DEFAULTINTERVAL'};
 
       GroheOndusSmartDevice_TimerExecute( $hash );
 
@@ -430,22 +457,74 @@ sub GroheOndusSmartDevice_Attr(@)
     }
   }
 
-  # Attribute "waterconsumptionoffset"
-  elsif ( $attrName eq 'waterconsumptionoffset' )
+  # Attribute "offsetWaterCost"
+  elsif ( $attrName eq 'offsetWaterCost' )
   {
     if ( $cmd eq 'set' )
     {
-      $hash->{WATERCONSUMPTIONOFFSET} = $attrVal;
-
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set waterconsumptionoffset: $attrVal";
+      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterCost: $attrVal";
+      
     } 
     elsif ( $cmd eq 'del' )
     {
-      $hash->{WATERCONSUMPTIONOFFSET} = 0;
-
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User waterconsumptionoffset and set default: 0";
+      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetWaterCost and set default: 0";
     }
+    
+    GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
+      if($init_done);
   }
+  
+  # Attribute "offsetHotWaterShare"
+  elsif ( $attrName eq 'offsetHotWaterShare' )
+  {
+    if ( $cmd eq 'set' )
+    {
+      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetHotWaterShare: $attrVal";
+      
+    } 
+    elsif ( $cmd eq 'del' )
+    {
+      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetHotWaterShare and set default: 0";
+    }
+    
+    GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
+      if($init_done); 
+  }
+  
+  # Attribute "offsetEnergyCost"
+  elsif ( $attrName eq 'offsetEnergyCost' )
+  {
+    if ( $cmd eq 'set' )
+    {
+      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetEnergyCost: $attrVal";
+      
+    } 
+    elsif ( $cmd eq 'del' )
+    {
+      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetEnergyCost and set default: 0";
+    }
+    
+    GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
+      if($init_done);
+  }
+  
+  # Attribute "offsetWaterConsumption"
+  elsif ( $attrName eq 'offsetWaterConsumption' )
+  {
+    if ( $cmd eq 'set' )
+    {
+      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterConsumption: $attrVal";
+      
+    } 
+    elsif ( $cmd eq 'del' )
+    {
+      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetWaterConsumption and set default: 0";
+    }
+    
+    GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
+      if($init_done);
+  }
+  
   return undef;
 }
 
@@ -626,15 +705,6 @@ sub GroheOndusSmartDevice_Upgrade($)
 {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
-
-  my $newAttrList = $GroheOndusSmartDevice_AttrList_V3 . $readingFnAttributes;
-  
-  if($GroheOndusSmartDeviceDefinition->{AttrList} ne $newAttrList)
-  {
-    Log3 $name, 3, "GroheOndusSmartDevice_Upgrade($name) - patching GroheOndusSmartDevice.AttrList";
-    # change list of attributes
-    $GroheOndusSmartDeviceDefinition->{AttrList} = $newAttrList;
-  } 
 
   if ( AttrVal( $name, 'IODev', 'none' ) ne 'none' )
   {
@@ -1465,9 +1535,9 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
             my $dataTodayAnalyzeStartTimestamp;
             my $dataTodayAnalyzeStopTimestamp;
             my $dataTodayAnalyzeCount     = 0;
-            my $dataTodayWaterconsumption = 0;
+            my $dataTodayWaterConsumption = 0;
             my $dataTodayMaxflowrate      = 0;
-            my $dataTodayHotwaterShare    = 0;
+            my $dataTodayHotWaterShare    = 0;
             my $dataTodayWaterCost        = 0;
             my $dataTodayEnergyCost       = 0;
 
@@ -1480,7 +1550,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
             foreach my $currentData ( @{ $decode_json->{data}->{withdrawals} } )
             {
               # is it the right dataset?
-              if (  defined( $currentData->{starttime} ) and
+              if ( defined( $currentData->{starttime} ) and
                 defined( $currentData->{stoptime} ) and
                 defined( $currentData->{waterconsumption} ) and
                 defined( $currentData->{maxflowrate} ) and
@@ -1539,8 +1609,8 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
                   }
 
                   $dataTodayAnalyzeCount     += 1;
-                  $dataTodayWaterconsumption += $currentData->{waterconsumption};
-                  $dataTodayHotwaterShare    += $currentData->{hotwater_share};
+                  $dataTodayWaterConsumption += $currentData->{waterconsumption};
+                  $dataTodayHotWaterShare    += $currentData->{hotwater_share};
                   $dataTodayWaterCost        += $currentData->{water_cost};
                   $dataTodayEnergyCost       += $currentData->{energy_cost};
                   $dataTodayMaxflowrate = ( $dataTodayMaxflowrate, $currentData->{maxflowrate} )[ $dataTodayMaxflowrate < $currentData->{maxflowrate} ];    # get maximum
@@ -1575,23 +1645,78 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
             readingsBulkUpdateIfChanged( $hash, "LastEnergyCost", $dataLastEnergyCost )
               if ( defined($dataLastEnergyCost) );
 
-            # today's values
+            # today's and total values
             readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStartTimestamp", $dataTodayAnalyzeStartTimestamp )
               if ( defined($dataTodayAnalyzeStartTimestamp) );
             readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStopTimestamp", $dataTodayAnalyzeStopTimestamp )
               if ( defined($dataTodayAnalyzeStopTimestamp) );
-            readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeCount",     $dataTodayAnalyzeCount );
-            readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumption", $dataTodayWaterconsumption );
-            readingsBulkUpdateIfChanged( $hash, "TodayMaxFlowRate",      $dataTodayMaxflowrate );
-            readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShare",    $dataTodayHotwaterShare );
-            readingsBulkUpdateIfChanged( $hash, "TodayWaterCost",        $dataTodayWaterCost );
-            readingsBulkUpdateIfChanged( $hash, "TodayEnergyCost",       $dataTodayEnergyCost );
+            readingsBulkUpdateIfChanged( $hash, "TodayMaxFlowRate", $dataTodayMaxflowrate );
+
+            # AnalyzeCount
+            my $deltaTodayAnalyzeCount = $dataTodayAnalyzeCount - ReadingsVal($hash, "TodayAnalyzeCount", 0);
+            if($deltaTodayAnalyzeCount > 0) # if there is a change of the value?
+            {
+              readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeCount", $dataTodayAnalyzeCount );
+
+              my $totalAnalyzeCount = ReadingsVal($hash, "TotalAnalyzeCount", 0) + $deltaTodayAnalyzeCount;
+              readingsBulkUpdateIfChanged( $hash, "TotalAnalyzeCount", $totalAnalyzeCount );
+            }
+
+            # WaterConsumption
+            readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumptionRaw", $dataTodayWaterConsumption );
+            my $deltaTodayWaterConsumption = $dataTodayWaterConsumption - ReadingsVal($hash, "TodayWaterConsumption", 0);
+            if($deltaTodayWaterConsumption > 0) # if there is a change of the value?
+            {
+              readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumption", $dataTodayWaterConsumption );
+
+              my $totalWaterConsumptionRaw = ReadingsVal($hash, "TotalWaterConsumptionRaw", 0) + $deltaTodayWaterConsumption;
+              readingsBulkUpdateIfChanged( $hash, "TotalWaterConsumptionRaw", $totalWaterConsumptionRaw );
+
+              $totalWaterConsumptionRaw = ReadingsVal($hash, "TotalWaterConsumptionRaw", 0);
+              my $totalWaterConsumption = $totalWaterConsumptionRaw;# + AttrVal($hash, "offsetWaterConsumption", 0);
+              readingsBulkUpdateIfChanged( $hash, "TotalWaterConsumption", $totalWaterConsumption );
+            }
+
+            # HotWaterShare
+            readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShareRaw", $dataTodayHotWaterShare );
+            my $deltaTodayHotWaterShare = $dataTodayHotWaterShare - ReadingsVal($hash, "TodayHotWaterShare", 0);
+            if($deltaTodayHotWaterShare > 0) # if there is a change of the value?
+            {
+              readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShare", $dataTodayHotWaterShare );
+
+              my $totalHotWaterShareRaw = ReadingsVal($hash, "TotalHotWaterShareRaw", 0) + $deltaTodayHotWaterShare;
+              readingsBulkUpdateIfChanged( $hash, "TotalHotWaterShareRaw", $totalHotWaterShareRaw );
+            }
+
+            # WaterCost
+            readingsBulkUpdateIfChanged( $hash, "TodayWaterCostRaw", $dataTodayWaterCost );
+            my $deltaTodayWaterCost = $dataTodayWaterCost - ReadingsVal($hash, "TodayWaterCost", 0);
+            if($deltaTodayWaterCost > 0) # if there is a change of the value?
+            {
+              readingsBulkUpdateIfChanged( $hash, "TodayWaterCost", $dataTodayWaterCost );
+
+              my $totalWaterCostRaw = ReadingsVal($hash, "TotalWaterCostRaw", 0) + $deltaTodayWaterCost;
+              readingsBulkUpdateIfChanged( $hash, "TotalWaterCostRaw", $totalWaterCostRaw );
+            }
+
+            # EnergyCost
+            readingsBulkUpdateIfChanged( $hash, "TodayEnergyCostRaw", $dataTodayEnergyCost);
+            my $deltaTodayEnergyCost = $dataTodayEnergyCost - ReadingsVal($hash, "TodayEnergyCost", 0);
+            if($deltaTodayEnergyCost > 0) # if there is a change of the value?
+            {
+              readingsBulkUpdateIfChanged( $hash, "TodayEnergyCost", $dataTodayEnergyCost);
+
+              my $totalEnergyCostRaw = ReadingsVal($hash, "TotalEnergyCostRaw", 0) + $deltaTodayEnergyCost;
+              readingsBulkUpdateIfChanged( $hash, "TotalEnergyCostRaw", $totalEnergyCostRaw );
+            }
           }
         }
 
         readingsEndUpdate( $hash, 1 );
 
         $hash->{TELEGRAMDATACOUNTER}++;
+
+        GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash);
       }
     }
 
@@ -1652,6 +1777,33 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
       $callbackFail->();
     }
   }
+}
+
+##################################
+sub GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($)
+{
+  my ( $hash ) = @_;
+  my $name = $hash->{NAME};
+  
+  readingsBeginUpdate($hash);
+
+  my $totalWaterConsumptionRaw = ReadingsVal($name, "TotalWaterConsumptionRaw", 0);
+  my $totalWaterConsumption = $totalWaterConsumptionRaw + AttrVal($name, "offsetWaterConsumption", 0);
+  readingsBulkUpdateIfChanged( $hash, "TotalWaterConsumption", $totalWaterConsumption );
+
+  my $totalHotWaterShareRaw = ReadingsVal($name, "TotalHotWaterShareRaw", 0);
+  my $totalHotWaterShare = $totalHotWaterShareRaw + AttrVal($name, "offsetHotWaterShare", 0);
+  readingsBulkUpdateIfChanged( $hash, "TotalHotWaterShare", $totalHotWaterShare );
+  
+  my $totalWaterCostRaw = ReadingsVal($name, "TotalWaterCostRaw", 0);
+  my $totalWaterCost = $totalWaterCostRaw + AttrVal($name, "offsetWaterCost", 0);
+  readingsBulkUpdateIfChanged( $hash, "TotalWaterCost", $totalWaterCost );
+  
+  my $totalEnergyCostRaw = ReadingsVal($name, "TotalEnergyCostRaw", 0);
+  my $totalEnergyCost = $totalEnergyCostRaw + AttrVal($name, "offsetEnergyCost", 0);
+  readingsBulkUpdateIfChanged( $hash, "TotalEnergyCost", $totalEnergyCost );
+  
+  readingsEndUpdate( $hash, 1 );
 }
 
 #################################

@@ -98,7 +98,7 @@ sub GroheOndusSmartBridge_Header_AddCookies($$);
 sub GroheOndusSmartBridge_Rename(@);
 
 
-my $VERSION = '3.0.3';
+my $VERSION = '3.0.4';
 my $DefaultRetries = 3;                                # default number of retries
 my $DefaultInterval = 60;                              # default value for the polling interval in seconds
 my $DefaultRetryInterval = 60;                         # default value for the retry interval in seconds
@@ -1825,6 +1825,11 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     elsif( $param->{code} == 403 ) ### Forbidden
     {
       $errorMsg = 'wrong password';
+      $leftRetries = 0; # no retry
+    }
+    elsif( $param->{code} == 429 ) ### To many requests
+    {
+      $errorMsg = 'To many requests';
       $leftRetries = 0; # no retry
     }
     elsif( $param->{code} == 503 ) ### Service Unavailable
