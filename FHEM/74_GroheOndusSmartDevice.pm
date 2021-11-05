@@ -642,7 +642,7 @@ sub GroheOndusSmartDevice_Parse($$)
   my $io_name = $io_hash->{NAME};
 
   # to pass parameters to this underlying logical device
-  # the hash 'currentAppliance' is set in io_hoch for the moment
+  # the hash 'currentAppliance' is set in io_hash for the moment
   my $current_appliance_id = $io_hash->{currentAppliance}->{appliance_id};
   my $current_type_id = $io_hash->{currentAppliance}->{type_id};
   my $current_name = $io_hash->{currentAppliance}->{name};
@@ -671,7 +671,11 @@ sub GroheOndusSmartDevice_Parse($$)
       readingsBulkUpdateIfChanged( $hash, 'state', 'connected over bridge to cloud', 1 );
       readingsEndUpdate( $hash, 1 );
 
-      GroheOndusSmartDevice_TimerExecute( $hash );
+      if( not defined( $hash->{NEXTTIMER} ) or
+        $hash->{NEXTTIMER} eq "none")
+      {
+        GroheOndusSmartDevice_TimerExecute( $hash );
+      }
 
       return $name;
     }
