@@ -98,7 +98,7 @@ sub GroheOndusSmartBridge_Header_AddCookies($$);
 sub GroheOndusSmartBridge_Rename(@);
 
 
-my $VERSION = '3.0.2';
+my $VERSION = '3.0.3';
 my $DefaultRetries = 3;                                # default number of retries
 my $DefaultInterval = 60;                              # default value for the polling interval in seconds
 my $DefaultRetryInterval = 60;                         # default value for the retry interval in seconds

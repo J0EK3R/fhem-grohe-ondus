@@ -92,7 +92,7 @@ sub GroheOndusSmartDevice_GetGMTOffset();
 sub GroheOndusSmartDevice_GetGMTMidnightDate();
 
 
-my $VERSION = '3.0.2';
+my $VERSION = '3.0.3';
 my $missingModul = "";
 
 my $SenseGuard_DefaultInterval = 60; # default value for the polling interval in seconds
@@ -261,7 +261,7 @@ sub GroheOndusSmartDevice_Define($$)
 
     $bridge = AttrVal( $name, 'IODev', 'none' );
     
-    $hash->{DEF} = "$name GroheOndusSmartDevice $bridge $deviceId $model";
+    $hash->{DEF} = "$bridge $deviceId $model";
   }
   elsif(@a == 5)
   {
