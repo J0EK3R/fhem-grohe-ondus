@@ -52,7 +52,7 @@
 ##
 ##
 
-my $VERSION = '3.0.5';
+my $VERSION = '3.0.6';
 
 package main;
 
@@ -1690,10 +1690,6 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
 
               my $totalWaterConsumptionRaw = ReadingsVal($hash, "TotalWaterConsumptionRaw", 0) + $deltaTodayWaterConsumption;
               readingsBulkUpdateIfChanged( $hash, "TotalWaterConsumptionRaw", $totalWaterConsumptionRaw );
-
-              $totalWaterConsumptionRaw = ReadingsVal($hash, "TotalWaterConsumptionRaw", 0);
-              my $totalWaterConsumption = $totalWaterConsumptionRaw;# + AttrVal($hash, "offsetWaterConsumption", 0);
-              readingsBulkUpdateIfChanged( $hash, "TotalWaterConsumption", $totalWaterConsumption );
             }
 
             # HotWaterShare

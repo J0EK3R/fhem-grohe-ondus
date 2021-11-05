@@ -52,7 +52,7 @@
 ##
 ##
 
-my $VERSION = '3.0.5';
+my $VERSION = '3.0.6';
 
 package main;
 
