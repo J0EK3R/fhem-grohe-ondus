@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.7';
+my $VERSION = '3.0.8';
 
 package main;
 
@@ -779,11 +779,11 @@ sub GroheOndusSmartDevice_TimerExecute($)
 
   GroheOndusSmartDevice_TimerRemove($hash);
 
-  Log3 $name, 4, "GroheOndusSmartDevice_TimerExecute($name)";
-
   if ( $init_done and 
     $hash->{helper}{IsDisabled} eq '0' )
   {
+    Log3 $name, 4, "GroheOndusSmartDevice_TimerExecute($name)";
+
     ### sense ###
     if ( $model eq 'sense' )
     {
@@ -804,7 +804,7 @@ sub GroheOndusSmartDevice_TimerExecute($)
   {
     readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
 
-    Log3 $name, 3, "GroheOndusSmartDevice_TimerExecute($name) - device is disabled";
+    Log3 $name, 4, "GroheOndusSmartDevice_TimerExecute($name) - device is disabled";
   }
 }
 
@@ -826,7 +826,7 @@ sub GroheOndusSmartDevice_IOWrite($$)
   my ( $hash, $param ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 3, "GroheOndusSmartDevice_IOWrite($name)";
+  Log3 $name, 4, "GroheOndusSmartDevice_IOWrite($name)";
 
   IOWrite( $hash, $param );
 }
