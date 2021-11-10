@@ -5,9 +5,6 @@
 #  (c) 2019 Copyright: J.K. (J0EK3R at gmx dot net)
 #  All rights reserved
 #
-#  The GroheOndus modules are based on 73_GardenaSmartBridge.pm and
-#  74_GardenaSmartDevice from Marko Oldenburg (leongaultier at gmail dot com)
-#
 #   Special thanks goes to comitters:
 #
 #
@@ -30,29 +27,8 @@
 # $Id: 73_GroheOndusSmartBridge.pm 201 2020-04-04 06:14:00Z J0EK3R $
 #
 ###############################################################################
-##
-##
-## Das JSON Modul immer in einem eval aufrufen
-# $data = eval{decode_json($data)};
-#
-# if($@){
-#   Log3($SELF, 2, "$TYPE ($SELF) - error while request: $@");
-#
-#   readingsSingleUpdate($hash, "state", "error", 1);
-#
-#   return;
-# }
-#
-#
-###### Wichtige Notizen
-#
-#   apt-get install libio-socket-ssl-perl
-#   http://www.dxsdata.com/de/2016/07/php-class-for-gardena-smart-system-api/
-#
-##
-##
 
-my $VERSION = '3.0.6';
+my $VERSION = '3.0.7';
 
 package main;
 
@@ -102,13 +78,14 @@ sub GroheOndusSmartBridge_Rename(@);
 
 my $DefaultRetries = 3;                                # default number of retries
 my $DefaultInterval = 60;                              # default value for the polling interval in seconds
-my $DefaultRetryInterval = 60;                         # default value for the retry interval in seconds
 my $DefaultTimeout = 5;                                # default value for response timeout in seconds
+
 my $DefaultAPIVersion = '/v3';                         # default API-Version
 my $DefaultURL = 'https://idp2-apigw.cloud.grohe.com'; # default URL
-
 my $LoginURL = '/iot/oidc/login';
+
 my $TimeStampFormat = '%Y-%m-%dT%I:%M:%S';
+
 my $ReloginOffset_s = -60;                             # (negative) timespan in seconds to add "expires_in" timespan to relogin
 
 
@@ -261,9 +238,11 @@ sub GroheOndusSmartBridge_Define($$)
   $hash->{helper}{RESPONSEERRORCOUNT}    = 0; # statistics
   $hash->{helper}{RESPONSETOTALTIMESPAN} = 0; # statistics
   $hash->{helper}{access_token}          = 'none';
+  $hash->{helper}{LoginInProgress}       = '0';
   $hash->{helper}{LoginCounter}          = 0;
   $hash->{helper}{LoginErrCounter}       = 0;
   $hash->{helper}{DEBUG}                 = '0';
+  $hash->{helper}{IsDisabled}            = '0';
   
   # set default Attributes
   CommandAttr( undef, $name . ' room GroheOndusSmart' )
@@ -319,15 +298,19 @@ sub GroheOndusSmartBridge_Attr(@)
     {
       Log3 $name, 3, "GroheOndusSmartBridge ($name) - disabled";
 
+      $hash->{helper}{IsDisabled} = '1';
+      
       GroheOndusSmartBridge_TimerRemove($hash);
 
       readingsBeginUpdate($hash);
       readingsBulkUpdateIfChanged( $hash, 'state', 'inactive', 1 );
       readingsEndUpdate( $hash, 1 );
     } 
-    else #elsif ( $cmd eq 'del' )
+    else
     {
       Log3 $name, 3, "GroheOndusSmartBridge ($name) - enabled";
+
+      $hash->{helper}{IsDisabled} = '0';
 
       readingsBeginUpdate($hash);
       readingsBulkUpdateIfChanged( $hash, 'state', 'active', 1 );
@@ -372,7 +355,7 @@ sub GroheOndusSmartBridge_Attr(@)
     {
       Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - debugging enabled";
 
-      $hash->{helper}{DEBUG} = '$attrVal';
+      $hash->{helper}{DEBUG} = "$attrVal";
       GroheOndusSmartBridge_Debug_Update($hash);
     } 
     elsif ( $cmd eq 'del' )
@@ -412,7 +395,7 @@ sub GroheOndusSmartBridge_Notify($$)
   my $name = $hash->{NAME};
 
   return
-    if ( IsDisabled($name) );
+    if ( $hash->{helper}{IsDisabled} ne '0' );
 
   my $devname = $dev->{NAME};
   my $devtype = $dev->{TYPE};
@@ -475,32 +458,13 @@ sub GroheOndusSmartBridge_Set($@)
 
   Log3 $name, 4, "GroheOndusSmartBridge_Set($name) - Set was called cmd: >>$cmd<<";
 
-  ### Command 'getdevicesstate'
-  if ( lc $cmd eq 'update' )
+  ### Command 'update'
+  if ( lc $cmd eq lc 'update' )
   {
     GroheOndusSmartBridge_GetDevices($hash);
   }
-  ### Command 'getdevicesstate'
-  elsif ( lc $cmd eq 'getdevicesstate' )
-  {
-    GroheOndusSmartBridge_GetDevices($hash);
-  }
-  ### Command 'login'
-  elsif ( lc $cmd eq 'login' )
-  {
-    return "please set Attribut groheOndusAccountEmail first"
-      if ( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) eq 'none' );
-
-    return "please set groheOndusAccountPassword first"
-      if ( not defined( GroheOndusSmartBridge_ReadPassword($hash) ) );
-
-    #return "token is up to date"
-    #  if ( defined( $hash->{helper}{refresh_token} ) );
-
-    GroheOndusSmartBridge_Login($hash);
-  }
-  ###  Command 'groheondusaccountpassword'
-  elsif ( lc $cmd eq 'groheondusaccountpassword' )
+  ###  Command 'groheOndusAccountPassword'
+  elsif ( lc $cmd eq lc 'groheOndusAccountPassword' )
   {
     return "please set Attribut groheOndusAccountEmail first"
       if ( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) eq 'none' );
@@ -510,19 +474,48 @@ sub GroheOndusSmartBridge_Set($@)
 
     my $passwd = join( ' ', @args );
     GroheOndusSmartBridge_StorePassword( $hash, $passwd );
+    GroheOndusSmartBridge_ClearLogin($hash);
+    GroheOndusSmartBridge_GetDevices($hash);
   } 
-  ### Command 'deleteaccountpassword'
-  elsif ( lc $cmd eq 'deleteaccountpassword' )
+  ### Command 'deleteAccountPassword'
+  elsif ( lc $cmd eq lc 'deleteAccountPassword' )
   {
-    return "usage: $cmd <password>"
-      if ( @args != 0 );
-
     GroheOndusSmartBridge_DeletePassword($hash);
+    GroheOndusSmartBridge_ClearLogin($hash);
   } 
   ### Command 'clearreadings'
-  elsif ( lc $cmd eq 'clearreadings' )
+  elsif ( lc $cmd eq lc 'clearreadings' )
   {
     fhem("deletereading $name .*", 1);
+  }
+  ### Command 'debugGetDevicesState'
+  elsif ( lc $cmd eq lc 'debugGetDevicesState' )
+  {
+    GroheOndusSmartBridge_GetDevices($hash);
+  }
+  ### Command 'debugLogin'
+  elsif ( lc $cmd eq lc 'debugLogin' )
+  {
+    return "please set Attribut groheOndusAccountEmail first"
+      if ( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) eq 'none' );
+
+    return "please set groheOndusAccountPassword first"
+      if ( not defined( GroheOndusSmartBridge_ReadPassword($hash) ) );
+
+    GroheOndusSmartBridge_Login($hash);
+  }
+  ### Command 'debugSetLoginState'
+  elsif ( lc $cmd eq lc 'debugSetLoginState' )
+  {
+    $hash->{helper}{LoginInProgress} = join( " ", @args );
+    GroheOndusSmartBridge_Debug_Update($hash);
+  }
+  ### Command 'debugSetTokenExpired'
+  elsif ( lc $cmd eq lc 'debugSetTokenExpired' )
+  {
+  	my $loginNextTimeStamp = gettimeofday();
+    $hash->{helper}{LoginNextTimeStamp} = $loginNextTimeStamp; 
+    GroheOndusSmartBridge_Debug_Update($hash);
   }
   else
   {
@@ -532,16 +525,24 @@ sub GroheOndusSmartBridge_Set($@)
     $list .= "update:noArg "
       if ( $isPasswordSet );
 
-    $list .= "getDevicesState:noArg login:noArg "
-      if ( $isPasswordSet and $hash->{helper}{DEBUG} ne '0');
-
-    $list .= "groheOndusAccountPassword "
-      if ( not $isPasswordSet );
+    $list .= "groheOndusAccountPassword ";
 
     $list .= "deleteAccountPassword:noArg "
       if ( $isPasswordSet );
 
-    $list .= 'clearreadings:noArg ';
+    $list .= "clearreadings:noArg ";
+
+    $list .= "debugGetDevicesState:noArg "
+      if ( $isPasswordSet and $hash->{helper}{DEBUG} ne '0');
+
+    $list .= "debugLogin:noArg "
+      if ( $isPasswordSet and $hash->{helper}{DEBUG} ne '0');
+
+    $list .= "debugSetLoginState:0,1 "
+      if ( $isPasswordSet and $hash->{helper}{DEBUG} ne '0');
+
+    $list .= "debugSetTokenExpired:noArg "
+      if ( $isPasswordSet and $hash->{helper}{DEBUG} ne '0');
 
     return "Unknown argument $cmd, choose one of $list";
   }
@@ -559,10 +560,15 @@ sub GroheOndusSmartBridge_TimerExecute($)
 
   GroheOndusSmartBridge_TimerRemove($hash);
 
-  Log3 $name, 4, "GroheOndusSmartBridge_TimerExecute($name)";
-  
-  if ( not IsDisabled($name) )
+  if ( $init_done and 
+    $hash->{helper}{IsDisabled} ne '0' )
   {
+    Log3 $name, 4, "GroheOndusSmartBridge_TimerExecute($name) - Disabled";
+  }
+  else
+  {
+    Log3 $name, 4, "GroheOndusSmartBridge_TimerExecute($name)";
+  
     GroheOndusSmartBridge_GetDevices($hash);
 
     # reload timer
@@ -584,7 +590,7 @@ sub GroheOndusSmartBridge_TimerRemove($)
   Log3 $name, 4, "GroheOndusSmartBridge_TimerRemove($name)";
   
   $hash->{NEXTTIMER} = "none";
-  RemoveInternalTimer($hash);
+  RemoveInternalTimer($hash, \&GroheOndusSmartBridge_TimerExecute);
 }
 
 #####################################
@@ -617,10 +623,13 @@ sub GroheOndusSmartBridge_Debug_Update($)
     $hash->{DEBUG_tandc_accepted} = $hash->{helper}{tandc_accepted};
     $hash->{DEBUG_partialLogin} = $hash->{helper}{partialLogin};
     
+    $hash->{DEBUG_LOGIN_INPROGRESS} = $hash->{helper}{LoginInProgress};
     $hash->{DEBUG_LOGIN_NEXTTIMESTAMP} = $hash->{helper}{LoginNextTimeStamp};
-    $hash->{DEBUG_LOGIN_NEXTTIMESTAMPAT} = $hash->{helper}{LoginNextTimeStampAt};
+    $hash->{DEBUG_LOGIN_NEXTTIMESTAMPAT} = strftime($TimeStampFormat, localtime($hash->{DEBUG_LOGIN_NEXTTIMESTAMP}));
     $hash->{DEBUG_LOGIN_COUNTER} = $hash->{helper}{LoginCounter};
     $hash->{DEBUG_LOGIN_COUNTER_ERROR} = $hash->{helper}{LoginErrCounter};
+
+    $hash->{DEBUG_IsDisabled} = $hash->{helper}{IsDisabled};
   }
   else
   {
@@ -643,10 +652,13 @@ sub GroheOndusSmartBridge_Debug_Update($)
     delete $hash->{DEBUG_tandc_accepted};
     delete $hash->{DEBUG_partialLogin};
 
+    delete $hash->{DEBUG_LOGIN_INPROGRESS};
     delete $hash->{DEBUG_LOGIN_NEXTTIMESTAMP};
     delete $hash->{DEBUG_LOGIN_NEXTTIMESTAMPAT};
     delete $hash->{DEBUG_LOGIN_COUNTER};
     delete $hash->{DEBUG_LOGIN_COUNTER_ERROR};
+    
+    delete $hash->{DEBUG_IsDisabled};
   }
 }
 
@@ -658,36 +670,61 @@ sub GroheOndusSmartBridge_Connect($;$$)
   my $name = $hash->{NAME};
   my $now = gettimeofday();
   my $message = "";
-  
-  Log3 $name, 4, "GroheOndusSmartBridge_Connect($name)";
 
-  # no valid AccessToken
-  if( !defined( $hash->{helper}{access_token}) or
-    $hash->{helper}{access_token} eq "none" )
+  if( $hash->{helper}{IsDisabled} ne '0' )
   {
-  	$message = "No valid AccessToken";
-  }
-  # token has expired
-  elsif(!defined($hash->{helper}{LoginNextTimeStamp}) or
-    $now >= $hash->{helper}{LoginNextTimeStamp})
-  {
-    $message = "AccessToken expired - Relogin needed";
-  }
-  
-  if( $message eq "")
-  {
+    Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - IsDisabled";
+
     # if there is a callback then call it
-    if( defined($callbackSuccess) )
+    if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - callbackSuccess";
-      $callbackSuccess->();
+      Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - callbackFail";
+      $callbackFail->('bridge inactive');
+    }
+  }
+  elsif($hash->{helper}{LoginInProgress} ne '0')
+  {
+    Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - LoginInProgress";
+
+    # if there is a callback then call it
+    if( defined($callbackFail) )
+    {
+      Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - callbackFail";
+      $callbackFail->('login in progress');
     }
   }
   else
   {
-  	Log3 $name, 3, "GroheOndusSmartBridge_Connect($name) - $message";
-  	
-    GroheOndusSmartBridge_Login($hash, $callbackSuccess, $callbackFail);
+    Log3 $name, 4, "GroheOndusSmartBridge_Connect($name)";
+    
+    # no valid AccessToken
+    if( !defined( $hash->{helper}{access_token}) or
+      $hash->{helper}{access_token} eq "none" )
+    {
+      $message = "No valid AccessToken";
+    }
+    # token has expired
+    elsif(!defined($hash->{helper}{LoginNextTimeStamp}) or
+      $now >= $hash->{helper}{LoginNextTimeStamp})
+    {
+      $message = "AccessToken expired - Relogin needed";
+    }
+  
+    if( $message eq "")
+    {
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - callbackSuccess";
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      Log3 $name, 3, "GroheOndusSmartBridge_Connect($name) - $message";
+
+      GroheOndusSmartBridge_Login($hash, $callbackSuccess, $callbackFail);
+    }
   }
 }
 
@@ -735,19 +772,51 @@ sub GroheOndusSmartBridge_Login($;$$)
   {
     $errorMsg = 'please set grohe account password first';
   }
+  elsif($hash->{helper}{LoginInProgress} ne '0')
+  {
+    $errorMsg = 'login in progress';
+  }
 
   GroheOndusSmartBridge_ClearLogin($hash);
 
   if($errorMsg eq "")
   {
-  
+    $hash->{helper}{LoginInProgress}       = '1';
+  	GroheOndusSmartBridge_Debug_Update($hash);
+  	
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged( $hash, 'state', 'logging in', 1 );
     readingsEndUpdate( $hash, 1 );
 
-    my $login_PostOndusAddress = sub { GroheOndusSmartBridge_Login_GetToken($hash, $callbackSuccess, $callbackFail); };
-    my $login_PostLoginAddress = sub { GroheOndusSmartBridge_Login_PostAddress($hash, $login_PostOndusAddress, $callbackFail); };
-    my $login_GetLoginAddress = sub { GroheOndusSmartBridge_Login_GetLoginAddress($hash, $login_PostLoginAddress, $callbackFail); };
+    my $loginSuccess = sub
+    {
+      $hash->{helper}{LoginInProgress}       = '0';
+      GroheOndusSmartBridge_Debug_Update($hash);
+
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail";
+        $callbackSuccess->();
+      }
+    };
+
+    my $loginFail = sub
+    {
+      $hash->{helper}{LoginInProgress}       = '0';
+      GroheOndusSmartBridge_Debug_Update($hash);
+
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3 $name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail";
+        $callbackFail->($errorMsg);
+      }
+    };
+
+    my $login_PostOndusAddress = sub { GroheOndusSmartBridge_Login_GetToken($hash, $loginSuccess, $loginFail); };
+    my $login_PostLoginAddress = sub { GroheOndusSmartBridge_Login_PostAddress($hash, $login_PostOndusAddress, $loginFail); };
+    my $login_GetLoginAddress = sub { GroheOndusSmartBridge_Login_GetLoginAddress($hash, $login_PostLoginAddress, $loginFail); };
   
     $login_GetLoginAddress->();
   }
@@ -761,7 +830,7 @@ sub GroheOndusSmartBridge_Login($;$$)
     if( defined($callbackFail) )
     {
       Log3 $name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail";
-      $callbackFail->();
+      $callbackFail->($errorMsg);
     }
   }
 }
@@ -822,7 +891,7 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
       if( defined($callbackFail) )
       {
         Log3 $name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - callbackFail";
-        $callbackFail->();
+        $callbackFail->($errorMsg);
       }
     }
   }; 
@@ -881,6 +950,13 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
         GroheOndusSmartBridge_ProcessSetCookies($hash, $callbackparam->{httpheader}, "AWSALB");
         #GroheOndusSmartBridge_ProcessSetCookies( $hash, $callbackparam->{httpheader}, undef );
       }
+      # Invalid email address or password? 
+      elsif ( $data =~ m/Invalid email address or password/ )
+      {
+        Log3 $name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login - Invalid email address or password";
+
+        $errorMsg = "Invalid email address or password";
+      }
       else
       {
         $hash->{helper}{ondusaddress} = undef;
@@ -908,7 +984,7 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
       if( defined($callbackFail) )
       {
         Log3 $name, 4, "GroheOndusSmartBridge_Login_PostAddress($name) - callbackFail";
-        $callbackFail->();
+        $callbackFail->($errorMsg);
       }
     }
   }; 
@@ -993,7 +1069,6 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
 
         my $loginNextTimeStamp = $now + $decode_json->{expires_in} + $ReloginOffset_s;
         $hash->{helper}{LoginNextTimeStamp} = $loginNextTimeStamp; 
-        $hash->{helper}{LoginNextTimeStampAt} = strftime($TimeStampFormat, localtime($loginNextTimeStamp));
         $hash->{helper}{LoginCounter}++;
         
         Log3 $name, 5, "GroheOndusSmartBridge_Login_GetToken($name) - RefreshToken\n$hash->{helper}{refresh_token}";
@@ -1017,7 +1092,6 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
 
         my $loginNextTimeStamp = $now;
         $hash->{helper}{LoginNextTimeStamp} = $loginNextTimeStamp; 
-        $hash->{helper}{LoginNextTimeStampAt} = strftime($TimeStampFormat, localtime($loginNextTimeStamp));
         $hash->{helper}{LoginErrCounter}++;
 
         $errorMsg = "LOGIN_GETTOKEN: WRONG JSON STRUCTURE";
@@ -1049,7 +1123,7 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
       if( defined($callbackFail) )
       {
         Log3 $name, 4, "GroheOndusSmartBridge_Login_GetToken($name) - callbackFail";
-        $callbackFail->();
+        $callbackFail->($errorMsg);
       }
     }
   }; 
@@ -1176,7 +1250,7 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
       if( defined($callbackFail) )
       {
         Log3 $name, 4, "GroheOndusSmartBridge_Login_Refresh($name) - callbackFail";
-        $callbackFail->();
+        $callbackFail->($errorMsg);
       }
     }
   }; 
@@ -1320,7 +1394,7 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
       if( defined($callbackFail) )
       {
         Log3 $name, 4, "GroheOndusSmartBridge_GetLocations($name) - callbackFail";
-        $callbackFail->();
+        $callbackFail->($errorMsg);
       }
     }
   }; 
@@ -1421,7 +1495,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
       if( defined($callbackFail) )
       {
         Log3 $name, 4, "GroheOndusSmartBridge_GetRooms($name) - callbackFail";
-        $callbackFail->();
+        $callbackFail->($errorMsg);
       }
     }
   }; 
@@ -1680,7 +1754,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
       if( defined($callbackFail) )
       {
         Log3 $name, 4, "GroheOndusSmartBridge_GetAppliances($name) - callbackFail";
-        $callbackFail->();
+        $callbackFail->($errorMsg);
       }
     }
   };
@@ -1709,6 +1783,7 @@ sub GroheOndusSmartBridge_RequestParam($$)
 {
   my ( $hash, $param ) = @_;
   my $name = $hash->{NAME};
+  my $resultCallback = $param->{resultCallback};
 
   Log3 $name, 4, "GroheOndusSmartBridge_RequestParam($name)";
 
@@ -1756,21 +1831,35 @@ sub GroheOndusSmartBridge_RequestParam($$)
     HttpUtils_NonblockingGet($param);
   };
 
-  $param->{compress} = 0;
-  $param->{doTrigger} = 1;
-  $param->{callback} = \&GroheOndusSmartBridge_RequestErrorHandling;
+  if( $hash->{helper}{IsDisabled} ne '0' )
+  {
+    # is there a callback function?
+    if(defined($resultCallback))
+    {
+      my $data = undef;
+      my $errorMsg = "Bridge inactive";
 
-  $hash->{helper}{WRITEMETHOD} = $param->{method};
-  $hash->{helper}{WRITEURL} = $param->{url};
-  $hash->{helper}{WRITEHEADER} = $param->{header};
-  $hash->{helper}{WRITEPAYLOAD} = $param->{payload};
-  $hash->{helper}{WRITEHTTPVERSION} = $param->{httpversion};
-  $hash->{helper}{WRITEIGNOREREDIRECTS} = $param->{ignoreredirects};
-  $hash->{helper}{WRITEKEEPALIVE} = $param->{keepalive};
-  
-  GroheOndusSmartBridge_Debug_Update($hash);
-  
-  $sendReceive->($hash->{RETRIES}, $sendReceive);
+      $resultCallback->($param, $data, $errorMsg);
+    }
+  }
+  else
+  {
+    $param->{compress} = 0;
+    $param->{doTrigger} = 1;
+    $param->{callback} = \&GroheOndusSmartBridge_RequestErrorHandling;
+
+    $hash->{helper}{WRITEMETHOD} = $param->{method};
+    $hash->{helper}{WRITEURL} = $param->{url};
+    $hash->{helper}{WRITEHEADER} = $param->{header};
+    $hash->{helper}{WRITEPAYLOAD} = $param->{payload};
+    $hash->{helper}{WRITEHTTPVERSION} = $param->{httpversion};
+    $hash->{helper}{WRITEIGNOREREDIRECTS} = $param->{ignoreredirects};
+    $hash->{helper}{WRITEKEEPALIVE} = $param->{keepalive};
+
+    GroheOndusSmartBridge_Debug_Update($hash);
+
+    $sendReceive->($hash->{RETRIES}, $sendReceive);
+  }
 }
 
 #####################################
@@ -1824,8 +1913,9 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     }
     elsif( $param->{code} == 403 ) ### Forbidden
     {
-      $errorMsg = 'wrong password';
-      $leftRetries = 0; # no retry
+      # {"message":"The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method. Consult the service documentation for details.\n\nThe Canonical String for this request should have been\n'GET\n/v3/locations/48434/rooms/58512/appliances\n\nhost:7r0z8xr3fg.execute-api.eu-central-1.amazonaws.com\nx-amz-date:20211110T054820Z\nx-authorization:Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJaMXA0SjVtWmRwRlBNRlg3NjJuQ253aW9wQ05iVmZBam9ab3BVcUllY3c0In0.eyJleHAiOjE2MzY1MjY4ODQsImlhdCI6MTYzNjUyMzI4NCwiYXV0aF90aW1lIjoxNjM2NTIzMjY3LCJqdGkiOiJlNjQ5YmVkNy05YzRlLTRiN2YtYjI1Yy0zNGMwYzE5ZmUyODUiLCJpc3MiOiJodHRwczovL2lkcDItYXBpZ3cuY2xvdWQuZ3JvaGUuY29tL3YxL3Nzby9hdXRoL3JlYWxtcy9pZG0tYXBpZ3ciLCJhdWQiOiJpb3QiLCJzdWIiOiI5YmRiZGE4OS0zOGM2LTRlZTktOTQwOC01ZDIyYzM0NDUzZmIiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJpb3QiLCJzZXNzaW9uX3N0YXRlIjoiNGMwNjg3NmItNjg4Yi00YWNkLTg2OGItMzg1Y2JlNzRiMjdhIiwiYWNyIjoiMSIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJzaG9wIiwic2Vuc2UiLCJ1bWFfYXV0aG9yaXphdGlvbiIsImlvdCJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIEdyb2hlX0lEUDIiLCJjb3VudHJ5IjoiREUiLCJuYW1lIjoiSm9jaGVuIEtlbW0iLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJqb2NoZW4ua2VtbUBnbXguZGUiLCJzYWx1dGF0aW9uIjoibXIiLCJnaXZlbl9uYW1lIjoiSm9jaGVuIiwiZmFtaWx5X25hbWUiOiJLZW1tIiwiZW1haWwiOiJqb2NoZW4ua2VtbUBnbXguZGUifQ.J6aBmz247kazFZ0041k_yW9LQM-0fLyyeqyuLdSidtxIInsDv6HHF8yWzD6j0vag_stFteMQDeWCukJFG3aDKjpd8CyAK96ZgiXA2RiROiKhZQ2tJxUFDArf6jvZKuHTKf-sk3wtxx6Om6mTPVCp1nPHaFT0Z3DJMQblmLTdejaf0_7-s0y8gw2O-2QSw_wDihTdoGWI2OS-zZwb9eiAaxRkuoNrZYT4g1yrDfqn2h38N2a9fUbwzPHpCVEl8wRurYUdV6QEMk41toCjkRYXcnOAD_INbMMCpOxsAnkZjDwEaxIlPRd9vdhNRQ_Da23wHAYGJgwR21qrkwEOgtBDtg\n\nhost;x-amz-date;x-authorization\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'\n\nThe String-to-Sign should have been\n'AWS4-HMAC-SHA256\n20211110T054820Z\n20211110/eu-central-1/execute-api/aws4_request\n141c3af27e3cc31c6bcf90c894c10a67aaffb73b7e9b6e138deef59a6e1c663e'\n"}
+      #$errorMsg = 'wrong password';
+      #$leftRetries = 0; # no retry
     }
     elsif( $param->{code} == 429 ) ### To many requests
     {
@@ -1979,6 +2069,7 @@ sub GroheOndusSmartBridge_Write($$)
 {
   my ( $hash, $param ) = @_;
   my $name = $hash->{NAME};
+  my $resultCallback = $param->{resultCallback};
 
   Log3 $name, 4, "GroheOndusSmartBridge_Write($name)";
 
@@ -1986,13 +2077,25 @@ sub GroheOndusSmartBridge_Write($$)
   {
     # Add Authorization to Header
     GroheOndusSmartBridge_Header_AddAuthorization( $hash, $param );
-  
+
     $param->{hash} = $hash;
-  
+
     GroheOndusSmartBridge_RequestParam( $hash, $param );
   };
+
+  my $callbackFail = sub
+  {
+    # is there a callback function?
+    if(defined($resultCallback))
+    {
+      my $data = undef;
+      my $errorMsg = $_[0];
+
+      $resultCallback->($param, $data, $errorMsg);
+    }
+  };
   
-  GroheOndusSmartBridge_Connect($hash, $callbackSuccess);
+   GroheOndusSmartBridge_Connect($hash, $callbackSuccess, $callbackFail);
 }
 
 #####################################
