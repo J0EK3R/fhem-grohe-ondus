@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.10';
+my $VERSION = '3.0.11';
 
 package main;
 
@@ -568,7 +568,10 @@ sub GroheOndusSmartBridge_Debug_Update($)
   {
     # delete all keys starting with 'DEBUG_'
     my @matching_keys =  grep /DEBUG_/, keys %$hash;
-    delete %$hash{@matching_keys};
+    foreach (@matching_keys)
+    {
+      delete $hash->{$_};
+    }
   }
 }
 
