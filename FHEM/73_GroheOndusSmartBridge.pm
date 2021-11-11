@@ -28,14 +28,19 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.8';
+my $VERSION = '3.0.9';
 
 package main;
 
 use strict;
 use warnings;
+
+my $missingModul = "";
+
 use FHEM::Meta;
 use HTML::Entities;
+eval {use JSON;1 or $missingModul .= 'JSON '};
+
 #use HttpUtils;
 
 #########################
@@ -87,89 +92,6 @@ my $LoginURL = '/iot/oidc/login';
 my $TimeStampFormat = '%Y-%m-%dT%I:%M:%S';
 
 my $ReloginOffset_s = -60;                             # (negative) timespan in seconds to add "expires_in" timespan to relogin
-
-
-my $missingModul = '';
-
-eval "use Encode qw(encode encode_utf8 decode_utf8);1"
-  or $missingModul .= "Encode ";
-
-eval "use IO::Socket::SSL;1"
-  or $missingModul .= 'IO::Socket::SSL ';
-
-# try to use JSON::MaybeXS wrapper
-#   for chance of better performance + open code
-eval {
-  require JSON::MaybeXS;
-  import JSON::MaybeXS qw( decode_json encode_json );
-  1;
-};
-
-if ($@)
-{
-  $@ = undef;
-
-  # try to use JSON wrapper
-  #   for chance of better performance
-  eval {
-    # JSON preference order
-    local $ENV{PERL_JSON_BACKEND} = 'Cpanel::JSON::XS,JSON::XS,JSON::PP,JSON::backportPP'
-      unless ( defined( $ENV{PERL_JSON_BACKEND} ) );
-
-    require JSON;
-    import JSON qw( decode_json encode_json );
-    1;
-  };
-
-  if ($@)
-  {
-    $@ = undef;
-
-    # In rare cases, Cpanel::JSON::XS may
-    #   be installed but JSON|JSON::MaybeXS not ...
-    eval {
-      require Cpanel::JSON::XS;
-      import Cpanel::JSON::XS qw(decode_json encode_json);
-      1;
-    };
-
-    if ($@)
-    {
-      $@ = undef;
-
-      # In rare cases, JSON::XS may
-      #   be installed but JSON not ...
-      eval {
-        require JSON::XS;
-        import JSON::XS qw(decode_json encode_json);
-        1;
-      };
-
-      if ($@)
-      {
-        $@ = undef;
-
-        # Fallback to built-in JSON which SHOULD
-        #   be available since 5.014 ...
-        eval {
-          require JSON::PP;
-          import JSON::PP qw(decode_json encode_json);
-          1;
-        };
-
-        if ($@)
-        {
-          $@ = undef;
-
-          # Fallback to JSON::backportPP in really rare cases
-          require JSON::backportPP;
-          import JSON::backportPP qw(decode_json encode_json);
-          1;
-        }
-      }
-    }
-  }
-}
 
 #####################################
 sub GroheOndusSmartBridge_Initialize($)
@@ -611,7 +533,16 @@ sub GroheOndusSmartBridge_Debug_Update($)
     $hash->{DEBUG_WRITEHTTPVERSION} = $hash->{helper}{WRITEHTTPVERSION};
     $hash->{DEBUG_WRITEIGNOREREDIRECTS} = $hash->{helper}{WRITEIGNOREREDIRECTS};
     $hash->{DEBUG_WRITEKEEPALIVE} = $hash->{helper}{WRITEKEEPALIVE};
-  	
+
+    $hash->{DEBUG_RESPONSECOUNT_SUCCESS} = $hash->{helper}{RESPONSECOUNT_SUCCESS};
+    $hash->{DEBUG_RESPONSECOUNT_ERROR} = $hash->{helper}{RESPONSECOUNT_ERROR};
+    $hash->{DEBUG_RESPONSEAVERAGETIMESPAN} = $hash->{helper}{RESPONSEAVERAGETIMESPAN};
+    my @retrystring_keys =  grep /RESPONSECOUNT_RETRY_/, keys %{$hash->{helper}};
+    foreach (@retrystring_keys)
+    {
+      $hash->{'DEBUG_' . $_} = $hash->{helper}{$_};
+    }
+
     $hash->{DEBUG_refresh_token} = $hash->{helper}{refresh_token};
     $hash->{DEBUG_access_token} = $hash->{helper}{access_token};
     $hash->{DEBUG_expires_in} = $hash->{helper}{expires_in};
@@ -624,8 +555,10 @@ sub GroheOndusSmartBridge_Debug_Update($)
     $hash->{DEBUG_partialLogin} = $hash->{helper}{partialLogin};
     
     $hash->{DEBUG_LOGIN_INPROGRESS} = $hash->{helper}{LoginInProgress};
-    $hash->{DEBUG_LOGIN_NEXTTIMESTAMP} = $hash->{helper}{LoginNextTimeStamp};
-    $hash->{DEBUG_LOGIN_NEXTTIMESTAMPAT} = strftime($TimeStampFormat, localtime($hash->{DEBUG_LOGIN_NEXTTIMESTAMP}));
+    $hash->{DEBUG_LOGIN_NEXTTIMESTAMP} = $hash->{helper}{LoginNextTimeStamp}
+      if(defined($hash->{helper}{LoginNextTimeStamp}));
+    $hash->{DEBUG_LOGIN_NEXTTIMESTAMPAT} = strftime($TimeStampFormat, localtime($hash->{helper}{LoginNextTimeStamp}))
+      if(defined($hash->{helper}{LoginNextTimeStamp}));
     $hash->{DEBUG_LOGIN_COUNTER} = $hash->{helper}{LoginCounter};
     $hash->{DEBUG_LOGIN_COUNTER_ERROR} = $hash->{helper}{LoginErrCounter};
 
@@ -633,32 +566,9 @@ sub GroheOndusSmartBridge_Debug_Update($)
   }
   else
   {
-    delete $hash->{DEBUG_WRITEMETHOD};
-    delete $hash->{DEBUG_WRITEURL};
-    delete $hash->{DEBUG_WRITEHEADER};
-    delete $hash->{DEBUG_WRITEPAYLOAD};
-    delete $hash->{DEBUG_WRITEHTTPVERSION};
-    delete $hash->{DEBUG_WRITEIGNOREREDIRECTS};
-    delete $hash->{DEBUG_WRITEKEEPALIVE};
-
-    delete $hash->{DEBUG_refresh_token};
-    delete $hash->{DEBUG_access_token};
-    delete $hash->{DEBUG_expires_in};
-    delete $hash->{DEBUG_token_type};
-    delete $hash->{DEBUG_id_token};
-    delete $hash->{"DEBUG_not-before-policy"};
-    delete $hash->{DEBUG_session_state};
-    delete $hash->{DEBUG_scope};
-    delete $hash->{DEBUG_tandc_accepted};
-    delete $hash->{DEBUG_partialLogin};
-
-    delete $hash->{DEBUG_LOGIN_INPROGRESS};
-    delete $hash->{DEBUG_LOGIN_NEXTTIMESTAMP};
-    delete $hash->{DEBUG_LOGIN_NEXTTIMESTAMPAT};
-    delete $hash->{DEBUG_LOGIN_COUNTER};
-    delete $hash->{DEBUG_LOGIN_COUNTER_ERROR};
-    
-    delete $hash->{DEBUG_IsDisabled};
+    # delete all keys starting with 'DEBUG_'
+    my @matching_keys =  grep /DEBUG_/, keys %$hash;
+    delete %$hash{@matching_keys};
   }
 }
 
@@ -1947,10 +1857,11 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     $hash->{helper}{RESPONSEAVERAGETIMESPAN} = $hash->{helper}{RESPONSETOTALTIMESPAN} / $hash->{helper}{RESPONSECOUNT_SUCCESS};
     $hash->{helper}{$retrystring}++;
 
+    GroheOndusSmartBridge_Debug_Update($hash);
     ### just copy from helper
-    $hash->{RESPONSECOUNT_SUCCESS} = $hash->{helper}{RESPONSECOUNT_SUCCESS};
-    $hash->{RESPONSEAVERAGETIMESPAN} = $hash->{helper}{RESPONSEAVERAGETIMESPAN};
-    $hash->{$retrystring} = $hash->{helper}{$retrystring};
+    #$hash->{RESPONSECOUNT_SUCCESS} = $hash->{helper}{RESPONSECOUNT_SUCCESS};
+    #$hash->{RESPONSEAVERAGETIMESPAN} = $hash->{helper}{RESPONSEAVERAGETIMESPAN};
+    #$hash->{$retrystring} = $hash->{helper}{$retrystring};
   }
   ### error: retries left
   elsif(defined($retryCallback) and # is retryCallbeck defined
@@ -1967,7 +1878,8 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     Log3 $name, 3, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: no retries left Error: " . $errorMsg;
 
     $hash->{helper}{RESPONSECOUNT_ERROR}++;
-    $hash->{RESPONSECOUNT_ERROR} = $hash->{helper}{RESPONSECOUNT_ERROR};
+
+    GroheOndusSmartBridge_Debug_Update($hash);
 
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged( $hash, 'state', $errorMsg, 1 );
