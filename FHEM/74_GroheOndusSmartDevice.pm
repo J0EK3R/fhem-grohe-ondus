@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.11';
+my $VERSION = '3.0.12';
 
 package main;
 
@@ -2971,78 +2971,119 @@ sub GroheOndusSmartDevice_GetGMTMidnightDate()
 =pod
 
 =item device
-=item summary    Modul to control GroheOndusSmart Devices
-=item summary_DE Modul zur Steuerung von GroheOndusSmartger&aumlten
+=item summary Module wich represents a Grohe appliance like Sense or SenseGuard
 
 =begin html
 
 <a name="GroheOndusSmartDevice"></a>
 <h3>GroheOndusSmartDevice</h3>
 <ul>
-    In combination with GroheOndusSmartBridge this FHEM Module controls the GroheOndusSmart Device using the GroheOndusCloud
-    <br><br>
-    Once the Bridge device is created, the connected devices are automatically recognized and created in FHEM. <br>
-    From now on the devices can be controlled and changes in the GroheOndusAPP are synchronized with the state and readings of the devices.
-    <a name="GroheOndusSmartDevicereadings"></a>
-    <br><br><br>
-    <b>Readings</b>
+    In combination with FHEM module <b>GroheOndusSmartBridge</b> this module represents a grohe appliance like <b>Sense</b> or <b>SenseGuard</b>.<br>
+    It communicates over <b>GroheOndusSmartBridge</b> to the <b>GroheOndusCloud</b> to get the configuration and measured values of the appliance.<br>
+    <br>
+    Once the Bridge device is created, the connected devices are recognized and created automatically in FHEM.<br>
+    From now on the devices can be controlled and changes in the GroheOndusAPP are synchronized with the state and readings of the devices.<br>
+    <br>
+    <a name="GroheOndusSmartDevice"></a><b>Define</b>
     <ul>
-        <li>ApplianceID - ID of the device</li>
-        <li>ApplianceInstallationDate - installation date of the device</li>
-        <li>ApplianceName - name of the device set with GroheOndusAPP</li>
-    </ul>
-    <br><br>
-    <a name="GroheOndusSmartDeviceattributes"></a>
-    <b>Attributes</b>
+      <code><B>define &lt;name&gt; GroheOndusSmartDevice &lt;bridge&gt; &lt;deviceId&gt; &lt;model&gt;</B></code>
+      <br><br>
+      Example:<br>
+      <ul>
+        <code>
+        define SenseGuard GroheOndusSmartDevice GroheBridge 00000000-1111-2222-3333-444444444444 sense_guard <br>
+        <br>
+        </code>
+      </ul>
+    </ul><br>
+    <a name="GroheOndusSmartDevice"></a><b>Set</b>
     <ul>
-        <li>model - model of the device: sense/sense_guard</li>
-        <li>interval - Interval in seconds</li>
+      <li><B>update</B><a name="GroheOndusSmartDeviceupdate"></a><br>
+        Update configuration and values.
+      </li>
+      <br>
+      <li><B>clearreadings</B><a name="GroheOndusSmartDeviceclearreadings"></a><br>
+        Clear all readings of the module.
+      </li>
+      <br>
+      <li><B>buzzer</B><a name="GroheOndusSmartDevicebuzzer"></a><br>
+        <i>SenseGuard only</i><br>
+        <b>off</b> stop buzzer.<br>
+        <b>on</b> enable buzzer.<br>
+      </li>
+      <br>
+      <li><B>valve</B><a name="GroheOndusSmartDevicevalve"></a><br>
+        <i>SenseGuard only</i><br>
+        <b>on</b> open valve.<br>
+        <b>off</b> close valve.<br>
+      </li>
+      <br>
+      <b><i>Debug-mode</i></b><br>
+      <br>
+      <li><B>debugRefreshConfig</B><a name="GroheOndusSmartDevicedebugRefreshConfig"></a><br>
+        Update the configuration.
+      </li>
+      <br>
+      <li><B>debugRefreshValues</B><a name="GroheOndusSmartDevicedebugRefreshValues"></a><br>
+        Update the values.
+      </li>
+      <br>
+      <li><B>debugRefreshState</B><a name="GroheOndusSmartDevicedebugRefreshState"></a><br>
+        Update the state.
+      </li>
+      <br>
+      <li><B>debugGetApplianceCommand</B><a name="GroheOndusSmartDevicedebugGetApplianceCommand"></a><br>
+        <i>SenseGuard only</i><br>
+        Update the command-state.
+      </li>
     </ul>
-    <br><br>
-    <a name="GroheOndusSmartDeviceset"></a>
-    <b>set</b>
+    <br>
+    <a name="GroheOndusSmartDeviceattr"></a><b>Attributes</b><br>
     <ul>
-        <li>refreshState</li>
-        <li>refreshValues</li>
-    </ul>
+      <li><a name="GroheOndusSmartDeviceinterval">interval</a><br>
+        Interval in seconds to poll for locations, rooms and appliances.
+        The default value is 60 seconds for SenseGuard and 600 seconds for Sense.
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDevicedisable">disable</a><br>
+        If <b>0</b> (default) then GroheOndusSmartDevice is <b>enabled</b>.<br>
+        If <b>1</b> then GroheOndusSmartDevice is <b>disabled</b> - no communication to the grohe cloud will be done.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDevicedebug">debug</a><br>
+        If <b>0</b> (default) debugging mode is <b>disabled</b>.<br>
+        If <b>1</b> debugging mode is <b>enabled</b> - more internals and commands are shown.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDevicedebugJSON">debugJSON</a><br>
+        If <b>0</b> (default)<br>
+        If <b>1</b> if communication fails the json-payload of incoming telegrams is set to a reading.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDeviceoffsetEnergyCost">offsetEnergyCost</a><br>
+        <i>SenseGuard only</i><br>
+        Offset value for calculating reading TotalEnergyCost.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDeviceoffsetWaterCost">offsetWaterCost</a><br>
+        <i>SenseGuard only</i><br>
+        Offset value for calculating reading TotalWaterCost.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDeviceoffsetWaterConsumption">offsetWaterConsumption</a><br>
+        <i>SenseGuard only</i><br>
+        Offset value for calculating reading TotalWaterConsumption.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDeviceoffsetHotWaterShare">offsetHotWaterShare</a><br>
+        <i>SenseGuard only</i><br>
+        Offset value for calculating reading TotalHotWaterShare.<br>
+      </li>
+    </ul><br>
+    <br><br>
 </ul>
 
 =end html
-=begin html_DE
-
-<a name="GroheOndusSmartDevice"></a>
-<h3>GroheOndusSmartDevice</h3>
-<ul>
-    Zusammen mit dem Device GroheOndusSmartDevice stellt dieses FHEM Modul die Kommunikation zwischen der GroheOndusCloud und Fhem her.
-    <br><br>
-    Wenn das GroheOndusSmartBridge Device erzeugt wurde, werden verbundene Ger&auml;te automatisch erkannt und in Fhem angelegt.<br> 
-    Von nun an k&ouml;nnen die eingebundenen Ger&auml;te gesteuert werden. &Auml;nderungen in der APP werden mit den Readings und dem Status syncronisiert.
-    <a name="GroheOndusSmartDevicereadings"></a>
-    </ul>
-    <br>
-    <ul>
-    <b>Readings</b>
-    <ul>
-        <li>ApplianceID - ID des Ger&auml;tes</li>
-        <li>ApplianceInstallationDate - Installationdatum des Ger&auml;tes</li>
-        <li>ApplianceName - Name des Ger&auml;tes, der in der GroheOndusAPP gesetzt wurde</li>
-    </ul>
-    <br><br>
-    <a name="GroheOndusSmartDeviceattributes"></a>
-    <b>Attribute</b>
-    <ul>
-        <li>model - Modell des Ger&auml;tes: sense/sense_guard</li>
-        <li>interval - Abfrageintervall in Sekunden</li>
-    </ul>
-    <a name="GroheOndusSmartDeviceset"></a>
-    <b>set</b>
-    <ul>
-        <li>refreshState</li>
-        <li>refreshValues</li>
-    </ul>
-</ul>
-
-=end html_DE
 
 =for :application/json;q=META.json 74_GroheOndusSmartDevice.pm
 {

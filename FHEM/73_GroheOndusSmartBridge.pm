@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.11';
+my $VERSION = '3.0.12';
 
 package main;
 
@@ -2157,119 +2157,130 @@ sub GroheOndusSmartBridge_Rename(@)
 }
 
 
-1;
-
 =pod
-
 =item device
-=item summary       Modul to communicate with the GroheCloud
-=item summary_DE    Modul zur Datenübertragung zur GroheCloud
-
+=item summary module to communicate with the GroheOndusCloud
 =begin html
 
-<a name="GroheOndusSmartBridge"></a>
-<h3>GroheOndusSmartBridge</h3>
-<ul>
-  <u><b>Prerequisite</b></u>
-  <br><br>
-  <li>In combination with GroheOndusSmartDevice this FHEM Module controls the communication between the GroheOndusCloud and connected Devices like Grohe Sense and Grohe SenseGUARD</li>
-  <li>Installation of the following packages: apt-get install libio-socket-ssl-perl</li>
-  <li>All connected Devices must be correctly installed in the GroheOndusAPP</li>
-</ul>
-<br>
-<a name="GroheOndusSmartBridgedefine"></a>
-<b>Define</b>
-<ul><br>
-  <code>define &lt;name&gt; GroheOndusSmartBridge</code>
-  <br><br>
-  Example:
-  <ul><br>
-    <code>define GroheOndus_Bridge GroheOndusSmartBridge</code><br>
-  </ul>
-  <br>
-  The GroheOndusSmartBridge device is created in the room GroheOndusSmart, then the devices of Your system are recognized automatically and created in FHEM. From now on the devices can be controlled and changes in the GroheOndusAPP are synchronized with the state and readings of the devices.
-  <br><br>
-  <a name="GroheOndusSmartBridgereadings"></a>
-  <br><br>
-  <b>Readings</b>
+  <a name="GroheOndusSmartBridge"></a><h3>GroheOndusSmartBridge</h3>
   <ul>
-    <li>state - State of the Bridge</li>
-    <li>token - SessionID</li>
+    In combination with the FHEM module <b>GroheOndusSmartDevice</b> this module communicates with the <b>GroheOndusCloud</b>.<br>
+    <br>
+    You can get the configurations and measured values of the registered <b>Sense</b> und <b>SenseGuard</b> applications 
+    and open/close the valve of a <b>SenseGuard</b> application.<br>
+    <br>
+    Once the <b>GroheOndusSmartDevice</b> is created, the connected devices are automatically recognized and created in FHEM.<br>
+    From now on the devices can be controlled and changes in the <b>GroheOndusAPP</b> are synchronized with the state and readings of the devices.
+    <br>
+      <b>Notes</b>
+      <ul>
+        <li>This module communicates with the <b>GroheOndusCloud</b> - you have to be registered.
+        </li>
+        <li>Register your account directly at grohe - don't use "Sign in with Apple/Google/Facebook" or something else.
+        </li>
+        <li>There is a <b>debug-mode</b> you can enable/disable with the <b>attribute debug</b> to see more internals.
+        </li>
+      </ul>
+    <br>
+    <a name="GroheOndusSmartBridge"></a><b>Define</b>
+    <ul>
+      <code><B>define &lt;name&gt; GroheOndusSmartBridge</B></code>
+      <br><br>
+      Example:<br>
+      <ul>
+        <code>
+        define GroheBridge GroheOndusSmartBridge<br>
+        <br>
+        </code>
+      </ul>
+    </ul><br>
+    <a name="GroheOndusSmartBridge"></a><b>Set</b>
+    <ul>
+      <li><B>grogeOndusAccountPassword</B><a name="GroheOndusSmartBridgegroheOndusAccountPassword"></a><br>
+        Set the password and store it.
+      </li>
+      <br>
+      <li><B>deleteAccountPassword</B><a name="GroheOndusSmartBridgedeleteAccountPassword"></a><br>
+        Delete the password from store.
+      </li>
+      <br>
+      <li><B>update</B><a name="GroheOndusSmartBridgeupdate"></a><br>
+        Login if needed and update all locations, rooms and appliances.
+      </li>
+      <br>
+      <li><B>clearreadings</B><a name="GroheOndusSmartBridgeclearreadings"></a><br>
+        Clear all readings of the module.
+      </li>
+      <br>
+      <b><i>Debug-mode</i></b><br>
+      <br>
+      <li><B>debugGetDevicesState</B><a name="GroheOndusSmartBridgedebugGetDevicesState"></a><br>
+        If debug-mode is enabled: get locations, rooms and appliances.
+      </li>
+      <br>
+      <li><B>debugLogin</B><a name="GroheOndusSmartBridgedebugLogin"></a><br>
+        If debug-mode is enabled: login.
+      </li>
+      <br>
+      <li><B>debugSetLoginState</B><a name="GroheOndusSmartBridgedebugSetLoginState"></a><br>
+        If debug-mode is enabled: set/reset internal statemachine to/from state "login" - if set all actions will be locked!.
+      </li>
+      <br>
+      <li><B>debugSetTokenExpired</B><a name="GroheOndusSmartBridgedebugSetTokenExpired"></a><br>
+        If debug-mode is enabled: set the expiration timestamp of the login-token to now - next action will trigger a login.
+      </li>
+    </ul>
+    <br>
+    <a name="GroheOndusSmartBridgeattr"></a><b>Attributes</b><br>
+    <ul>
+      <li><a name="GroheOndusSmartBridgegroheOndusAccountEmail">groheOndusAccountEmail</a><br>
+        Your registered Email-address to login to the grohe clound.
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartBridgeinterval">interval</a><br>
+        Interval in seconds to poll for locations, rooms and appliances.
+        The default value is 60 seconds.
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartBridgedisable">disable</a><br>
+        If <b>0</b> (default) then GroheOndusSmartBridge is <b>enabled</b>.<br>
+        If <b>1</b> then GroheOndusSmartBridge is <b>disabled</b> - no communication to the grohe cloud will be done.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartBridgedebug">debug</a><br>
+        If <b>0</b> (default) debugging mode is <b>disabled</b>.<br>
+        If <b>1</b> debugging mode is <b>enabled</b> - more internals and commands are shown.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartBridgedebugJSON">debugJSON</a><br>
+        If <b>0</b> (default)<br>
+        If <b>1</b> if communication fails the json-payload of incoming telegrams is set to a reading.<br>
+      </li>
+    </ul><br>
+    <a name="GroheOndusSmartBridgereadings"></a><b>Readings</b>
+    <ul>
+      <li><B>count_appliance</B><br>
+        Count of appliances.<br>
+      </li>
+      <br>
+      <li><B>count_locations</B><br>
+        Count of locations.<br>
+      </li>
+      <br>
+      <li><B>count_rooms</B><br>
+        Count of rooms.<br>
+      </li>
+    </ul><br>
+    <a name="GroheOndusSmartBridgeinternals"></a><b>Internals</b>
+    <ul>
+      <li><B>DEBUG_IsDisabled</B><br>
+        If <b>1</b> (default)<br>
+        If <b>0</b> debugging mode is enabled - more internals and commands are shown.<br>
+      </li>
+    </ul><br>
+    <br>
   </ul>
-  <br><br>
-  <a name="GroheOndusSmartBridgeset"></a>
-  <b>set</b>
-  <ul>
-    <li>getDeviceState - Starts a Datarequest</li>
-    <li>login - Gets a new Session-ID</li>
-    <li>groheOndusAccountPassword - Passwort which was used in the GroheOndusAPP</li>
-    <li>deleteAccountPassword - delete the password from store</li>
-  </ul>
-  <br><br>
-  <a name="GroheOndusSmartBridgeattributes"></a>
-  <b>Attributes</b>
-  <ul>
-    <li>debugJSON - </li>
-    <li>disable - Disables the Bridge</li>
-    <li>interval - Interval in seconds (Default=60)</li>
-    <li>groheOndusAccountEmail - Email Adresse which was used in the GroheOndusAPP</li>
-  </ul>
-</ul>
-
 =end html
-=begin html_DE
-
-<a name="GroheOndusSmartBridge"></a>
-<h3>GroheOndusSmartBridge</h3>
-<ul>
-  <u><b>Voraussetzungen</b></u>
-  <br><br>
-  <li>Zusammen mit dem Device GroheOndusSmartDevice stellt dieses FHEM Modul die Kommunikation zwischen der GroheOndusCloud und Fhem her. Es k&ouml;nnen damit Grohe Sense und Grohe SenseGUARD überwacht und gesteuert werden</li>
-  <li>Das Perl-Modul "SSL Packet" wird ben&ouml;tigt.</li>
-  <li>Unter Debian (basierten) System, kann dies mittels "apt-get install libio-socket-ssl-perl" installiert werden.</li>
-  <li>Alle verbundenen Ger&auml;te und Sensoren m&uuml;ssen vorab in der GroheOndusApp eingerichtet sein.</li>
-</ul>
-<br>
-<a name="GroheOndusSmartBridgedefine"></a>
-<b>Define</b>
-<ul><br>
-  <code>define &lt;name&gt; GroheOndusSmartBridge</code>
-  <br><br>
-  Beispiel:
-  <ul><br>
-    <code>define GroheOndus_Bridge GroheOndusSmartBridge</code><br>
-  </ul>
-  <br>
-  Das Bridge Device wird im Raum GroheOndusSmart angelegt und danach erfolgt das Einlesen und automatische Anlegen der Ger&auml;te. Von nun an k&ouml;nnen die eingebundenen Ger&auml;te gesteuert werden. &Auml;nderungen in der APP werden mit den Readings und dem Status syncronisiert.
-  <br><br>
-  <a name="GroheOndusSmartBridgereadings"></a>
-  <br><br>
-  <b>Readings</b>
-  <ul>
-    <li>state - Status der Bridge</li>
-    <li>token - SessionID</li>
-  </ul>
-  <br><br>
-  <a name="GroheOndusSmartBridgeset"></a>
-  <b>set</b>
-  <ul>
-    <li>getDeviceState - Startet eine Abfrage der Daten.</li>
-    <li>login - Holt eine neue Session-ID</li>
-    <li>groheOndusAccountPassword - Passwort, welches in der GroheOndusApp verwendet wurde</li>
-    <li>deleteAccountPassword - l&oml;scht das Passwort aus dem Passwortstore</li>
-  </ul>
-  <br><br>
-  <a name="GroheOndusSmartBridgeattributes"></a>
-  <b>Attribute</b>
-  <ul>
-    <li>debugJSON - JSON Fehlermeldungen</li>
-    <li>disable - Schaltet die Datenübertragung der Bridge ab</li>
-    <li>interval - Abfrageinterval in Sekunden (default: 300)</li>
-    <li>groheOndusAccountEmail - Email Adresse, die auch in der GroheOndusApp verwendet wurde</li>
-  </ul>
-</ul>
-
-=end html_DE
 
 =for :application/json;q=META.json 73_GroheOndusSmartBridge.pm
 {
@@ -2302,10 +2313,7 @@ sub GroheOndusSmartBridge_Rename(@)
         "FHEM": 5.00918799,
         "perl": 5.016, 
         "Meta": 0,
-        "IO::Socket::SSL": 0,
-        "JSON": 0,
-        "HttpUtils": 0,
-        "Encode": 0
+        "JSON": 0
       },
       "recommends": {
       },
