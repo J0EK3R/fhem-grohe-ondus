@@ -1,3 +1,5 @@
 FHEM Grohe Ondus last changes:
-2021-11-13
- - rework of html help
+2021-11-16
+ - stuffed a memory leak
+
+there was a circular reference in GroheOndusSmartBridge_RequestParam
