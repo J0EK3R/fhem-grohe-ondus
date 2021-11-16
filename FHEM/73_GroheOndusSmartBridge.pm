@@ -855,8 +855,6 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
   
-  $param->{memwatch} = memwatch->new('Memwatch: GroheOndusSmartBridge_Login_GetLoginAddress');
-
   GroheOndusSmartBridge_RequestParam( $hash, $param );
 }
 
@@ -945,8 +943,6 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
-
-  $param->{memwatch} = memwatch->new('Memwatch: GroheOndusSmartBridge_Login_PostAddress');
 
   GroheOndusSmartBridge_Header_AddCookies( $hash, $param );
   GroheOndusSmartBridge_RequestParam( $hash, $param );
@@ -1085,8 +1081,6 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
-
-  $param->{memwatch} = memwatch->new('Memwatch: GroheOndusSmartBridge_Login_GetToken');
 
   GroheOndusSmartBridge_Header_AddCookies( $hash, $param );
   GroheOndusSmartBridge_RequestParam( $hash, $param );
