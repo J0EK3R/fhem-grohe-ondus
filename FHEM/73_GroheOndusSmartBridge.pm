@@ -28,12 +28,12 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.12';
-
-package main;
+my $VERSION = '3.0.13';
 
 use strict;
 use warnings;
+
+package main;
 
 my $missingModul = "";
 
@@ -68,6 +68,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$);
 sub GroheOndusSmartBridge_GetAppliances($$$;$$);
 
 sub GroheOndusSmartBridge_RequestParam($$);
+sub GroheOndusSmartBridge_SendReceive($$);
 sub GroheOndusSmartBridge_RequestErrorHandling($$$);
 
 sub GroheOndusSmartBridge_StorePassword($$);
@@ -115,6 +116,7 @@ sub GroheOndusSmartBridge_Initialize($)
   $hash->{AttrList} = 
     'debugJSON:0,1 ' . 
     'debug:0,1 ' . 
+    'autocreatedevices:1,0 ' . 
     'disable:0,1 ' . 
     'interval ' . 
     'groheOndusAccountEmail ' . 
@@ -154,6 +156,7 @@ sub GroheOndusSmartBridge_Define($$)
   $hash->{TIMEOUT}                       = $DefaultTimeout;
   $hash->{RETRIES}                       = $DefaultRetries;
   $hash->{REQUESTID}                     = 0;
+  $hash->{AUTOCREATEDEVICES}             = '1';
 
   $hash->{helper}{RESPONSECOUNT_ERROR}   = 0;
   $hash->{helper}{RESPONSESUCCESSCOUNT}  = 0; # statistics
@@ -303,6 +306,33 @@ sub GroheOndusSmartBridge_Attr(@)
       Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - AccountEmail deleted";
 
       GroheOndusSmartBridge_TimerRemove($hash);
+    }
+  }
+
+  ### Attribute "autocreatedevices"
+  elsif ( $attrName eq 'autocreatedevices' )
+  {
+    if ( $cmd eq 'set' )
+    {
+      if ($attrVal eq '1' )
+      {
+        $hash->{AUTOCREATEDEVICES} = '1';
+        Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices enabled";
+      }
+      elsif ($attrVal eq '0' )
+      {
+        $hash->{AUTOCREATEDEVICES} = '0';
+        Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices disabled";
+      }
+      else
+      {
+        return 'autocreatedevices must be 0 or 1';
+      }
+    } 
+    elsif ( $cmd eq 'del' )
+    {
+      $hash->{AUTOCREATEDEVICES} = '1';
+      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices disabled";
     }
   }
 
@@ -784,7 +814,7 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
         $errorMsg = "LOGIN_GETLOGINADDRESS: WRONG ADDRESS";
       }
     }
-
+    
     if( $errorMsg eq "" )
     {
       # if there is a callback then call it
@@ -824,6 +854,8 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
+  
+  $param->{memwatch} = memwatch->new('Memwatch: GroheOndusSmartBridge_Login_GetLoginAddress');
 
   GroheOndusSmartBridge_RequestParam( $hash, $param );
 }
@@ -913,6 +945,8 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
+
+  $param->{memwatch} = memwatch->new('Memwatch: GroheOndusSmartBridge_Login_PostAddress');
 
   GroheOndusSmartBridge_Header_AddCookies( $hash, $param );
   GroheOndusSmartBridge_RequestParam( $hash, $param );
@@ -1051,6 +1085,8 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
+
+  $param->{memwatch} = memwatch->new('Memwatch: GroheOndusSmartBridge_Login_GetToken');
 
   GroheOndusSmartBridge_Header_AddCookies( $hash, $param );
   GroheOndusSmartBridge_RequestParam( $hash, $param );
@@ -1622,10 +1658,11 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
         $hash->{currentAppliance} = 
         {
           appliance_id => $current_appliance_id,
-          type_id => $current_type_id,
-          name     => $current_name,
-          location_id => $current_location_id,
-          room_id     => $current_room_id,
+          type_id      => $current_type_id,
+          name         => $current_name,
+          location_id  => $current_location_id,
+          room_id      => $current_room_id,
+          autocreate   => $hash->{AUTOCREATEDEVICES}
         };
         
         # dispatch to GroheOndusSmartDevice::Parse()
@@ -1700,50 +1737,6 @@ sub GroheOndusSmartBridge_RequestParam($$)
 
   Log3 $name, 4, "GroheOndusSmartBridge_RequestParam($name)";
 
-  my $sendReceive = undef; 
-  $sendReceive = sub ($;$)
-  {
-    my ( $leftRetries, $retryCallback ) = @_;
-    
-    my $request_id = ++$hash->{REQUESTID};
-    
-    ### limit request id
-    if($request_id >= 65536)
-    {
-      $hash->{REQUESTID} = 0;
-      $request_id = 0;
-    }
-
-    $param->{request_id} = $request_id;
-    $param->{request_timestamp} = gettimeofday();
-    $param->{leftRetries} = $leftRetries--;
-    $param->{retryCallback} = $sendReceive;
-
-    #{
-    #  hash            => $hash,
-    #  url             => $uri,
-    #  timeout         => $hash->{TIMEOUT},
-    #  data            => $payload,
-    #  method          => $method,
-    #  header          => $header,
-    #  ignoreredirects => $ignoreredirects,
-    #  keepalive       => $keepalive,
-    #  httpversion     => $httpversion, #"1.1",
-    #  compress        => 0,
-    #  doTrigger       => 1,
-    #  callback        => \&GroheOndusSmartBridge_RequestErrorHandling,
-
-    #  request_id => $request_id,
-    #  request_timestamp => $request_timestamp,
-          
-    #  leftRetries => $leftRetries,
-    #  retryCallback => $retryCallback,
-    #  resultCallback => $resultCallback,
-    #}
-    
-    HttpUtils_NonblockingGet($param);
-  };
-
   if( $hash->{helper}{IsDisabled} ne '0' )
   {
     # is there a callback function?
@@ -1760,6 +1753,10 @@ sub GroheOndusSmartBridge_RequestParam($$)
     $param->{compress} = 0;
     $param->{doTrigger} = 1;
     $param->{callback} = \&GroheOndusSmartBridge_RequestErrorHandling;
+    
+    $param->{resultCallback} = $resultCallback;
+    $param->{retryCallback} = \&GroheOndusSmartBridge_SendReceive;
+    $param->{leftRetries} = $hash->{RETRIES};
 
     $hash->{helper}{WRITEMETHOD} = $param->{method};
     $hash->{helper}{WRITEURL} = $param->{url};
@@ -1771,9 +1768,32 @@ sub GroheOndusSmartBridge_RequestParam($$)
 
     GroheOndusSmartBridge_Debug_Update($hash);
 
-    $sendReceive->($hash->{RETRIES}, $sendReceive);
+    GroheOndusSmartBridge_SendReceive($hash, $param);
   }
 }
+
+#####################################
+# RequestErrorHandling( $param, $err, $data )
+sub GroheOndusSmartBridge_SendReceive($$)
+{
+  my ( $hash, $param ) = @_;
+  my $name = $hash->{NAME};
+	
+  $param->{request_timestamp} = gettimeofday();
+  $param->{leftRetries}--;
+
+  my $request_id = $hash->{REQUESTID}++;
+  
+  if($request_id >= 65536)
+  {
+    $hash->{REQUESTID} = 0;
+    $request_id = 0;
+  }
+  $param->{request_id} = $request_id;
+
+  HttpUtils_NonblockingGet($param);
+};
+
 
 #####################################
 # RequestErrorHandling( $param, $err, $data )
@@ -1800,7 +1820,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
 
   my $dname = $dhash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_RequestErrorHandling($name)";
+  Log3 $name, 4, "GroheOndusSmartBridge_RequestErrorHandling($name) ";
 
   ### check error variable
   if ( defined($err) and 
@@ -1839,6 +1859,10 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     {
       $errorMsg = 'error ' . $param->{code};
     }
+    elsif( $param->{code} == -1 ) ### Debugging
+    {
+      $errorMsg = 'DebuggingLeak';
+    }
     elsif( $data eq "" )
     {
       $errorMsg = 'error ' . $param->{code};
@@ -1854,17 +1878,13 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
   ### no error: process response
   if($errorMsg eq "")
   {
-    my $retrystring = 'RESPONSECOUNT_RETRY_' . ($hash->{RETRIES} - $leftRetries);
     $hash->{helper}{RESPONSECOUNT_SUCCESS}++;
     $hash->{helper}{RESPONSETOTALTIMESPAN} += $requestResponse_timespan;
     $hash->{helper}{RESPONSEAVERAGETIMESPAN} = $hash->{helper}{RESPONSETOTALTIMESPAN} / $hash->{helper}{RESPONSECOUNT_SUCCESS};
+    my $retrystring = 'RESPONSECOUNT_RETRY_' . ($hash->{RETRIES} - $leftRetries);
     $hash->{helper}{$retrystring}++;
 
     GroheOndusSmartBridge_Debug_Update($hash);
-    ### just copy from helper
-    #$hash->{RESPONSECOUNT_SUCCESS} = $hash->{helper}{RESPONSECOUNT_SUCCESS};
-    #$hash->{RESPONSEAVERAGETIMESPAN} = $hash->{helper}{RESPONSEAVERAGETIMESPAN};
-    #$hash->{$retrystring} = $hash->{helper}{$retrystring};
   }
   ### error: retries left
   elsif(defined($retryCallback) and # is retryCallbeck defined
@@ -1873,7 +1893,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     Log3 $name, 5, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: retry " . $leftRetries . " Error: " . $errorMsg;
 
     ### call retryCallback with decremented number of left retries
-    $retryCallback->($leftRetries - 1, $retryCallback);
+    $retryCallback->($hash, $param);
     return; # resultCallback is handled in retry 
   }
   else
@@ -2210,6 +2230,11 @@ sub GroheOndusSmartBridge_Rename(@)
       <br>
       <li><B>clearreadings</B><a name="GroheOndusSmartBridgeclearreadings"></a><br>
         Clear all readings of the module.
+      </li>
+      <br>
+      <li><B>autocreatedevices</B><a name="GroheOndusSmartBridgeautocreatedevices"></a><br>
+        If <b>enabled</b> (default) then GroheOndusSmartDevices will be created automatically.<br>
+        If <b>disabled</b> then GroheOndusSmartDevices must be create manually.<br>
       </li>
       <br>
       <b><i>Debug-mode</i></b><br>

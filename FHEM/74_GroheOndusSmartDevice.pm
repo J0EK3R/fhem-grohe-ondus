@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.12';
+my $VERSION = '3.0.13';
 
 package main;
 
@@ -587,6 +587,7 @@ sub GroheOndusSmartDevice_Parse($$)
   my $current_name = $io_hash->{currentAppliance}->{name};
   my $current_location_id = $io_hash->{currentAppliance}->{location_id};
   my $current_room_id = $io_hash->{currentAppliance}->{room_id};
+  my $autocreate = $io_hash->{currentAppliance}->{autocreate};
 
   Log3 $io_name, 4, "GroheOndusSmartBridge($io_name) -> GroheOndusSmartDevice_Parse";
 
@@ -621,7 +622,7 @@ sub GroheOndusSmartDevice_Parse($$)
     }
 
     # SmartDevice not found, create new one
-    else
+    elsif ($autocreate eq '1')
     {
       my $deviceName = makeDeviceName( $current_name );
       
@@ -2777,13 +2778,13 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
           # Not found -> no data in requested timespan
           if( $errorCode == 404 )
           {
-            Log3 $name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - $message";
+            Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - $message";
             readingsSingleUpdate( $hash, 'Message', $message, 1 );
           }
           # Too many requests 
           elsif ($errorCode == 429)
           {
-            Log3 $name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - $message";
+            Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - $message";
             readingsSingleUpdate( $hash, 'Message', $message, 1 );
           }
           else
