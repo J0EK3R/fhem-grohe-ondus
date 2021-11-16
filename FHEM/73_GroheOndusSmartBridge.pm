@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.13';
+my $VERSION = '3.0.14';
 
 use strict;
 use warnings;
@@ -95,24 +95,23 @@ my $TimeStampFormat = '%Y-%m-%dT%I:%M:%S';
 my $ReloginOffset_s = -60;                             # (negative) timespan in seconds to add "expires_in" timespan to relogin
 
 #####################################
+# GroheOndusSmartBridge_Initialize( $hash )
 sub GroheOndusSmartBridge_Initialize($)
 {
-  my ($hash) = @_;
+  my ( $hash ) = @_;
 
-  # Provider
-  $hash->{WriteFn}   = \&GroheOndusSmartBridge_Write;
-  $hash->{Clients}   = 'GroheOndusSmartDevice';
-  $hash->{MatchList} = { '1:GroheOndusSmartDevice' => 'GROHEONDUSSMARTDEVICE_.*' };
-
-  # Consumer
+  $hash->{WriteFn}  = \&GroheOndusSmartBridge_Write;
   $hash->{SetFn}    = \&GroheOndusSmartBridge_Set;
   $hash->{DefFn}    = \&GroheOndusSmartBridge_Define;
   $hash->{UndefFn}  = \&GroheOndusSmartBridge_Undef;
   $hash->{DeleteFn} = \&GroheOndusSmartBridge_Delete;
   $hash->{RenameFn} = \&GroheOndusSmartBridge_Rename;
   $hash->{NotifyFn} = \&GroheOndusSmartBridge_Notify;
-
   $hash->{AttrFn}   = \&GroheOndusSmartBridge_Attr;
+
+  $hash->{Clients}   = 'GroheOndusSmartDevice';
+  $hash->{MatchList} = { '1:GroheOndusSmartDevice' => 'GROHEONDUSSMARTDEVICE_.*' };
+
   $hash->{AttrList} = 
     'debugJSON:0,1 ' . 
     'debug:0,1 ' . 
@@ -132,7 +131,7 @@ sub GroheOndusSmartBridge_Initialize($)
 }
 
 #####################################
-# Define( $hash, $def )
+# GroheOndusSmartBridge_Define( $hash, $def )
 sub GroheOndusSmartBridge_Define($$)
 {
   my ( $hash, $def ) = @_;
@@ -145,7 +144,7 @@ sub GroheOndusSmartBridge_Define($$)
   return 'too few parameters: define <NAME> GroheOndusSmartBridge'
     if ( @a != 2 );
 
-  return 'Cannot define GroheOndus Bridge device. Perl modul ' . ${missingModul} . ' is missing.'
+  return 'Cannot define GroheOndusBridge. Perl modul ' . ${missingModul} . ' is missing.'
     if ($missingModul);
 
   my $name = $a[0];
@@ -156,7 +155,6 @@ sub GroheOndusSmartBridge_Define($$)
   $hash->{TIMEOUT}                       = $DefaultTimeout;
   $hash->{RETRIES}                       = $DefaultRetries;
   $hash->{REQUESTID}                     = 0;
-  $hash->{AUTOCREATEDEVICES}             = '1';
 
   $hash->{helper}{RESPONSECOUNT_ERROR}   = 0;
   $hash->{helper}{RESPONSESUCCESSCOUNT}  = 0; # statistics
@@ -168,6 +166,7 @@ sub GroheOndusSmartBridge_Define($$)
   $hash->{helper}{LoginErrCounter}       = 0;
   $hash->{helper}{DEBUG}                 = '0';
   $hash->{helper}{IsDisabled}            = '0';
+  $hash->{helper}{AUTOCREATEDEVICES}     = '1';
   
   # set default Attributes
   CommandAttr( undef, $name . ' room GroheOndusSmart' )
@@ -183,7 +182,7 @@ sub GroheOndusSmartBridge_Define($$)
 }
 
 #####################################
-# Undef( $hash, $name )
+# GroheOndusSmartBridge_Undef( $hash, $name )
 sub GroheOndusSmartBridge_Undef($$)
 {
   my ( $hash, $name ) = @_;
@@ -197,7 +196,7 @@ sub GroheOndusSmartBridge_Undef($$)
 }
 
 #####################################
-# Delete( $hash, $name )
+# GroheOndusSmartBridge_Delete( $hash, $name )
 sub GroheOndusSmartBridge_Delete($$)
 {
   my ( $hash, $name ) = @_;
@@ -207,7 +206,7 @@ sub GroheOndusSmartBridge_Delete($$)
 }
 
 #####################################
-# ATTR($cmd, $name, $attrName, $attrVal)
+# GroheOndusSmartBridge_Attr($cmd, $name, $attrName, $attrVal)
 sub GroheOndusSmartBridge_Attr(@)
 {
   my ( $cmd, $name, $attrName, $attrVal ) = @_;
@@ -316,12 +315,12 @@ sub GroheOndusSmartBridge_Attr(@)
     {
       if ($attrVal eq '1' )
       {
-        $hash->{AUTOCREATEDEVICES} = '1';
+        $hash->{helper}{AUTOCREATEDEVICES} = '1';
         Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices enabled";
       }
       elsif ($attrVal eq '0' )
       {
-        $hash->{AUTOCREATEDEVICES} = '0';
+        $hash->{helper}{AUTOCREATEDEVICES} = '0';
         Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices disabled";
       }
       else
@@ -331,7 +330,7 @@ sub GroheOndusSmartBridge_Attr(@)
     } 
     elsif ( $cmd eq 'del' )
     {
-      $hash->{AUTOCREATEDEVICES} = '1';
+      $hash->{helper}{AUTOCREATEDEVICES} = '1';
       Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices disabled";
     }
   }
@@ -340,7 +339,7 @@ sub GroheOndusSmartBridge_Attr(@)
 }
 
 #####################################
-# Notify( $hash, $dev )
+# GroheOndusSmartBridge_Notify( $hash, $dev )
 sub GroheOndusSmartBridge_Notify($$)
 {
   my ( $hash, $dev ) = @_;
@@ -404,6 +403,7 @@ sub GroheOndusSmartBridge_Notify($$)
 }
 
 #####################################
+# GroheOndusSmartBridge_Set( $hash, $name, $cmd, @args )
 sub GroheOndusSmartBridge_Set($@)
 {
   my ( $hash, $name, $cmd, @args ) = @_;
@@ -465,15 +465,15 @@ sub GroheOndusSmartBridge_Set($@)
   ### Command 'debugSetTokenExpired'
   elsif ( lc $cmd eq lc 'debugSetTokenExpired' )
   {
-  	my $loginNextTimeStamp = gettimeofday();
+    my $loginNextTimeStamp = gettimeofday();
     $hash->{helper}{LoginNextTimeStamp} = $loginNextTimeStamp; 
     GroheOndusSmartBridge_Debug_Update($hash);
   }
   else
   {
-  	my $isPasswordSet = defined( GroheOndusSmartBridge_ReadPassword($hash) );
-  	my $list = "";
-  	
+    my $isPasswordSet = defined( GroheOndusSmartBridge_ReadPassword($hash) );
+    my $list = "";
+
     $list .= "update:noArg "
       if ( $isPasswordSet );
 
@@ -502,6 +502,7 @@ sub GroheOndusSmartBridge_Set($@)
 }
 
 #####################################
+# GroheOndusSmartBridge_TimerExecute( $hash )
 sub GroheOndusSmartBridge_TimerExecute($)
 {
   my ( $hash ) = @_;
@@ -531,6 +532,7 @@ sub GroheOndusSmartBridge_TimerExecute($)
 }
 
 #####################################
+# GroheOndusSmartBridge_TimerRemove( $hash )
 sub GroheOndusSmartBridge_TimerRemove($)
 {
   my ( $hash ) = @_;
@@ -546,7 +548,7 @@ sub GroheOndusSmartBridge_TimerRemove($)
 }
 
 #####################################
-#
+# GroheOndusSmartBridge_Debug_Update( $hash )
 sub GroheOndusSmartBridge_Debug_Update($)
 {
   my ( $hash ) = @_;
@@ -606,7 +608,7 @@ sub GroheOndusSmartBridge_Debug_Update($)
 }
 
 #####################################
-# Login( $hash )
+# GroheOndusSmartBridge_Connect( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartBridge_Connect($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -672,7 +674,7 @@ sub GroheOndusSmartBridge_Connect($;$$)
 }
 
 #####################################
-# Login( $hash )
+# GroheOndusSmartBridge_ClearLogin( $hash )
 sub GroheOndusSmartBridge_ClearLogin($)
 {
   my ( $hash ) = @_;
@@ -696,7 +698,7 @@ sub GroheOndusSmartBridge_ClearLogin($)
 }
 
 #####################################
-# Login( $hash )
+# GroheOndusSmartBridge_Login( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartBridge_Login($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -725,8 +727,8 @@ sub GroheOndusSmartBridge_Login($;$$)
   if($errorMsg eq "")
   {
     $hash->{helper}{LoginInProgress}       = '1';
-  	GroheOndusSmartBridge_Debug_Update($hash);
-  	
+    GroheOndusSmartBridge_Debug_Update($hash);
+
     readingsBeginUpdate($hash);
     readingsBulkUpdateIfChanged( $hash, 'state', 'logging in', 1 );
     readingsEndUpdate( $hash, 1 );
@@ -779,7 +781,7 @@ sub GroheOndusSmartBridge_Login($;$$)
 }
 
 #####################################
-# Login_GetLoginAddress( $hash )
+# GroheOndusSmartBridge_Login_GetLoginAddress( $hash, $callbackSuccess, $callbackFail )
 #####################################
 sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
 {
@@ -859,7 +861,7 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
 }
 
 #####################################
-# Login_PostAddress( $hash )
+# GroheOndusSmartBridge_Login_PostAddress( $hash, $callbackSuccess, $callbackFail )
 #####################################
 sub GroheOndusSmartBridge_Login_PostAddress($;$$)
 {
@@ -949,7 +951,7 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
 }
 
 #####################################
-# Login_GetToken( $hash )
+# GroheOndusSmartBridge_Login_GetToken( $hash, $callbackSuccess, $callbackFail )
 #####################################
 sub GroheOndusSmartBridge_Login_GetToken($;$$)
 {
@@ -1087,7 +1089,7 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
 }
 
 #####################################
-# Login_Refresh( $hash )
+# GroheOndusSmartBridge_Login_Refresh( $hash, $callbackSuccess, $callbackFail )
 #####################################
 sub GroheOndusSmartBridge_Login_Refresh($;$$)
 {
@@ -1217,6 +1219,7 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
 }
 
 #####################################
+# GroheOndusSmartBridge_GetDevices( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartBridge_GetDevices($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -1236,8 +1239,7 @@ sub GroheOndusSmartBridge_GetDevices($;$$)
 }
 
 #####################################
-# GetLocations( $hash )
-#####################################
+# GroheOndusSmartBridge_GetLocations( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartBridge_GetLocations($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -1359,8 +1361,7 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
 }
 
 #####################################
-# GetRooms( $hash )
-#####################################
+# GroheOndusSmartBridge_GetRooms( $hash, $current_location_id, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartBridge_GetRooms($$;$$)
 {
   my ( $hash, $current_location_id, $callbackSuccess, $callbackFail ) = @_;
@@ -1460,7 +1461,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
 }
 
 #####################################
-# GetAppliances( $hash )
+# GroheOndusSmartBridge_GetAppliances( $hash, $current_location_id, $current_room_id, $callbackSuccess, $callbackFail )
 #####################################
 sub GroheOndusSmartBridge_GetAppliances($$$;$$)
 {
@@ -1656,7 +1657,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
           name         => $current_name,
           location_id  => $current_location_id,
           room_id      => $current_room_id,
-          autocreate   => $hash->{AUTOCREATEDEVICES}
+          autocreate   => $hash->{helper}{AUTOCREATEDEVICES}
         };
         
         # dispatch to GroheOndusSmartDevice::Parse()
@@ -1721,8 +1722,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
 
 
 #####################################
-# Request( $hash, $resultCallback, $uri, $method, $header, $payload, $httpversion, $ignoreredirects, $keepalive )
-#####################################
+# GroheOndusSmartBridge_RequestParam( $hash, $param )
 sub GroheOndusSmartBridge_RequestParam($$)
 {
   my ( $hash, $param ) = @_;
@@ -1767,12 +1767,12 @@ sub GroheOndusSmartBridge_RequestParam($$)
 }
 
 #####################################
-# RequestErrorHandling( $param, $err, $data )
+# GroheOndusSmartBridge_SendReceive( $hash, $param )
 sub GroheOndusSmartBridge_SendReceive($$)
 {
   my ( $hash, $param ) = @_;
   my $name = $hash->{NAME};
-	
+
   $param->{request_timestamp} = gettimeofday();
   $param->{leftRetries}--;
 
@@ -1790,7 +1790,7 @@ sub GroheOndusSmartBridge_SendReceive($$)
 
 
 #####################################
-# RequestErrorHandling( $param, $err, $data )
+# GroheOndusSmartBridge_RequestErrorHandling( $param, $err, $data )
 sub GroheOndusSmartBridge_RequestErrorHandling($$$)
 {
   my ( $param, $err, $data ) = @_;
@@ -1830,8 +1830,8 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
   ### check code
   if (exists( $param->{code} ) )
   {
-  	$code = "$param->{code}";
-  	
+    $code = "$param->{code}";
+
     if( $param->{code} == 200 ) ###
     {
     }
@@ -1913,7 +1913,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
 }
 
 #####################################
-# ProcessSetCookies( $hash, $header, $regex )
+# GroheOndusSmartBridge_ProcessSetCookies( $hash, $header, $regex )
 # find all "Set-Cookie" entries in header and put them as "Cookie:" entry in $hash->{helper}{cookie}.
 # So cookies can easily added to new outgoing telegrams.
 sub GroheOndusSmartBridge_ProcessSetCookies($@)
@@ -1993,7 +1993,7 @@ sub GroheOndusSmartBridge_ProcessSetCookies($@)
 }
 
 #####################################
-# Write($hash, $payload, $deviceId, $model)
+# GroheOndusSmartBridge_Write( $hash, $param )
 sub GroheOndusSmartBridge_Write($$)
 {
   my ( $hash, $param ) = @_;
@@ -2028,7 +2028,7 @@ sub GroheOndusSmartBridge_Write($$)
 }
 
 #####################################
-# Write($hash, $payload, $deviceId, $model)
+# GroheOndusSmartBridge_Header_AddAuthorization( $hash, $param )
 sub GroheOndusSmartBridge_Header_AddAuthorization($$)
 {
   my ( $hash, $param ) = @_;
@@ -2049,7 +2049,7 @@ sub GroheOndusSmartBridge_Header_AddAuthorization($$)
 }
 
 #####################################
-# Write($hash, $payload, $deviceId, $model)
+# GroheOndusSmartBridge_Header_AddCookies( $hash, $param )
 sub GroheOndusSmartBridge_Header_AddCookies($$)
 {
   my ( $hash, $param ) = @_;
@@ -2071,6 +2071,7 @@ sub GroheOndusSmartBridge_Header_AddCookies($$)
 }
 
 #####################################
+# GroheOndusSmartBridge_StorePassword( $hash, $password )
 sub GroheOndusSmartBridge_StorePassword($$)
 {
   my ( $hash, $password ) = @_;
@@ -2103,9 +2104,10 @@ sub GroheOndusSmartBridge_StorePassword($$)
 }
 
 #####################################
+# GroheOndusSmartBridge_ReadPassword( $hash )
 sub GroheOndusSmartBridge_ReadPassword($)
 {
-  my ($hash) = @_;
+  my ( $hash ) = @_;
   my $name   = $hash->{NAME};
   my $index  = $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd";
   my $key    = getUniqueId() . $index;
@@ -2148,9 +2150,10 @@ sub GroheOndusSmartBridge_ReadPassword($)
 }
 
 #####################################
+# GroheOndusSmartBridge_DeletePassword( $hash )
 sub GroheOndusSmartBridge_DeletePassword($)
 {
-  my $hash = shift;
+  my ( $hash ) = @_;
   my $name   = $hash->{NAME};
 
   setKeyValue( $hash->{TYPE} . "_" . $hash->{NAME} . "_passwd", undef );
@@ -2159,6 +2162,7 @@ sub GroheOndusSmartBridge_DeletePassword($)
 }
 
 #####################################
+# GroheOndusSmartBridge_Rename( $new, $old )
 sub GroheOndusSmartBridge_Rename(@)
 {
   my ( $new, $old ) = @_;

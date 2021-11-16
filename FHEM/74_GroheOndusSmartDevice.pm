@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.13';
+my $VERSION = '3.0.14';
 
 package main;
 
@@ -129,16 +129,14 @@ my $GroheOndusSmartDevice_AttrList_Upgrade =
 my $GroheOndusSmartDeviceDefinition;
 
 #####################################
+# GroheOndusSmartDevice_Initialize( $hash )
 sub GroheOndusSmartDevice_Initialize($)
 {
-  my ($hash) = @_;
+  my ( $hash ) = @_;
 
+  # safe reference to global definition
   $GroheOndusSmartDeviceDefinition = $hash;
 
-  # Provider
-  $hash->{Match} = '^GROHEONDUSSMARTDEVICE_.*';
-
-  # Consumer
   $hash->{SetFn}    = \&GroheOndusSmartDevice_Set;
   $hash->{DefFn}    = \&GroheOndusSmartDevice_Define;
   $hash->{UndefFn}  = \&GroheOndusSmartDevice_Undef;
@@ -147,8 +145,10 @@ sub GroheOndusSmartDevice_Initialize($)
   $hash->{NotifyFn} = \&GroheOndusSmartDevice_Notify;
 
   $hash->{AttrFn}   = \&GroheOndusSmartDevice_Attr;
+
+  $hash->{Match} = '^GROHEONDUSSMARTDEVICE_.*';
   
-  # list aof attributes has changed from v2 -> v3
+  # list of attributes has changed from v2 -> v3
   # -> the redefinition is done automatically
   # old attribute list is set to be able to get the deprecated attribute values
   # on global event "INITIALIZED" the new attribute list is set 
@@ -166,7 +166,7 @@ sub GroheOndusSmartDevice_Initialize($)
 }
 
 #####################################
-# Define( $hash, $def)
+# GroheOndusSmartDevice_Define( $hash, $def )
 sub GroheOndusSmartDevice_Define($$)
 {
   my ( $hash, $def ) = @_;
@@ -175,7 +175,7 @@ sub GroheOndusSmartDevice_Define($$)
   return $@
     unless ( FHEM::Meta::SetInternals($hash) );
 
-  return "Cannot define GroheOndus Bridge device. Perl modul $missingModul is missing."
+  return "Cannot define GroheOndusSmartDevice. Perl modul $missingModul is missing."
     if ($missingModul);
 
   my $name;
@@ -298,7 +298,7 @@ sub GroheOndusSmartDevice_Define($$)
 }
 
 #####################################
-# Undef( $hash, $arg )
+# GroheOndusSmartDevice_Undef( $hash, $arg )
 sub GroheOndusSmartDevice_Undef($$)
 {
   my ( $hash, $arg ) = @_;
@@ -313,7 +313,7 @@ sub GroheOndusSmartDevice_Undef($$)
 }
 
 #####################################
-# Delete( $hash, $name )
+# GroheOndusSmartDevice_Delete( $hash, $name )
 sub GroheOndusSmartDevice_Delete($$)
 {
   my ( $hash, $name ) = @_;
@@ -322,6 +322,7 @@ sub GroheOndusSmartDevice_Delete($$)
 }
 
 #####################################
+# GroheOndusSmartDevice_Attr( $cmd, $name, $attrName, $attrVal )
 sub GroheOndusSmartDevice_Attr(@)
 {
   my ( $cmd, $name, $attrName, $attrVal ) = @_;
@@ -473,6 +474,7 @@ sub GroheOndusSmartDevice_Attr(@)
 }
 
 #####################################
+# GroheOndusSmartDevice_Notify( $hash, $dev )
 sub GroheOndusSmartDevice_Notify($$)
 {
   my ( $hash, $dev ) = @_;
@@ -539,6 +541,7 @@ sub GroheOndusSmartDevice_Notify($$)
 }
 
 #####################################
+# GroheOndusSmartDevice_Set( $hash, $name, $cmd, @args )
 sub GroheOndusSmartDevice_Set($@)
 {
   my ( $hash, $name, $cmd, @args ) = @_;
@@ -571,10 +574,7 @@ sub GroheOndusSmartDevice_Set($@)
 }
 
 #####################################
-# This methode parses the given json string.
-# If there is a defined GroheOndusSmartDevice module then the json-structure
-# is passed to the methode WriteReadings.
-# Else a new GroheOndusSmartDevice module is created.
+# GroheOndusSmartDevice_Parse( $io_hash, $match )
 sub GroheOndusSmartDevice_Parse($$)
 {
   my ( $io_hash, $match ) = @_;
@@ -651,6 +651,7 @@ sub GroheOndusSmartDevice_Parse($$)
 }
 
 ##################################
+# GroheOndusSmartDevice_Upgrade( $hash )
 sub GroheOndusSmartDevice_Upgrade($)
 {
   my ( $hash ) = @_;
@@ -679,7 +680,7 @@ sub GroheOndusSmartDevice_Upgrade($)
 }
 
 #####################################
-#
+# GroheOndusSmartDevice_Debug_Update( $hash )
 sub GroheOndusSmartDevice_Debug_Update($)
 {
   my ( $hash ) = @_;
@@ -710,9 +711,10 @@ sub GroheOndusSmartDevice_Debug_Update($)
 }
 
 ##################################
+# GroheOndusSmartDevice_TimerExecute( $hash )
 sub GroheOndusSmartDevice_TimerExecute($)
 {
-  my $hash     = shift;
+  my ( $hash ) = @_;
   my $name     = $hash->{NAME};
   my $interval = $hash->{INTERVAL};
   my $model = $hash->{MODEL};
@@ -749,6 +751,7 @@ sub GroheOndusSmartDevice_TimerExecute($)
 }
 
 ##################################
+# GroheOndusSmartDevice_TimerRemove( $hash )
 sub GroheOndusSmartDevice_TimerRemove($)
 {
   my ( $hash ) = @_;
@@ -761,6 +764,7 @@ sub GroheOndusSmartDevice_TimerRemove($)
 }
 
 ##################################
+# GroheOndusSmartDevice_IOWrite( $hash, $param )
 sub GroheOndusSmartDevice_IOWrite($$)
 {
   my ( $hash, $param ) = @_;
@@ -772,6 +776,7 @@ sub GroheOndusSmartDevice_IOWrite($$)
 }
 
 ##################################
+# GroheOndusSmartDevice_SenseGuard_Update( $hash )
 sub GroheOndusSmartDevice_SenseGuard_Update($)
 {
   my ( $hash ) = @_;
@@ -795,6 +800,7 @@ sub GroheOndusSmartDevice_SenseGuard_Update($)
 }
 
 ##################################
+# GroheOndusSmartDevice_SenseGuard_GetState( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -895,7 +901,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
     else
     {
       readingsSingleUpdate( $hash, 'state', $errorMsg, 1 );
-    	
+
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
@@ -939,6 +945,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
 }
 
 ##################################
+# GroheOndusSmartDevice_SenseGuard_GetConfig( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -1401,6 +1408,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
 }
 
 ##################################
+# GroheOndusSmartDevice_SenseGuard_GetData( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -1800,6 +1808,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
 }
 
 ##################################
+# GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues( $hash )
 sub GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($)
 {
   my ( $hash ) = @_;
@@ -1827,6 +1836,7 @@ sub GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($)
 }
 
 #################################
+# GroheOndusSmartDevice_SenseGuard_GetApplianceCommand( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -1960,6 +1970,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
 }
 
 #####################################
+# GroheOndusSmartDevice_SenseGuard_Set( $hash, $name, $cmd, @args )
 sub GroheOndusSmartDevice_SenseGuard_Set($@)
 {
   my ( $hash, $name, $cmd, @args ) = @_;
@@ -2050,14 +2061,7 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
 }
 
 #################################
-# $command:
-#  "buzzer_on"
-#  "buzzer_sound_profile"
-#  "measure_now"
-#  "pressure_measurement_running"
-#  "reason_for_change"
-#  "temp_user_unlock_on"
-#  "valve_open"
+# GroheOndusSmartDevice_SenseGuard_SetApplianceCommand( $hash, $command, $setValue, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
 {
   my ( $hash, $command, $setValue, $callbackSuccess, $callbackFail ) = @_;
@@ -2177,7 +2181,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
         lc $setValue eq "on" or
         $setValue != 0)
       {
-      	$setValueString = "true";
+        $setValueString = "true";
       }
     }
     
@@ -2223,6 +2227,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
 }
 
 ##################################
+# GroheOndusSmartDevice_Sense_Update( $hash )
 sub GroheOndusSmartDevice_Sense_Update($)
 {
   my ( $hash ) = @_;
@@ -2244,6 +2249,7 @@ sub GroheOndusSmartDevice_Sense_Update($)
 }
 
 ##################################
+# GroheOndusSmartDevice_Sense_GetState( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartDevice_Sense_GetState($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -2400,6 +2406,7 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
 }
 
 ##################################
+# GroheOndusSmartDevice_Sense_GetConfig( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -2662,6 +2669,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
 }
 
 ##################################
+# GroheOndusSmartDevice_Sense_GetData( $hash, $callbackSuccess, $callbackFail )
 sub GroheOndusSmartDevice_Sense_GetData($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
@@ -2862,6 +2870,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
 }
 
 #####################################
+# GroheOndusSmartDevice_Sense_Set( $hash, $name, $cmd, @args )
 sub GroheOndusSmartDevice_Sense_Set($@)
 {
   my ( $hash, $name, $cmd, @args ) = @_;
@@ -2913,6 +2922,7 @@ sub GroheOndusSmartDevice_Sense_Set($@)
 }
 
 ##################################
+# GroheOndusSmartDevice_GetGMTOffset()
 # This methode calculates the offset in hours from GMT and localtime
 # returns ($offsetLocalTimeGMT_hours)
 sub GroheOndusSmartDevice_GetGMTOffset()
@@ -2936,6 +2946,7 @@ sub GroheOndusSmartDevice_GetGMTOffset()
 }
 
 ##################################
+# GroheOndusSmartDevice_GetGMTMidnightDate()
 # This methode returns today's date convertet to GMT
 # returns $gmtMidnightDate
 sub GroheOndusSmartDevice_GetGMTMidnightDate()
