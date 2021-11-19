@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.15';
+my $VERSION = '3.0.16';
 
 use strict;
 use warnings;
@@ -38,7 +38,7 @@ package main;
 my $missingModul = "";
 
 use FHEM::Meta;
-use HTML::Entities;
+eval {use HTML::Entities;1 or $missingModul .= 'HTML::Entities '};
 eval {use JSON;1 or $missingModul .= 'JSON '};
 
 #use HttpUtils;
@@ -49,9 +49,12 @@ sub GroheOndusSmartBridge_Initialize($);
 sub GroheOndusSmartBridge_Define($$);
 sub GroheOndusSmartBridge_Undef($$);
 sub GroheOndusSmartBridge_Delete($$);
+sub GroheOndusSmartBridge_Rename(@);
 sub GroheOndusSmartBridge_Attr(@);
 sub GroheOndusSmartBridge_Notify($$);
 sub GroheOndusSmartBridge_Set($@);
+sub GroheOndusSmartBridge_Write($$);
+
 sub GroheOndusSmartBridge_TimerExecute($);
 sub GroheOndusSmartBridge_TimerRemove($);
 sub GroheOndusSmartBridge_Debug_Update($);
@@ -76,10 +79,8 @@ sub GroheOndusSmartBridge_ReadPassword($);
 sub GroheOndusSmartBridge_DeletePassword($);
 
 sub GroheOndusSmartBridge_ProcessSetCookies($@);
-sub GroheOndusSmartBridge_Write($$);
 sub GroheOndusSmartBridge_Header_AddAuthorization($$);
 sub GroheOndusSmartBridge_Header_AddCookies($$);
-sub GroheOndusSmartBridge_Rename(@);
 
 
 my $DefaultRetries = 3;                                # default number of retries
@@ -100,14 +101,14 @@ sub GroheOndusSmartBridge_Initialize($)
 {
   my ( $hash ) = @_;
 
-  $hash->{WriteFn}  = \&GroheOndusSmartBridge_Write;
-  $hash->{SetFn}    = \&GroheOndusSmartBridge_Set;
   $hash->{DefFn}    = \&GroheOndusSmartBridge_Define;
   $hash->{UndefFn}  = \&GroheOndusSmartBridge_Undef;
   $hash->{DeleteFn} = \&GroheOndusSmartBridge_Delete;
   $hash->{RenameFn} = \&GroheOndusSmartBridge_Rename;
-  $hash->{NotifyFn} = \&GroheOndusSmartBridge_Notify;
   $hash->{AttrFn}   = \&GroheOndusSmartBridge_Attr;
+  $hash->{NotifyFn} = \&GroheOndusSmartBridge_Notify;
+  $hash->{SetFn}    = \&GroheOndusSmartBridge_Set;
+  $hash->{WriteFn}  = \&GroheOndusSmartBridge_Write;
 
   $hash->{Clients}   = 'GroheOndusSmartDevice';
   $hash->{MatchList} = { '1:GroheOndusSmartDevice' => 'GROHEONDUSSMARTDEVICE_.*' };
@@ -204,6 +205,20 @@ sub GroheOndusSmartBridge_Delete($$)
   setKeyValue( $hash->{TYPE} . '_' . $name . '_passwd', undef );
   return undef;
 }
+
+#####################################
+# GroheOndusSmartBridge_Rename( $new, $old )
+sub GroheOndusSmartBridge_Rename(@)
+{
+  my ( $new, $old ) = @_;
+  my $hash = $defs{$new};
+
+  GroheOndusSmartBridge_StorePassword( $hash, GroheOndusSmartBridge_ReadPassword($hash) );
+  setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
+
+  return undef;
+}
+
 
 #####################################
 # GroheOndusSmartBridge_Attr($cmd, $name, $attrName, $attrVal)
@@ -499,6 +514,41 @@ sub GroheOndusSmartBridge_Set($@)
     return "Unknown argument $cmd, choose one of $list";
   }
   return undef;
+}
+
+#####################################
+# GroheOndusSmartBridge_Write( $hash, $param )
+sub GroheOndusSmartBridge_Write($$)
+{
+  my ( $hash, $param ) = @_;
+  my $name = $hash->{NAME};
+  my $resultCallback = $param->{resultCallback};
+
+  Log3 $name, 4, "GroheOndusSmartBridge_Write($name)";
+
+  my $callbackSuccess = sub
+  {
+    # Add Authorization to Header
+    GroheOndusSmartBridge_Header_AddAuthorization( $hash, $param );
+
+    $param->{hash} = $hash;
+
+    GroheOndusSmartBridge_RequestParam( $hash, $param );
+  };
+
+  my $callbackFail = sub
+  {
+    # is there a callback function?
+    if(defined($resultCallback))
+    {
+      my $data = undef;
+      my $errorMsg = $_[0];
+
+      $resultCallback->($param, $data, $errorMsg);
+    }
+  };
+  
+   GroheOndusSmartBridge_Connect($hash, $callbackSuccess, $callbackFail);
 }
 
 #####################################
@@ -1992,40 +2042,7 @@ sub GroheOndusSmartBridge_ProcessSetCookies($@)
   }
 }
 
-#####################################
-# GroheOndusSmartBridge_Write( $hash, $param )
-sub GroheOndusSmartBridge_Write($$)
-{
-  my ( $hash, $param ) = @_;
-  my $name = $hash->{NAME};
-  my $resultCallback = $param->{resultCallback};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_Write($name)";
-
-  my $callbackSuccess = sub
-  {
-    # Add Authorization to Header
-    GroheOndusSmartBridge_Header_AddAuthorization( $hash, $param );
-
-    $param->{hash} = $hash;
-
-    GroheOndusSmartBridge_RequestParam( $hash, $param );
-  };
-
-  my $callbackFail = sub
-  {
-    # is there a callback function?
-    if(defined($resultCallback))
-    {
-      my $data = undef;
-      my $errorMsg = $_[0];
-
-      $resultCallback->($param, $data, $errorMsg);
-    }
-  };
-  
-   GroheOndusSmartBridge_Connect($hash, $callbackSuccess, $callbackFail);
-}
 
 #####################################
 # GroheOndusSmartBridge_Header_AddAuthorization( $hash, $param )
@@ -2161,19 +2178,6 @@ sub GroheOndusSmartBridge_DeletePassword($)
   return undef;
 }
 
-#####################################
-# GroheOndusSmartBridge_Rename( $new, $old )
-sub GroheOndusSmartBridge_Rename(@)
-{
-  my ( $new, $old ) = @_;
-  my $hash = $defs{$new};
-
-  GroheOndusSmartBridge_StorePassword( $hash, GroheOndusSmartBridge_ReadPassword($hash) );
-  setKeyValue( $hash->{TYPE} . "_" . $old . "_passwd", undef );
-
-  return undef;
-}
-
 
 =pod
 =item device
@@ -2182,23 +2186,24 @@ sub GroheOndusSmartBridge_Rename(@)
 
   <a name="GroheOndusSmartBridge"></a><h3>GroheOndusSmartBridge</h3>
   <ul>
-    In combination with the FHEM module <b>GroheOndusSmartDevice</b> this module communicates with the <b>GroheOndusCloud</b>.<br>
+    In combination with the FHEM module <b>GroheOndusSmartDevice</b> this module communicates with the <b>Grohe-Cloud</b>.<br>
     <br>
-    You can get the configurations and measured values of the registered <b>Sense</b> und <b>SenseGuard</b> applications 
-    and open/close the valve of a <b>SenseGuard</b> application.<br>
+    You can get the configurations and measured values of the registered <b>Sense</b> und <b>SenseGuard</b> appliances 
+    and i.E. open/close the valve of a <b>SenseGuard</b> appliance.<br>
     <br>
-    Once the <b>GroheOndusSmartDevice</b> is created, the connected devices are automatically recognized and created in FHEM.<br>
+    Once the <b>GroheOndusSmartBridge</b> is created the connected devices are recognized and created automatically in FHEM.<br>
     From now on the devices can be controlled and changes in the <b>GroheOndusAPP</b> are synchronized with the state and readings of the devices.
     <br>
-      <b>Notes</b>
-      <ul>
-        <li>This module communicates with the <b>GroheOndusCloud</b> - you have to be registered.
-        </li>
-        <li>Register your account directly at grohe - don't use "Sign in with Apple/Google/Facebook" or something else.
-        </li>
-        <li>There is a <b>debug-mode</b> you can enable/disable with the <b>attribute debug</b> to see more internals.
-        </li>
-      </ul>
+    <br>
+    <b>Notes</b>
+    <ul>
+      <li>This module communicates with the <b>Grohe-Cloud</b> - you have to be registered.
+      </li>
+      <li>Register your account directly at grohe - don't use "Sign in with Apple/Google/Facebook" or something else.
+      </li>
+      <li>There is a <b>debug-mode</b> you can enable/disable with the <b>attribute debug</b> to see more internals.
+      </li>
+    </ul>
     <br>
     <a name="GroheOndusSmartBridge"></a><b>Define</b>
     <ul>
@@ -2214,7 +2219,7 @@ sub GroheOndusSmartBridge_Rename(@)
     </ul><br>
     <a name="GroheOndusSmartBridge"></a><b>Set</b>
     <ul>
-      <li><B>grogeOndusAccountPassword</B><a name="GroheOndusSmartBridgegroheOndusAccountPassword"></a><br>
+      <li><B>groheOndusAccountPassword</B><a name="GroheOndusSmartBridgegroheOndusAccountPassword"></a><br>
         Set the password and store it.
       </li>
       <br>
@@ -2238,19 +2243,23 @@ sub GroheOndusSmartBridge_Rename(@)
       <b><i>Debug-mode</i></b><br>
       <br>
       <li><B>debugGetDevicesState</B><a name="GroheOndusSmartBridgedebugGetDevicesState"></a><br>
-        If debug-mode is enabled: get locations, rooms and appliances.
+        If debug-mode is enabled:<br>
+        get locations, rooms and appliances.
       </li>
       <br>
       <li><B>debugLogin</B><a name="GroheOndusSmartBridgedebugLogin"></a><br>
-        If debug-mode is enabled: login.
+        If debug-mode is enabled:<br>
+        login.
       </li>
       <br>
       <li><B>debugSetLoginState</B><a name="GroheOndusSmartBridgedebugSetLoginState"></a><br>
-        If debug-mode is enabled: set/reset internal statemachine to/from state "login" - if set all actions will be locked!.
+        If debug-mode is enabled:<br>
+        set/reset internal statemachine to/from state "login" - if set all actions will be locked!.
       </li>
       <br>
       <li><B>debugSetTokenExpired</B><a name="GroheOndusSmartBridgedebugSetTokenExpired"></a><br>
-        If debug-mode is enabled: set the expiration timestamp of the login-token to now - next action will trigger a login.
+        If debug-mode is enabled:<br>
+        set the expiration timestamp of the login-token to now - next action will trigger a login.
       </li>
     </ul>
     <br>
@@ -2325,10 +2334,10 @@ sub GroheOndusSmartBridge_Rename(@)
     "J0EK3R <J0EK3R@gmx.net>"
   ],
   "x_fhem_maintainer": [
-    ""
+    "J0EK3R"
   ],
   "x_fhem_maintainer_github": [
-    "J0EK3R"
+    "J0EK3R@gmx.net"
   ],
   "prereqs": {
     "runtime": {
@@ -2336,6 +2345,7 @@ sub GroheOndusSmartBridge_Rename(@)
         "FHEM": 5.00918799,
         "perl": 5.016, 
         "Meta": 0,
+        "HTML::Entities": 0,
         "JSON": 0
       },
       "recommends": {

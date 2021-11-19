@@ -28,7 +28,7 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.15';
+my $VERSION = '3.0.16';
 
 package main;
 
@@ -75,8 +75,8 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$);
 sub GroheOndusSmartDevice_Sense_GetData($;$$);
 sub GroheOndusSmartDevice_Sense_Set($@);
 
-sub GroheOndusSmartDevice_GetGMTOffset();
-sub GroheOndusSmartDevice_GetGMTMidnightDate();
+sub GroheOndusSmartDevice_GetUTCOffset();
+sub GroheOndusSmartDevice_GetUTCMidnightDate($);
 
 my $SenseGuard_DefaultInterval = 60; # default value for the polling interval in seconds
 my $Sense_DefaultInterval = 600;     # default value for the polling interval in seconds
@@ -137,14 +137,13 @@ sub GroheOndusSmartDevice_Initialize($)
   # safe reference to global definition
   $GroheOndusSmartDeviceDefinition = $hash;
 
-  $hash->{SetFn}    = \&GroheOndusSmartDevice_Set;
   $hash->{DefFn}    = \&GroheOndusSmartDevice_Define;
   $hash->{UndefFn}  = \&GroheOndusSmartDevice_Undef;
   $hash->{DeleteFn} = \&GroheOndusSmartDevice_Delete;
-  $hash->{ParseFn}  = \&GroheOndusSmartDevice_Parse;
-  $hash->{NotifyFn} = \&GroheOndusSmartDevice_Notify;
-
   $hash->{AttrFn}   = \&GroheOndusSmartDevice_Attr;
+  $hash->{NotifyFn} = \&GroheOndusSmartDevice_Notify;
+  $hash->{SetFn}    = \&GroheOndusSmartDevice_Set;
+  $hash->{ParseFn}  = \&GroheOndusSmartDevice_Parse;
 
   $hash->{Match} = '^GROHEONDUSSMARTDEVICE_.*';
   
@@ -1658,10 +1657,10 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
             readingsBulkUpdateIfChanged( $hash, "AnalyzeCount", $dataAnalyzeCount );
 
             # last dataset
-            readingsBulkUpdateIfChanged( $hash, "LastRequestFromTimestampGMT", $hash->{helper}{lastrequestfromtimestamp} )
+            readingsBulkUpdateIfChanged( $hash, "LastRequestFromTimestampUTC", $hash->{helper}{lastrequestfromtimestamp} )
               if ( defined( $hash->{helper}{lastrequestfromtimestamp} ) );
-            readingsBulkUpdateIfChanged( $hash, "OffsetLocalTimeGMTime", $hash->{helper}{offsetLocalTimeGMTime} )
-              if ( defined( $hash->{helper}{offsetLocalTimeGMTime} ) );
+            readingsBulkUpdateIfChanged( $hash, "OffsetLocalTimeUTC", $hash->{helper}{offsetLocalTimeUTC} )
+              if ( defined( $hash->{helper}{offsetLocalTimeUTC} ) );
             readingsBulkUpdateIfChanged( $hash, "LastStartTimestamp", $dataLastStartTimestamp )
               if ( defined($dataLastStartTimestamp) );
             readingsBulkUpdateIfChanged( $hash, "LastStopTimestamp", $dataLastStopTimestamp )
@@ -1779,7 +1778,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
   {
     # get all Data from within today
     # calc gmt from localtime because the grohe cloud works with gmt
-    my $requestFromTimestamp     = GroheOndusSmartDevice_GetGMTMidnightDate();
+    my $requestFromTimestamp     = GroheOndusSmartDevice_GetUTCMidnightDate(0);
 
     my $param = {};
     $param->{method} = 'GET';
@@ -2841,7 +2840,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
   {
     # get all Data from within today
     # calc gmt from localtime because the grohe cloud works with gmt
-    my $requestFromTimestamp = GroheOndusSmartDevice_GetGMTMidnightDate();
+    my $requestFromTimestamp = GroheOndusSmartDevice_GetUTCMidnightDate(0);
 
     my $param = {};
     $param->{method} = 'GET';
@@ -2922,15 +2921,15 @@ sub GroheOndusSmartDevice_Sense_Set($@)
 }
 
 ##################################
-# GroheOndusSmartDevice_GetGMTOffset()
-# This methode calculates the offset in hours from GMT and localtime
-# returns ($offsetLocalTimeGMT_hours)
-sub GroheOndusSmartDevice_GetGMTOffset()
+# GroheOndusSmartDevice_GetUTCOffset()
+# This methode calculates the offset in hours from UTC and localtime
+# returns ($offsetLocalTimeUTC_hours)
+sub GroheOndusSmartDevice_GetUTCOffset()
 {
-  # it seems that the timestamp for this command has to be in GMT
+  # it seems that the timestamp for this command has to be in UTC
   # we want to request all data from within the current day beginning from 00:00:00
-  # so we need to transform the current date 00:00:00 to GMT
-  # localtime           -> request GMT
+  # so we need to transform the current date 00:00:00 to UTC
+  # localtime           -> request UTC
   # 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
   # 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
   # 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
@@ -2938,23 +2937,25 @@ sub GroheOndusSmartDevice_GetGMTOffset()
   # 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
   my $currentTimestamp = gettimeofday();
 
-  # calculate the offset between localtime and GMT in hours
-  #my $offsetLocalTimeGMTime = localtime($currentTimestamp) - gmtime($currentTimestamp);
-  my $offsetLocalTimeGMT_hours = ( localtime $currentTimestamp + 3600 * ( 12 - (gmtime)[2] ) )[2] - 12;
+  # calculate the offset between localtime and UTC in hours
+  #my $offsetLocalTimeUTCime = localtime($currentTimestamp) - gmtime($currentTimestamp);
+  my $offsetLocalTimeUTC_hours = ( localtime $currentTimestamp + 3600 * ( 12 - (gmtime)[2] ) )[2] - 12;
 
-  return ($offsetLocalTimeGMT_hours);
+  return ($offsetLocalTimeUTC_hours);
 }
 
 ##################################
-# GroheOndusSmartDevice_GetGMTMidnightDate()
-# This methode returns today's date convertet to GMT
+# GroheOndusSmartDevice_GetUTCMidnightDate()
+# This methode returns today's date convertet to UTC
 # returns $gmtMidnightDate
-sub GroheOndusSmartDevice_GetGMTMidnightDate()
+sub GroheOndusSmartDevice_GetUTCMidnightDate($)
 {
-  # it seems that the timestamp for this command has to be in GMT
+  my ( $offset_hour ) = @_;
+  
+  # it seems that the timestamp for this command has to be in UTC
   # we want to request all data from within the current day beginning from 00:00:00
-  # so we need to transform the current date 00:00:00 to GMT
-  # localtime           -> request GMT
+  # so we need to transform the current date 00:00:00 to UTC
+  # localtime           -> request UTC
   # 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
   # 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
   # 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
@@ -2962,14 +2963,14 @@ sub GroheOndusSmartDevice_GetGMTMidnightDate()
   # 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
   my $currentTimestamp = gettimeofday();
 
-  # calculate the offset between localtime and GMT in hours
-  my $offsetLocalTimeGMT_hours = GroheOndusSmartDevice_GetGMTOffset();
+  # calculate the offset between localtime and UTC in hours
+  my $offsetLocalTimeUTC_hours = GroheOndusSmartDevice_GetUTCOffset();
 
   # current date in Greenwich
   my ( $d, $m, $y ) = ( gmtime($currentTimestamp) )[ 3, 4, 5 ];
 
   # Greenwich's date minus offset
-  my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) = gmtime( timegm( 0, 0, 0, $d, $m, $y ) - $offsetLocalTimeGMT_hours * 3600 );
+  my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) = gmtime( timegm( 0, 0, 0, $d, $m, $y ) - ($offsetLocalTimeUTC_hours - $offset_hour) * 3600 );
 
   # today -> get all data from within this day
   #my $requestFromTimestamp = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
@@ -2991,10 +2992,21 @@ sub GroheOndusSmartDevice_GetGMTMidnightDate()
 <h3>GroheOndusSmartDevice</h3>
 <ul>
     In combination with FHEM module <b>GroheOndusSmartBridge</b> this module represents a grohe appliance like <b>Sense</b> or <b>SenseGuard</b>.<br>
-    It communicates over <b>GroheOndusSmartBridge</b> to the <b>GroheOndusCloud</b> to get the configuration and measured values of the appliance.<br>
+    It communicates over <b>GroheOndusSmartBridge</b> to the <b>Grohe-Cloud</b> to get the configuration and measured values of the appliance.<br>
     <br>
     Once the Bridge device is created, the connected devices are recognized and created automatically in FHEM.<br>
     From now on the devices can be controlled and changes in the GroheOndusAPP are synchronized with the state and readings of the devices.<br>
+    <br>
+    <br>
+    <b>Notes</b>
+    <ul>
+      <li>This module communicates with the <b>Grohe-Cloud</b> - you have to be registered.
+      </li>
+      <li>Register your account directly at grohe - don't use "Sign in with Apple/Google/Facebook" or something else.
+      </li>
+      <li>There is a <b>debug-mode</b> you can enable/disable with the <b>attribute debug</b> to see more internals.
+      </li>
+    </ul>
     <br>
     <a name="GroheOndusSmartDevice"></a><b>Define</b>
     <ul>
@@ -3018,14 +3030,14 @@ sub GroheOndusSmartDevice_GetGMTMidnightDate()
         Clear all readings of the module.
       </li>
       <br>
+      <b><i>SenseGuard-only</i></b><br>
+      <br>
       <li><B>buzzer</B><a name="GroheOndusSmartDevicebuzzer"></a><br>
-        <i>SenseGuard only</i><br>
         <b>off</b> stop buzzer.<br>
         <b>on</b> enable buzzer.<br>
       </li>
       <br>
       <li><B>valve</B><a name="GroheOndusSmartDevicevalve"></a><br>
-        <i>SenseGuard only</i><br>
         <b>on</b> open valve.<br>
         <b>off</b> close valve.<br>
       </li>
@@ -3072,23 +3084,21 @@ sub GroheOndusSmartDevice_GetGMTMidnightDate()
         If <b>1</b> if communication fails the json-payload of incoming telegrams is set to a reading.<br>
       </li>
       <br>
+      <b><i>SenseGuard-only</i></b><br>
+      <br>
       <li><a name="GroheOndusSmartDeviceoffsetEnergyCost">offsetEnergyCost</a><br>
-        <i>SenseGuard only</i><br>
         Offset value for calculating reading TotalEnergyCost.<br>
       </li>
       <br>
       <li><a name="GroheOndusSmartDeviceoffsetWaterCost">offsetWaterCost</a><br>
-        <i>SenseGuard only</i><br>
         Offset value for calculating reading TotalWaterCost.<br>
       </li>
       <br>
       <li><a name="GroheOndusSmartDeviceoffsetWaterConsumption">offsetWaterConsumption</a><br>
-        <i>SenseGuard only</i><br>
         Offset value for calculating reading TotalWaterConsumption.<br>
       </li>
       <br>
       <li><a name="GroheOndusSmartDeviceoffsetHotWaterShare">offsetHotWaterShare</a><br>
-        <i>SenseGuard only</i><br>
         Offset value for calculating reading TotalHotWaterShare.<br>
       </li>
     </ul><br>
@@ -3102,7 +3112,7 @@ sub GroheOndusSmartDevice_GetGMTMidnightDate()
   "abstract": "Modul to control GroheOndusSmart Devices",
   "x_lang": {
     "de": {
-      "abstract": "Modul zur Steuerung von GroheOndus Smart Ger&aumlten"
+      "abstract": "Modul zur Steuerung von GroheOndusSmart Ger&aumlten"
     }
   },
   "keywords": [
@@ -3117,10 +3127,10 @@ sub GroheOndusSmartDevice_GetGMTMidnightDate()
     "J0EK3R <J0EK3R@gmx.net>"
   ],
   "x_fhem_maintainer": [
-    ""
+    "J0EK3R"
   ],
   "x_fhem_maintainer_github": [
-    "J0EK3R"
+    "J0EK3R@gmx.net"
   ],
   "prereqs": {
     "runtime": {
