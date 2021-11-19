@@ -2840,7 +2840,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
   {
     # get all Data from within today
     # calc gmt from localtime because the grohe cloud works with gmt
-    my $requestFromTimestamp = GroheOndusSmartDevice_GetUTCMidnightDate(0);
+    my $requestFromTimestamp = GroheOndusSmartDevice_GetUTCMidnightDate(-24); # offset to prevent empty responses
 
     my $param = {};
     $param->{method} = 'GET';
