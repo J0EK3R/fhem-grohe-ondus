@@ -28,12 +28,12 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.16';
+package main;
+
+my $VERSION = '3.0.17';
 
 use strict;
 use warnings;
-
-package main;
 
 my $missingModul = "";
 
@@ -175,7 +175,7 @@ sub GroheOndusSmartBridge_Define($$)
 
   readingsSingleUpdate( $hash, 'state', 'initialized', 1 );
 
-  Log3 $name, 3, "GroheOndusSmartBridge_Define($name) - defined GroheOndusSmartBridge";
+  Log3($name, 3, "GroheOndusSmartBridge_Define($name) - defined GroheOndusSmartBridge");
 
   $modules{GroheOndusSmartBridge}{defptr}{BRIDGE} = $hash;
 
@@ -227,7 +227,7 @@ sub GroheOndusSmartBridge_Attr(@)
   my ( $cmd, $name, $attrName, $attrVal ) = @_;
   my $hash = $defs{$name};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_Attr($name) - AttrName \'$attrName\' : \'$attrVal\'";
+  Log3($name, 4, "GroheOndusSmartBridge_Attr($name) - AttrName \'$attrName\' : \'$attrVal\'");
 
   # Attribute "disable"
   if ( $attrName eq 'disable' )
@@ -235,7 +235,7 @@ sub GroheOndusSmartBridge_Attr(@)
     if ( $cmd eq 'set' and 
       $attrVal eq '1' )
     {
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - disabled";
+      Log3($name, 3, "GroheOndusSmartBridge ($name) - disabled");
 
       $hash->{helper}{IsDisabled} = '1';
       
@@ -247,7 +247,7 @@ sub GroheOndusSmartBridge_Attr(@)
     } 
     else
     {
-      Log3 $name, 3, "GroheOndusSmartBridge ($name) - enabled";
+      Log3($name, 3, "GroheOndusSmartBridge ($name) - enabled");
 
       $hash->{helper}{IsDisabled} = '0';
 
@@ -267,7 +267,7 @@ sub GroheOndusSmartBridge_Attr(@)
       return 'Interval must be greater than 0'
         unless ( $attrVal > 0 );
 
-      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - set interval: $attrVal";
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - set interval: $attrVal");
 
       GroheOndusSmartBridge_TimerRemove($hash);
 
@@ -277,7 +277,7 @@ sub GroheOndusSmartBridge_Attr(@)
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - delete User interval and set default: $DefaultInterval";
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - delete User interval and set default: $DefaultInterval");
 
       GroheOndusSmartBridge_TimerRemove($hash);
     
@@ -292,14 +292,14 @@ sub GroheOndusSmartBridge_Attr(@)
   {
     if ( $cmd eq 'set')
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - debugging enabled";
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - debugging enabled");
 
       $hash->{helper}{DEBUG} = "$attrVal";
       GroheOndusSmartBridge_Debug_Update($hash);
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - debugging disabled";
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - debugging disabled");
 
       $hash->{helper}{DEBUG} = '0';
       GroheOndusSmartBridge_Debug_Update($hash);
@@ -311,13 +311,13 @@ sub GroheOndusSmartBridge_Attr(@)
   {
     if ( $cmd eq 'set')
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - AccountEmail set to \'$attrVal\'";
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - AccountEmail set to \'$attrVal\'");
 
       GroheOndusSmartBridge_TimerExecute($hash);      
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - AccountEmail deleted";
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - AccountEmail deleted");
 
       GroheOndusSmartBridge_TimerRemove($hash);
     }
@@ -331,12 +331,12 @@ sub GroheOndusSmartBridge_Attr(@)
       if ($attrVal eq '1' )
       {
         $hash->{helper}{AUTOCREATEDEVICES} = '1';
-        Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices enabled";
+        Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices enabled");
       }
       elsif ($attrVal eq '0' )
       {
         $hash->{helper}{AUTOCREATEDEVICES} = '0';
-        Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices disabled";
+        Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices disabled");
       }
       else
       {
@@ -346,7 +346,7 @@ sub GroheOndusSmartBridge_Attr(@)
     elsif ( $cmd eq 'del' )
     {
       $hash->{helper}{AUTOCREATEDEVICES} = '1';
-      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices disabled";
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - autocreatedevices disabled");
     }
   }
 
@@ -370,7 +370,7 @@ sub GroheOndusSmartBridge_Notify($$)
   return
     if ( !$events );
 
-  Log3 $name, 4, "GroheOndusSmartBridge_Notify($name) - DevType: \'$devtype\'";
+  Log3($name, 4, "GroheOndusSmartBridge_Notify($name) - DevType: \'$devtype\'");
 
   # process 'global' events
   if ( $devtype eq 'Global')
@@ -378,28 +378,28 @@ sub GroheOndusSmartBridge_Notify($$)
     if ( grep /^INITIALIZED$/, @{$events} )
     {
       # this is the initial call after fhem has startet
-      Log3 $name, 3, "GroheOndusSmartBridge_Notify($name) - INITIALIZED";
+      Log3($name, 3, "GroheOndusSmartBridge_Notify($name) - INITIALIZED");
 
       GroheOndusSmartBridge_TimerExecute( $hash );
     }
 
     elsif ( grep /^REREADCFG$/, @{$events} )
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Notify($name) - REREADCFG";
+      Log3($name, 3, "GroheOndusSmartBridge_Notify($name) - REREADCFG");
 
       GroheOndusSmartBridge_TimerExecute( $hash );
     }
 
     elsif ( grep /^DEFINED.$name$/, @{$events} )
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Notify($name) - DEFINED";
+      Log3($name, 3, "GroheOndusSmartBridge_Notify($name) - DEFINED");
 
       GroheOndusSmartBridge_TimerExecute( $hash );
     }
 
     elsif ( grep /^MODIFIED.$name$/, @{$events} )
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Notify($name) - MODIFIED";
+      Log3($name, 3, "GroheOndusSmartBridge_Notify($name) - MODIFIED");
 
       GroheOndusSmartBridge_TimerExecute( $hash );
     }
@@ -423,7 +423,7 @@ sub GroheOndusSmartBridge_Set($@)
 {
   my ( $hash, $name, $cmd, @args ) = @_;
 
-  Log3 $name, 4, "GroheOndusSmartBridge_Set($name) - Set was called cmd: >>$cmd<<";
+  Log3($name, 4, "GroheOndusSmartBridge_Set($name) - Set was called cmd: >>$cmd<<");
 
   ### Command 'update'
   if ( lc $cmd eq lc 'update' )
@@ -524,7 +524,7 @@ sub GroheOndusSmartBridge_Write($$)
   my $name = $hash->{NAME};
   my $resultCallback = $param->{resultCallback};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_Write($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_Write($name)");
 
   my $callbackSuccess = sub
   {
@@ -566,11 +566,11 @@ sub GroheOndusSmartBridge_TimerExecute($)
   if ( $init_done and 
     $hash->{helper}{IsDisabled} ne '0' )
   {
-    Log3 $name, 4, "GroheOndusSmartBridge_TimerExecute($name) - Disabled";
+    Log3($name, 4, "GroheOndusSmartBridge_TimerExecute($name) - Disabled");
   }
   else
   {
-    Log3 $name, 4, "GroheOndusSmartBridge_TimerExecute($name)";
+    Log3($name, 4, "GroheOndusSmartBridge_TimerExecute($name)");
   
     GroheOndusSmartBridge_GetDevices($hash);
 
@@ -591,7 +591,7 @@ sub GroheOndusSmartBridge_TimerRemove($)
   return
     if(!$init_done);
 
-  Log3 $name, 4, "GroheOndusSmartBridge_TimerRemove($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_TimerRemove($name)");
   
   $hash->{NEXTTIMER} = "none";
   RemoveInternalTimer($hash, \&GroheOndusSmartBridge_TimerExecute);
@@ -604,7 +604,7 @@ sub GroheOndusSmartBridge_Debug_Update($)
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 5, "GroheOndusSmartBridge_Debug_Update($name)";
+  Log3($name, 5, "GroheOndusSmartBridge_Debug_Update($name)");
   
   if( $hash->{helper}{DEBUG} eq '1')
   {
@@ -668,29 +668,29 @@ sub GroheOndusSmartBridge_Connect($;$$)
 
   if( $hash->{helper}{IsDisabled} ne '0' )
   {
-    Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - IsDisabled";
+    Log3($name, 4, "GroheOndusSmartBridge_Connect($name) - IsDisabled");
 
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartBridge_Connect($name) - callbackFail");
       $callbackFail->('bridge inactive');
     }
   }
   elsif($hash->{helper}{LoginInProgress} ne '0')
   {
-    Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - LoginInProgress";
+    Log3($name, 4, "GroheOndusSmartBridge_Connect($name) - LoginInProgress");
 
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartBridge_Connect($name) - callbackFail");
       $callbackFail->('login in progress');
     }
   }
   else
   {
-    Log3 $name, 4, "GroheOndusSmartBridge_Connect($name)";
+    Log3($name, 4, "GroheOndusSmartBridge_Connect($name)");
     
     # no valid AccessToken
     if( !defined( $hash->{helper}{access_token}) or
@@ -710,13 +710,13 @@ sub GroheOndusSmartBridge_Connect($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Connect($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartBridge_Connect($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
     else
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Connect($name) - $message";
+      Log3($name, 3, "GroheOndusSmartBridge_Connect($name) - $message");
 
       GroheOndusSmartBridge_Login($hash, $callbackSuccess, $callbackFail);
     }
@@ -730,7 +730,7 @@ sub GroheOndusSmartBridge_ClearLogin($)
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_ClearLogin($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_ClearLogin($name)");
 
   readingsBeginUpdate($hash);
   readingsBulkUpdateIfChanged( $hash, 'state', 'login cleared', 1 );
@@ -755,7 +755,7 @@ sub GroheOndusSmartBridge_Login($;$$)
   my $name = $hash->{NAME};
   my $errorMsg = "";
 
-  Log3 $name, 4, "GroheOndusSmartBridge_Login($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_Login($name)");
 
   # Check for AccountEmail
   if ( AttrVal( $name, 'groheOndusAccountEmail', 'none' ) eq 'none' )
@@ -791,7 +791,7 @@ sub GroheOndusSmartBridge_Login($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail");
         $callbackSuccess->();
       }
     };
@@ -804,7 +804,7 @@ sub GroheOndusSmartBridge_Login($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail");
         $callbackFail->($errorMsg);
       }
     };
@@ -824,7 +824,7 @@ sub GroheOndusSmartBridge_Login($;$$)
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartBridge_Login($name) - callbackFail");
       $callbackFail->($errorMsg);
     }
   }
@@ -838,7 +838,7 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name)");
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
@@ -854,7 +854,7 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
         my $formTargetOf = decode_entities($1);
         $hash->{helper}{loginaddress} = $formTargetOf;
 
-        Log3 $name, 5, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - Action\n$formTargetOf";
+        Log3($name, 5, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - Action\n$formTargetOf");
 
         # find all "Set-Cookie" lines and create cookie header
         GroheOndusSmartBridge_ProcessSetCookies( $hash, $callbackparam->{httpheader}, undef );
@@ -872,7 +872,7 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -885,7 +885,7 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartBridge_Login_GetLoginAddress($name) - callbackFail");
         $callbackFail->($errorMsg);
       }
     }
@@ -918,14 +918,14 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_Login_PostAddress($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_Login_PostAddress($name)");
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    Log3 $name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login\n$callbackparam->{httpheader}";
+    Log3($name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login\n$callbackparam->{httpheader}");
 
     if( $errorMsg eq "" )
     {
@@ -938,7 +938,7 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
         # remove last trailing newline
         $location =~ s/\r|\n//g;
 
-        Log3 $name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login Location\n\"$location\"";
+        Log3($name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login Location\n\"$location\"");
         $hash->{helper}{ondusaddress} = $location;
 
         # find all "Set-Cookie" lines and create cookie header
@@ -948,7 +948,7 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
       # Invalid email address or password? 
       elsif ( $data =~ m/Invalid email address or password/ )
       {
-        Log3 $name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login - Invalid email address or password";
+        Log3($name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login - Invalid email address or password");
 
         $errorMsg = "Invalid email address or password";
       }
@@ -965,7 +965,7 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login_PostAddress($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartBridge_Login_PostAddress($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -978,7 +978,7 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login_PostAddress($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartBridge_Login_PostAddress($name) - callbackFail");
         $callbackFail->($errorMsg);
       }
     }
@@ -1009,7 +1009,7 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
   my $name = $hash->{NAME};
 
   my $now = gettimeofday();
-  Log3 $name, 4, "GroheOndusSmartBridge_Login_GetToken($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_Login_GetToken($name)");
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
@@ -1036,7 +1036,7 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
       my $decode_json = eval { decode_json($data) };
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartBridge_Login_GetToken($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartBridge_Login_GetToken($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -1066,7 +1066,7 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
         $hash->{helper}{LoginNextTimeStamp} = $loginNextTimeStamp; 
         $hash->{helper}{LoginCounter}++;
         
-        Log3 $name, 5, "GroheOndusSmartBridge_Login_GetToken($name) - RefreshToken\n$hash->{helper}{refresh_token}";
+        Log3($name, 5, "GroheOndusSmartBridge_Login_GetToken($name) - RefreshToken\n$hash->{helper}{refresh_token}");
 
         # find all "Set-Cookie" lines and create cookie header
         #ProcessSetCookies($hash, $param->{httpheader}, "AWSALB");
@@ -1104,7 +1104,7 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login_GetToken($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartBridge_Login_GetToken($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -1117,7 +1117,7 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login_GetToken($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartBridge_Login_GetToken($name) - callbackFail");
         $callbackFail->($errorMsg);
       }
     }
@@ -1146,7 +1146,7 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_Login_Refresh($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_Login_Refresh($name)");
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
@@ -1172,7 +1172,7 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
       my $decode_json = eval { decode_json($data) };
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartBridge_Login_Refresh($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartBridge_Login_Refresh($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -1197,7 +1197,7 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
         $hash->{helper}{scope} = $decode_json->{scope};
         $hash->{helper}{tandc_accepted} = $decode_json->{tandc_accepted};
 
-        Log3 $name, 5, "GroheOndusSmartBridge_Login_Refresh($name) - RefreshToken\n$hash->{helper}{refresh_token}";
+        Log3($name, 5, "GroheOndusSmartBridge_Login_Refresh($name) - RefreshToken\n$hash->{helper}{refresh_token}");
 
         # find all "Set-Cookie" lines and create cookie header
         #ProcessSetCookies($hash, $callbackparam->{httpheader}, "AWSALB");
@@ -1231,7 +1231,7 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login_Refresh($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartBridge_Login_Refresh($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -1244,7 +1244,7 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_Login_Refresh($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartBridge_Login_Refresh($name) - callbackFail");
         $callbackFail->($errorMsg);
       }
     }
@@ -1275,7 +1275,7 @@ sub GroheOndusSmartBridge_GetDevices($;$$)
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_GetDevices($name) - fetch device list and device states";
+  Log3($name, 4, "GroheOndusSmartBridge_GetDevices($name) - fetch device list and device states");
 
   $hash->{helper}{CountAppliances} = 0;
   $hash->{helper}{CountRooms} = 0;
@@ -1295,7 +1295,7 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_GetLocations($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_GetLocations($name)");
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
@@ -1307,7 +1307,7 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
       my $decode_json = eval { decode_json($data) };
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartBridge_GetLocations($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartBridge_GetLocations($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -1360,12 +1360,12 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
           # if there is a callback then call it
           if( defined($callbackSuccess) )
           {
-            Log3 $name, 4, "GroheOndusSmartBridge_GetLocations($name) - callbackSuccess";
+            Log3($name, 4, "GroheOndusSmartBridge_GetLocations($name) - callbackSuccess");
             $callbackSuccess->($location->{id});
           }
         }
 
-        Log3 $name, 5, "GroheOndusSmartBridge_GetLocations($name) - locations count " . $hash->{helper}{CountLocations};
+        Log3($name, 5, "GroheOndusSmartBridge_GetLocations($name) - locations count " . $hash->{helper}{CountLocations});
 
         # update reading
         readingsSingleUpdate( $hash, 'count_locations', $hash->{helper}{CountLocations}, 0 );
@@ -1388,7 +1388,7 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_GetLocations($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartBridge_GetLocations($name) - callbackFail");
         $callbackFail->($errorMsg);
       }
     }
@@ -1417,7 +1417,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
   my ( $hash, $current_location_id, $callbackSuccess, $callbackFail ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_GetRooms($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_GetRooms($name)");
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
@@ -1429,7 +1429,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
       my $decode_json = eval { decode_json($data) };
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartBridge_GetRooms($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartBridge_GetRooms($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -1464,12 +1464,12 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
           # if there is a callback then call it
           if( defined($callbackSuccess) )
           {
-            Log3 $name, 4, "GroheOndusSmartBridge_GetRooms($name) - GetLocations callbackSuccess";
+            Log3($name, 4, "GroheOndusSmartBridge_GetRooms($name) - GetLocations callbackSuccess");
             $callbackSuccess->($current_location_id, $room->{id});
           }
         }
 
-        Log3 $name, 5, "GroheOndusSmartBridge ($name) - rooms count " . $hash->{helper}{CountRooms};
+        Log3($name, 5, "GroheOndusSmartBridge ($name) - rooms count " . $hash->{helper}{CountRooms});
 
         # update reading
         readingsSingleUpdate( $hash, 'count_rooms', $hash->{helper}{CountRooms}, 0 );
@@ -1488,7 +1488,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_GetRooms($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartBridge_GetRooms($name) - callbackFail");
         $callbackFail->($errorMsg);
       }
     }
@@ -1518,7 +1518,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
   my ( $hash, $current_location_id, $current_room_id, $callbackSuccess, $callbackFail ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_GetAppliances($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_GetAppliances($name)");
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
@@ -1528,7 +1528,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
     my $decode_json = eval { decode_json($data) };
     if ($@)
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_GetAppliances($name) - JSON error while request: $@";
+      Log3($name, 3, "GroheOndusSmartBridge_GetAppliances($name) - JSON error while request: $@");
 
       if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
       {
@@ -1717,7 +1717,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
         delete $hash->{currentAppliance}; 
       }
 
-      Log3 $name, 5, "GroheOndusSmartBridge_GetAppliances($name) - appliances count " . $hash->{helper}{CountAppliances};
+      Log3($name, 5, "GroheOndusSmartBridge_GetAppliances($name) - appliances count " . $hash->{helper}{CountAppliances});
 
       readingsSingleUpdate( $hash, 'count_appliance', $hash->{helper}{CountAppliances}, 0 );
     }
@@ -1735,7 +1735,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_GetAppliances($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartBridge_GetAppliances($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -1748,7 +1748,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartBridge_GetAppliances($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartBridge_GetAppliances($name) - callbackFail");
         $callbackFail->($errorMsg);
       }
     }
@@ -1779,7 +1779,7 @@ sub GroheOndusSmartBridge_RequestParam($$)
   my $name = $hash->{NAME};
   my $resultCallback = $param->{resultCallback};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_RequestParam($name)";
+  Log3($name, 4, "GroheOndusSmartBridge_RequestParam($name)");
 
   if( $hash->{helper}{IsDisabled} ne '0' )
   {
@@ -1864,13 +1864,13 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
 
   my $dname = $dhash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartBridge_RequestErrorHandling($name) ";
+  Log3($name, 4, "GroheOndusSmartBridge_RequestErrorHandling($name) ");
 
   ### check error variable
   if ( defined($err) and 
     $err ne "" )
   {
-    Log3 $name, 3, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: Error: " . $err . " data: \"" . $data . "\"";
+    Log3($name, 3, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: Error: " . $err . " data: \"" . $data . "\"");
     
     $errorMsg = 'error ' . $err;
   }
@@ -1917,7 +1917,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     }
   }
 
-  Log3 $name, 5, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: Code: " . $code . " data: \"" . $data . "\"";
+  Log3($name, 5, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: Code: " . $code . " data: \"" . $data . "\"");
 
   ### no error: process response
   if($errorMsg eq "")
@@ -1934,7 +1934,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
   elsif(defined($retryCallback) and # is retryCallbeck defined
     $leftRetries > 0)               # are there any left retries
   {
-    Log3 $name, 5, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: retry " . $leftRetries . " Error: " . $errorMsg;
+    Log3($name, 5, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: retry " . $leftRetries . " Error: " . $errorMsg);
 
     ### call retryCallback with decremented number of left retries
     $retryCallback->($hash, $param);
@@ -1942,7 +1942,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
   }
   else
   {
-    Log3 $name, 3, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: no retries left Error: " . $errorMsg;
+    Log3($name, 3, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: no retries left Error: " . $errorMsg);
 
     $hash->{helper}{RESPONSECOUNT_ERROR}++;
 
@@ -1956,7 +1956,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     # is there a callback function?
   if(defined($resultCallback))
   {
-    Log3 $name, 4, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: calling lambda function";
+    Log3($name, 4, "GroheOndusSmartBridge_RequestErrorHandling($dname) - ErrorHandling[ID:$request_id]: calling lambda function");
     
     $resultCallback->($param, $data, $errorMsg);
   }
@@ -2097,7 +2097,7 @@ sub GroheOndusSmartBridge_StorePassword($$)
   my $key     = getUniqueId() . $index;
   my $enc_pwd = "";
 
-  Log3 $name, 5, "GroheOndusSmartBridge_StorePassword($name)";
+  Log3($name, 5, "GroheOndusSmartBridge_StorePassword($name)");
 
   if ( eval "use Digest::MD5;1" )
   {
@@ -2130,13 +2130,13 @@ sub GroheOndusSmartBridge_ReadPassword($)
   my $key    = getUniqueId() . $index;
   my ( $password, $err );
 
-  Log3 $name, 5, "GroheOndusSmartBridge_ReadPassword($name)";
+  Log3($name, 5, "GroheOndusSmartBridge_ReadPassword($name)");
 
   ( $err, $password ) = getKeyValue($index);
 
   if ( defined($err) )
   {
-    Log3 $name, 3, "GroheOndusSmartBridge_ReadPassword($name) - unable to read password from file: $err";
+    Log3($name, 3, "GroheOndusSmartBridge_ReadPassword($name) - unable to read password from file: $err");
     return undef;
   }
 
@@ -2161,7 +2161,7 @@ sub GroheOndusSmartBridge_ReadPassword($)
   } 
   else
   {
-    Log3 $name, 3, "GroheOndusSmartBridge_ReadPassword($name) - No password in file";
+    Log3($name, 3, "GroheOndusSmartBridge_ReadPassword($name) - No password in file");
     return undef;
   }
 }

@@ -28,9 +28,9 @@
 #
 ###############################################################################
 
-my $VERSION = '3.0.16';
-
 package main;
+
+my $VERSION = '3.0.17';
 
 use strict;
 use warnings;
@@ -208,13 +208,14 @@ sub GroheOndusSmartDevice_Define($$)
     return "wrong number of parameters: define <NAME> GroheOndusSmartDevice <bridge> <deviceId> <model>"
   }
 
-  $hash->{DEVICEID}              = $deviceId;
-  $hash->{MODEL}                 = $model;
-  $hash->{VERSION}               = $VERSION;
-  $hash->{NOTIFYDEV}             = "global,$name,$bridge";
-  $hash->{RETRIES}               = 3;
-  $hash->{helper}{DEBUG}         = '0';
-  $hash->{helper}{IsDisabled}    = '0';
+  $hash->{DEVICEID}                 = $deviceId;
+  $hash->{MODEL}                    = $model;
+  $hash->{VERSION}                  = $VERSION;
+  $hash->{NOTIFYDEV}                = "global,$name,$bridge";
+  $hash->{RETRIES}                  = 3;
+  $hash->{helper}{DEBUG}            = '0';
+  $hash->{helper}{IsDisabled}       = '0';
+  $hash->{helper}{OverrideCheckTDT} = '0';
   
   # set model depending defaults
   ### sense_guard
@@ -287,7 +288,7 @@ sub GroheOndusSmartDevice_Define($$)
   CommandAttr( undef, $name . ' interval ' . $hash->{INTERVAL} )
     if ( AttrVal( $name, 'interval', 'none' ) eq 'none' );
 
-  Log3 $name, 3, "GroheOndusSmartDevice ($name) - defined GroheOndusSmartDevice with DEVICEID: $deviceId";
+  Log3($name, 3, "GroheOndusSmartDevice ($name) - defined GroheOndusSmartDevice with DEVICEID: $deviceId");
 
   readingsSingleUpdate( $hash, 'state', 'initialized', 1 );
 
@@ -327,7 +328,7 @@ sub GroheOndusSmartDevice_Attr(@)
   my ( $cmd, $name, $attrName, $attrVal ) = @_;
   my $hash = $defs{$name};
 
-  Log3 $name, 4, "GroheOndusSmartDevice_Attr($name) - Attr was called";
+  Log3($name, 4, "GroheOndusSmartDevice_Attr($name) - Attr was called");
 
   # Attribute "disable"
   if ( $attrName eq 'disable' )
@@ -340,7 +341,7 @@ sub GroheOndusSmartDevice_Attr(@)
       GroheOndusSmartDevice_TimerRemove($hash);
     
       readingsSingleUpdate( $hash, 'state', 'inactive', 1 );
-      Log3 $name, 3, "GroheOndusSmartDevice ($name) - disabled";
+      Log3($name, 3, "GroheOndusSmartDevice ($name) - disabled");
     } 
     else #elsif ( $cmd eq 'del' )
     {
@@ -349,7 +350,7 @@ sub GroheOndusSmartDevice_Attr(@)
       readingsSingleUpdate( $hash, 'state', 'active', 1 );
 
       GroheOndusSmartDevice_TimerExecute( $hash );
-      Log3 $name, 3, "GroheOndusSmartDevice ($name) - enabled";
+      Log3($name, 3, "GroheOndusSmartDevice ($name) - enabled");
     }
   }
 
@@ -368,7 +369,7 @@ sub GroheOndusSmartDevice_Attr(@)
 
       GroheOndusSmartDevice_TimerExecute( $hash );
 
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set interval: $attrVal";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set interval: $attrVal");
     } 
     elsif ( $cmd eq 'del' )
     {
@@ -378,7 +379,7 @@ sub GroheOndusSmartDevice_Attr(@)
 
       GroheOndusSmartDevice_TimerExecute( $hash );
 
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User interval and set default: 60";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User interval and set default: 60");
     }
   }
 
@@ -387,14 +388,14 @@ sub GroheOndusSmartDevice_Attr(@)
   {
     if ( $cmd eq 'set')
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - debugging enabled";
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - debugging enabled");
 
       $hash->{helper}{DEBUG} = "$attrVal";
       GroheOndusSmartDevice_Debug_Update($hash);
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3 $name, 3, "GroheOndusSmartBridge_Attr($name) - debugging disabled";
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - debugging disabled");
 
       $hash->{helper}{DEBUG} = '0';
       GroheOndusSmartDevice_Debug_Update($hash);
@@ -406,12 +407,12 @@ sub GroheOndusSmartDevice_Attr(@)
   {
     if ( $cmd eq 'set' )
     {
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterCost: $attrVal";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterCost: $attrVal");
       
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetWaterCost and set default: 0";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetWaterCost and set default: 0");
     }
     
     GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
@@ -423,12 +424,12 @@ sub GroheOndusSmartDevice_Attr(@)
   {
     if ( $cmd eq 'set' )
     {
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetHotWaterShare: $attrVal";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetHotWaterShare: $attrVal");
       
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetHotWaterShare and set default: 0";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetHotWaterShare and set default: 0");
     }
     
     GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
@@ -440,12 +441,12 @@ sub GroheOndusSmartDevice_Attr(@)
   {
     if ( $cmd eq 'set' )
     {
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetEnergyCost: $attrVal";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetEnergyCost: $attrVal");
       
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetEnergyCost and set default: 0";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetEnergyCost and set default: 0");
     }
     
     GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
@@ -457,12 +458,12 @@ sub GroheOndusSmartDevice_Attr(@)
   {
     if ( $cmd eq 'set' )
     {
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterConsumption: $attrVal";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterConsumption: $attrVal");
       
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3 $name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetWaterConsumption and set default: 0";
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetWaterConsumption and set default: 0");
     }
     
     GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
@@ -489,7 +490,7 @@ sub GroheOndusSmartDevice_Notify($$)
   return
     if ( !$events );
 
-  Log3 $name, 4, "GroheOndusSmartDevice_Notify($name) - DevType: \'$devtype\'";
+  Log3($name, 4, "GroheOndusSmartDevice_Notify($name) - DevType: \'$devtype\'");
 
   # process 'global' events
   if ( $devtype eq 'Global' )
@@ -497,7 +498,7 @@ sub GroheOndusSmartDevice_Notify($$)
     # global Initialization is done
     if( grep /^INITIALIZED$/, @{$events} )
     {
-      Log3 $name, 3, "GroheOndusSmartDevice_Notify($name) - global event INITIALIZED was catched";
+      Log3($name, 3, "GroheOndusSmartDevice_Notify($name) - global event INITIALIZED was catched");
 
       GroheOndusSmartDevice_Upgrade($hash);
     }
@@ -513,7 +514,8 @@ sub GroheOndusSmartDevice_Notify($$)
     if ( grep /^state:.*$/, @{$events} )
     {
       my $ioDeviceState =  ReadingsVal($hash->{IODev}->{NAME}, 'state', 'none');
-      Log3 $name, 4, "GroheOndusSmartDevice_Notify($name) - event \'state: $ioDeviceState\' from GroheOndusSmartBridge was catched";
+      
+      Log3($name, 4, "GroheOndusSmartDevice_Notify($name) - event \'state: $ioDeviceState\' from GroheOndusSmartBridge was catched");
 
       if ( $ioDeviceState eq 'connected to cloud' )
       {
@@ -527,7 +529,7 @@ sub GroheOndusSmartDevice_Notify($$)
     }
     else
     {
-      Log3 $name, 4, "GroheOndusSmartDevice_Notify($name) - event from GroheOndusSmartBridge was catched";
+      Log3($name, 4, "GroheOndusSmartDevice_Notify($name) - event from GroheOndusSmartBridge was catched");
     }
   }
   
@@ -549,7 +551,7 @@ sub GroheOndusSmartDevice_Set($@)
 #  my $model = AttrVal( $name, 'model', 'unknown' );
   my $model = $hash->{MODEL};
 
-  Log3 $name, 4, "GroheOndusSmartDevice_Set($name): cmd= $cmd";
+  Log3($name, 4, "GroheOndusSmartDevice_Set($name): cmd= $cmd");
 
   #########################################################
   ### sense_guard #########################################
@@ -588,7 +590,7 @@ sub GroheOndusSmartDevice_Parse($$)
   my $current_room_id = $io_hash->{currentAppliance}->{room_id};
   my $autocreate = $io_hash->{currentAppliance}->{autocreate};
 
-  Log3 $io_name, 4, "GroheOndusSmartBridge($io_name) -> GroheOndusSmartDevice_Parse";
+  Log3($io_name, 4, "GroheOndusSmartBridge($io_name) -> GroheOndusSmartDevice_Parse");
 
   if ( defined( $current_appliance_id ) )
   {
@@ -597,7 +599,7 @@ sub GroheOndusSmartDevice_Parse($$)
     {
       my $name = $hash->{NAME};
 
-      Log3 $name, 5, "GroheOndusSmartDevice_Parse($name) - found logical device";
+      Log3($name, 5, "GroheOndusSmartDevice_Parse($name) - found logical device");
 
       # set internals
       $hash->{appliance_id} = $current_appliance_id;
@@ -628,20 +630,20 @@ sub GroheOndusSmartDevice_Parse($$)
       if ( $current_type_id == 101 )
       {
         my $deviceTypeName = 'sense';
-        Log3 $io_name, 3, "GroheOndusSmartBridge($io_name) -> autocreate new device $deviceName with applianceId $current_appliance_id, model $deviceTypeName";
+        Log3($io_name, 3, "GroheOndusSmartBridge($io_name) -> autocreate new device $deviceName with applianceId $current_appliance_id, model $deviceTypeName");
 
         return "UNDEFINED $deviceName GroheOndusSmartDevice $io_name $current_appliance_id $deviceTypeName";
       } 
       elsif ( $current_type_id == 103 )
       {
         my $deviceTypeName = 'sense_guard';
-        Log3 $io_name, 3, "GroheOndusSmartBridge($io_name) -> autocreate new device $deviceName with applianceId $current_appliance_id, model $deviceTypeName";
+        Log3($io_name, 3, "GroheOndusSmartBridge($io_name) -> autocreate new device $deviceName with applianceId $current_appliance_id, model $deviceTypeName");
 
         return "UNDEFINED $deviceName GroheOndusSmartDevice $io_name $current_appliance_id $deviceTypeName";
       } 
       else
       {
-        Log3 $io_name, 3, "GroheOndusSmartBridge($io_name) - can't find matching devicetype";
+        Log3($io_name, 3, "GroheOndusSmartBridge($io_name) - can't find matching devicetype");
 
         return undef;
       }
@@ -660,20 +662,20 @@ sub GroheOndusSmartDevice_Upgrade($)
   
   if($GroheOndusSmartDeviceDefinition->{AttrList} ne $newAttrList)
   {
-    Log3 $name, 3, "GroheOndusSmartDevice_Upgrade($name) - patching GroheOndusSmartDevice.AttrList";
+    Log3($name, 3, "GroheOndusSmartDevice_Upgrade($name) - patching GroheOndusSmartDevice.AttrList");
     # change list of attributes
     $GroheOndusSmartDeviceDefinition->{AttrList} = $newAttrList;
   } 
 
   if ( AttrVal( $name, 'IODev', 'none' ) ne 'none' )
   {
-    Log3 $name, 3, "GroheOndusSmartDevice_Upgrade($name) - deleting old attribute IODEV";
+    Log3($name, 3, "GroheOndusSmartDevice_Upgrade($name) - deleting old attribute IODEV");
     fhem("deleteattr $name IODev", 1);
   }
 
   if ( AttrVal( $name, 'model', 'none' ) ne 'none' )
   {
-    Log3 $name, 3, "GroheOndusSmartDevice_Upgrade($name) - deleting old attribute model";
+    Log3($name, 3, "GroheOndusSmartDevice_Upgrade($name) - deleting old attribute model");
     fhem("deleteattr $name model", 1);
   }
 }
@@ -685,11 +687,13 @@ sub GroheOndusSmartDevice_Debug_Update($)
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 5, "GroheOndusSmartDevice_Debug_Update($name)";
+  Log3($name, 5, "GroheOndusSmartDevice_Debug_Update($name)");
   
   if( $hash->{helper}{DEBUG} eq '1')
   {
     $hash->{DEBUG_IsDisabled} = $hash->{helper}{IsDisabled};
+    $hash->{DEBUG_applianceTDT} = $hash->{helper}{applianceTDT};
+    $hash->{DEBUG_OverrideCheckTDT} = $hash->{helper}{OverrideCheckTDT};
     
     my @retrystring_keys =  grep /TELEGRAM_/, keys %{$hash->{helper}};
     foreach (@retrystring_keys)
@@ -723,7 +727,7 @@ sub GroheOndusSmartDevice_TimerExecute($)
   if ( $init_done and 
     $hash->{helper}{IsDisabled} eq '0' )
   {
-    Log3 $name, 4, "GroheOndusSmartDevice_TimerExecute($name)";
+    Log3($name, 4, "GroheOndusSmartDevice_TimerExecute($name)");
 
     ### sense ###
     if ( $model eq 'sense' )
@@ -745,7 +749,7 @@ sub GroheOndusSmartDevice_TimerExecute($)
   {
     readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
 
-    Log3 $name, 4, "GroheOndusSmartDevice_TimerExecute($name) - device is disabled";
+    Log3($name, 4, "GroheOndusSmartDevice_TimerExecute($name) - device is disabled");
   }
 }
 
@@ -756,7 +760,7 @@ sub GroheOndusSmartDevice_TimerRemove($)
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartDevice_TimerRemove($name)";
+  Log3($name, 4, "GroheOndusSmartDevice_TimerRemove($name)");
 
   $hash->{NEXTTIMER} = "none";
   RemoveInternalTimer($hash, \&GroheOndusSmartDevice_TimerExecute);
@@ -769,7 +773,7 @@ sub GroheOndusSmartDevice_IOWrite($$)
   my ( $hash, $param ) = @_;
   my $name = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartDevice_IOWrite($name)";
+  Log3($name, 4, "GroheOndusSmartDevice_IOWrite($name)");
 
   IOWrite( $hash, $param );
 }
@@ -781,7 +785,7 @@ sub GroheOndusSmartDevice_SenseGuard_Update($)
   my ( $hash ) = @_;
   my $name     = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_Update($name)";
+  Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_Update($name)");
 
   # paralleles Abrufen!
   #GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($hash);
@@ -812,7 +816,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
     $hash->{helper}{TELEGRAM_STATUSIOCALLBACK}  = strftime($TimeStampFormat, localtime(gettimeofday()));
-    Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetState($name) - resultCallback";
+    Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetState($name) - resultCallback");
 
     if ( $errorMsg eq "" )
     {
@@ -820,7 +824,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
 
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartDevice_SenseGuard_GetState($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetState($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -893,7 +897,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetState($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetState($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -904,7 +908,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetState($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetState($name) - callbackFail");
         $callbackFail->();
       }
     }
@@ -937,7 +941,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetState($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetState($name) - callbackFail");
       $callbackFail->();
     }
   }
@@ -957,7 +961,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
     $hash->{helper}{TELEGRAM_CONFIGCIOALLBACK}  = strftime($TimeStampFormat, localtime(gettimeofday()));
-    Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - resultCallback";
+    Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - resultCallback");
 
     if( $errorMsg eq "" )
     {
@@ -965,7 +969,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
     
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -1358,7 +1362,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -1367,7 +1371,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - callbackFail");
         $callbackFail->();
       }
     }
@@ -1400,7 +1404,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - callbackFail");
       $callbackFail->();
     }
   }
@@ -1420,7 +1424,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
     $hash->{helper}{TELEGRAM_DATAIOCALLBACK}  = strftime($TimeStampFormat, localtime(gettimeofday()));
-    Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - resultCallback";
+    Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - resultCallback");
 
     if( $errorMsg eq "" )
     {
@@ -1428,7 +1432,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
     
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -1487,6 +1491,8 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
         if ( defined( $decode_json->{data} ) and
           ref( $decode_json->{data} ) eq "HASH" )
         {
+          $hash->{helper}{applianceTDT} = $callbackparam->{applianceTDT};
+
           readingsBeginUpdate($hash);
 
           # Measurement
@@ -1752,7 +1758,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -1763,7 +1769,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackFail");
         $callbackFail->();
       }
     }
@@ -1776,31 +1782,50 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
   if( defined( $device_locationId ) and
     defined( $device_roomId ))
   {
-    # get all Data from within today
-    # calc gmt from localtime because the grohe cloud works with gmt
-    my $requestFromTimestamp     = GroheOndusSmartDevice_GetUTCMidnightDate(0);
-
-    my $param = {};
-    $param->{method} = 'GET';
-    $param->{url} = $hash->{IODev}{URL} . '/iot/locations/' . $device_locationId . '/rooms/' . $device_roomId . '/appliances/' . $deviceId . '/data?from=' . $requestFromTimestamp;
-    $param->{header} = "Content-Type: application/json";
-    $param->{data} = "{}";
-    $param->{httpversion} = "1.0";
-    $param->{ignoreredirects} = 0;
-    $param->{keepalive} = 1;
-
-    $param->{resultCallback} = $resultCallback;
+    my $lastTDT = $hash->{helper}{applianceTDT};
+    my $applianceTDT = ReadingsVal($name, "ApplianceTDT", "none");
     
-    $hash->{helper}{TELEGRAM_DATAIOWRITE} = strftime($TimeStampFormat, localtime(gettimeofday()));
+    if($hash->{helper}{OverrideCheckTDT} eq "0" and
+      $lastTDT eq $applianceTDT)
+    {
+      Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - no new TDT");
 
-    GroheOndusSmartDevice_IOWrite( $hash, $param );
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackSuccess");
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      # get all Data from within today
+      # calc gmt from localtime because the grohe cloud works with gmt
+      my $requestFromTimestamp     = GroheOndusSmartDevice_GetUTCMidnightDate(0);
+
+      my $param = {};
+      $param->{method} = 'GET';
+      $param->{url} = $hash->{IODev}{URL} . '/iot/locations/' . $device_locationId . '/rooms/' . $device_roomId . '/appliances/' . $deviceId . '/data?from=' . $requestFromTimestamp;
+      $param->{header} = "Content-Type: application/json";
+      $param->{data} = "{}";
+      $param->{httpversion} = "1.0";
+      $param->{ignoreredirects} = 0;
+      $param->{keepalive} = 1;
+
+      $param->{resultCallback} = $resultCallback;
+      $param->{applianceTDT} = $applianceTDT;
+
+      $hash->{helper}{TELEGRAM_DATAIOWRITE} = strftime($TimeStampFormat, localtime(gettimeofday()));
+
+      GroheOndusSmartDevice_IOWrite( $hash, $param );
+    }
   }
   else
   {
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackFail");
       $callbackFail->();
     }
   }
@@ -1848,7 +1873,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
     $hash->{helper}{TELEGRAM_COMMANDIOCALLBACK}  = strftime($TimeStampFormat, localtime(gettimeofday()));
-    Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - resultCallback";
+    Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - resultCallback");
 
     if ( $errorMsg eq "" )
     {
@@ -1856,7 +1881,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
     
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -1918,7 +1943,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -1929,7 +1954,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - callbackFail");
         $callbackFail->();
       }
     }
@@ -1962,7 +1987,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - callbackFail");
       $callbackFail->();
     }
   }
@@ -1974,22 +1999,25 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
 {
   my ( $hash, $name, $cmd, @args ) = @_;
 
-  Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_Set($name) - cmd= $cmd";
+  Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_Set($name) - cmd= $cmd");
 
   ### Command 'update'
   if ( lc $cmd eq lc 'update' )
   {
     GroheOndusSmartDevice_SenseGuard_Update($hash);
+    return;
   }
   ### Command 'on'
   elsif ( lc $cmd eq lc 'on' )
   {
-    GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", "on")
+    GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", "on");
+    return;
   }
   ### Command 'off'
   elsif ( lc $cmd eq lc 'off' )
   {
-    GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", "off")
+    GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", "off");
+    return;
   }
   ### Command 'buzzer'
   elsif ( lc $cmd eq lc 'buzzer' )
@@ -1997,7 +2025,8 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
     # parameter is "on" or "off" so convert to "true" : "false"
     my $onoff = join( " ", @args ) eq "on" ? "true" : "false";
 
-    GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "buzzer_on", $onoff)
+    GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "buzzer_on", $onoff);
+    return;
   }
   ### Command 'valve'
   elsif ( lc $cmd eq lc 'valve' )
@@ -2005,32 +2034,45 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
     # parameter is "on" or "off" so convert to "true" : "false"
     my $onoff = join( " ", @args ) eq "on" ? "true" : "false";
 
-    GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", $onoff)
+    GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", $onoff);
+    return;
   }
   ### Command 'clearreadings'
   elsif ( lc $cmd eq lc 'clearreadings' )
   {
     fhem("deletereading $name .*", 1);
+    return;
   }
   ### Command 'debugRefreshValues'
   elsif ( lc $cmd eq lc 'debugRefreshValues' )
   {
     GroheOndusSmartDevice_SenseGuard_GetData($hash);
+    return;
   }
   ### Command 'debugRefreshState'
   elsif ( lc $cmd eq lc 'debugRefreshState' )
   {
     GroheOndusSmartDevice_SenseGuard_GetState($hash);
+    return;
   }
   ### Command 'debugRefreshConfig'
   elsif ( lc $cmd eq lc 'debugRefreshConfig' )
   {
     GroheOndusSmartDevice_SenseGuard_GetConfig($hash);
+    return;
   }
   ### Command 'debugGetApplianceCommand'
   elsif ( lc $cmd eq lc 'debugGetApplianceCommand' )
   {
     GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($hash);
+    return;
+  }
+  ### Command 'debugOverrideCheckTDT'
+  elsif ( lc $cmd eq lc 'debugOverrideCheckTDT' )
+  {
+    $hash->{helper}{OverrideCheckTDT} = join( " ", @args );
+    GroheOndusSmartDevice_Debug_Update($hash);
+    return;
   }
   ### unknown Command
   else
@@ -2055,6 +2097,9 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
     $list .= 'debugGetApplianceCommand:noArg '
       if($hash->{helper}{DEBUG} ne '0');
 
+    $list .= 'debugOverrideCheckTDT:0,1 '
+      if($hash->{helper}{DEBUG} ne '0');
+
     return "Unknown argument $cmd, choose one of $list";
   }
 }
@@ -2073,7 +2118,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
     $hash->{SetApplianceCommandIOCALLBACK}  = strftime($TimeStampFormat, localtime(gettimeofday()));
-    Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - resultCallback";
+    Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - resultCallback");
 
     if( $errorMsg eq "" )
     {
@@ -2081,7 +2126,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
     
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -2149,7 +2194,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -2160,7 +2205,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - callbackFail");
         $callbackFail->();
       }
     }
@@ -2219,7 +2264,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - callbackFail");
       $callbackFail->();
     }
   }
@@ -2232,7 +2277,7 @@ sub GroheOndusSmartDevice_Sense_Update($)
   my ( $hash ) = @_;
   my $name     = $hash->{NAME};
 
-  Log3 $name, 4, "GroheOndusSmartDevice_Sense_Update($name)";
+  Log3($name, 4, "GroheOndusSmartDevice_Sense_Update($name)");
 
   # paralleles Abrufen!
   #GroheOndusSmartDevice_Sense_GetData($hash);
@@ -2261,7 +2306,7 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
     $hash->{helper}{TELEGRAM_STATUSIOCALLBACK}  = strftime($TimeStampFormat, localtime(gettimeofday()));
-    Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetState($name) - resultCallback";
+    Log3($name, 4, "GroheOndusSmartDevice_Sense_GetState($name) - resultCallback");
 
     if( $errorMsg eq "")
     {
@@ -2269,7 +2314,7 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
     
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartDevice_Sense_GetState($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartDevice_Sense_GetState($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -2354,7 +2399,7 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetState($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartDevice_Sense_GetState($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -2365,7 +2410,7 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetState($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartDevice_Sense_GetState($name) - callbackFail");
         $callbackFail->();
       }
     }
@@ -2398,7 +2443,7 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetState($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartDevice_Sense_GetState($name) - callbackFail");
       $callbackFail->();
     }
   }
@@ -2418,7 +2463,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
     $hash->{helper}{TELEGRAM_CONFIGIOCALLBACK}  = strftime($TimeStampFormat, localtime(gettimeofday()));
-    Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetConfig($name) - resultCallback";
+    Log3($name, 4, "GroheOndusSmartDevice_Sense_GetConfig($name) - resultCallback");
 
     if( $errorMsg eq "" )
     {
@@ -2426,7 +2471,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
     
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartDevice_Sense_GetConfig($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartDevice_Sense_GetConfig($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -2617,7 +2662,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetConfig($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartDevice_Sense_GetConfig($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -2628,7 +2673,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetConfig($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartDevice_Sense_GetConfig($name) - callbackFail");
         $callbackFail->();
       }
     }
@@ -2661,7 +2706,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetConfig($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartDevice_Sense_GetConfig($name) - callbackFail");
       $callbackFail->();
     }
   }
@@ -2681,7 +2726,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
     $hash->{helper}{TELEGRAM_DATAIOCALLBACK}  = strftime($TimeStampFormat, localtime(gettimeofday()));
-    Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - resultCallback";
+    Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - resultCallback");
 
     if( $errorMsg eq "" )
     {
@@ -2689,7 +2734,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
     
       if ($@)
       {
-        Log3 $name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - JSON error while request: $@";
+        Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - JSON error while request: $@");
 
         if ( AttrVal( $name, 'debugJSON', 0 ) == 1 )
         {
@@ -2728,10 +2773,23 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
           defined( $decode_json->{data}->{measurement} ) and
           ref( $decode_json->{data}->{measurement} ) eq "ARRAY" )
         {
-          $hash->{helper}{TELEGRAM_DATACOUNTER}++;
+          $hash->{helper}{applianceTDT} = $callbackparam->{applianceTDT};
+
+          my ($getKeyError, $lastProcessedMeasurementTimestamp) = getKeyValue("MeasurementDataTimestamp");
+
+          # on error get value from reading
+          if(defined($getKeyError))
+          {
+            $lastProcessedMeasurementTimestamp = ReadingsVal($name, "MeasurementDataTimestamp", "");
+            Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - getKeyValue error: $getKeyError");
+          }
+          else
+          {
+            Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData($name) - getKeyValue: $lastProcessedMeasurementTimestamp");
+          }
 
           # get entry with latest timestamp
-          my $dataTimestamp;
+          my $dataTimestamp = undef;
           my $dataHumidity;
           my $dataTemperature;
           my $loopCounter = 0;
@@ -2739,17 +2797,45 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
           foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
           {
             # is this the correct dataset?
-            if (  defined( $currentData->{timestamp} )
+            if ( defined( $currentData->{timestamp} )
               and defined( $currentData->{humidity} )
               and defined( $currentData->{temperature} ) )
             {
+              my $currentDataTimestamp   = $currentData->{timestamp};
+              my $currentDataHumidity    = $currentData->{humidity};
+              my $currentDataTemperature = $currentData->{temperature};
+              
+              if($currentDataTimestamp gt $lastProcessedMeasurementTimestamp)
+              {
+                readingsBeginUpdate($hash);
+
+                readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $currentDataTimestamp )
+                  if ( defined($currentDataTimestamp) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $currentDataTimestamp . " " . $currentDataHumidity )
+                  if ( defined($currentDataHumidity) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $currentDataTimestamp . " " . $currentDataTemperature )
+                  if ( defined($currentDataTemperature) );
+
+                readingsEndUpdate( $hash, 1 );
+
+                my $setKeyError = setKeyValue("MeasurementDataTimestamp", $currentDataTimestamp);
+                if(defined($setKeyError))
+                {
+                  Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue error: " . $setKeyError);
+                }
+                else
+                {
+                  Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue: $currentDataTimestamp");
+                }
+              }
+              
               # is timestamp newer?
               if ( not defined($dataTimestamp)
-                or $currentData->{timestamp} gt $dataTimestamp )
+                or $currentDataTimestamp gt $dataTimestamp )
               {
-                $dataTimestamp   = $currentData->{timestamp};
-                $dataHumidity    = $currentData->{humidity};
-                $dataTemperature = $currentData->{temperature};
+                $dataTimestamp   = $currentDataTimestamp;
+                $dataHumidity    = $currentDataHumidity;
+                $dataTemperature = $currentDataTemperature;
               }
             }
             $loopCounter++;
@@ -2785,18 +2871,18 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
           # Not found -> no data in requested timespan
           if( $errorCode == 404 )
           {
-            Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - $message";
+            Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - $message");
             readingsSingleUpdate( $hash, 'Message', $message, 1 );
           }
           # Too many requests 
           elsif ($errorCode == 429)
           {
-            Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - $message";
+            Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - $message");
             readingsSingleUpdate( $hash, 'Message', $message, 1 );
           }
           else
           {
-            Log3 $name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - $message";
+            Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - $message");
             readingsSingleUpdate( $hash, 'Message', $message, 1 );
           }
         }
@@ -2814,7 +2900,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - callbackSuccess";
+        Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
@@ -2825,7 +2911,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
-        Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - callbackFail";
+        Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - callbackFail");
         $callbackFail->();
       }
     }
@@ -2835,34 +2921,53 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
   my $device_locationId = $hash->{location_id};
   my $device_roomId     = $hash->{room_id};
 
-  if( defined( $device_locationId ) and
+  if(defined( $device_locationId ) and
     defined( $device_roomId ))
   {
-    # get all Data from within today
-    # calc gmt from localtime because the grohe cloud works with gmt
-    my $requestFromTimestamp = GroheOndusSmartDevice_GetUTCMidnightDate(-24); # offset to prevent empty responses
-
-    my $param = {};
-    $param->{method} = 'GET';
-    $param->{url} = $hash->{IODev}{URL} . '/iot/locations/' . $device_locationId . '/rooms/' . $device_roomId . '/appliances/' . $deviceId . '/data?from=' . $requestFromTimestamp;
-    $param->{header} = "Content-Type: application/json";
-    $param->{data} = "{}";
-    $param->{httpversion} = "1.0";
-    $param->{ignoreredirects} = 0;
-    $param->{keepalive} = 1;
+    my $lastTDT = $hash->{helper}{applianceTDT};
+    my $applianceTDT = ReadingsVal($name, "ApplianceTDT", "none");
     
-    $param->{resultCallback} = $resultCallback;
+    if($hash->{helper}{OverrideCheckTDT} eq "0" and
+      $lastTDT eq $applianceTDT)
+    {
+      Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - no new TDT");
 
-    $hash->{helper}{TELEGRAM_DATAIOWRITE} = strftime($TimeStampFormat, localtime(gettimeofday()));
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackSuccess");
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      # get all Data from within today
+      # calc gmt from localtime because the grohe cloud works with gmt
+      my $requestFromTimestamp = GroheOndusSmartDevice_GetUTCMidnightDate(-24); # offset to prevent empty responses
 
-    GroheOndusSmartDevice_IOWrite( $hash, $param );
+      my $param = {};
+      $param->{method} = 'GET';
+      $param->{url} = $hash->{IODev}{URL} . '/iot/locations/' . $device_locationId . '/rooms/' . $device_roomId . '/appliances/' . $deviceId . '/data?from=' . $requestFromTimestamp;
+      $param->{header} = "Content-Type: application/json";
+      $param->{data} = "{}";
+      $param->{httpversion} = "1.0";
+      $param->{ignoreredirects} = 0;
+      $param->{keepalive} = 1;
+
+      $param->{resultCallback} = $resultCallback;
+      $param->{applianceTDT} = $applianceTDT;
+
+      $hash->{helper}{TELEGRAM_DATAIOWRITE} = strftime($TimeStampFormat, localtime(gettimeofday()));
+
+      GroheOndusSmartDevice_IOWrite( $hash, $param );
+    }
   }
   else
   {
     # if there is a callback then call it
     if( defined($callbackFail) )
     {
-      Log3 $name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - callbackFail";
+      Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - callbackFail");
       $callbackFail->();
     }
   }
@@ -2878,26 +2983,38 @@ sub GroheOndusSmartDevice_Sense_Set($@)
   if ( lc $cmd eq lc 'update' )
   {
     GroheOndusSmartDevice_Sense_Update($hash);
+    return;
   }
   ### Command 'clearreadings'
   elsif ( lc $cmd eq lc 'clearreadings' )
   {
     fhem("deletereading $name .*", 1);
+    return;
   }
   ### Command 'debugRefreshValues'
   elsif ( lc $cmd eq lc 'debugRefreshValues' )
   {
     GroheOndusSmartDevice_Sense_GetData($hash);
+    return;
   }
   ### Command 'debugRefreshState'
   elsif ( lc $cmd eq lc 'debugRefreshState' )
   {
     GroheOndusSmartDevice_Sense_GetState($hash);
+    return;
   }
   ### Command 'debugRefreshConfig'
   elsif ( lc $cmd eq lc 'debugRefreshConfig' )
   {
     GroheOndusSmartDevice_Sense_GetConfig($hash);
+    return;
+  }
+  ### Command 'debugOverrideCheckTDT'
+  elsif ( lc $cmd eq lc 'debugOverrideCheckTDT' )
+  {
+    $hash->{helper}{OverrideCheckTDT} = join( " ", @args );
+    GroheOndusSmartDevice_Debug_Update($hash);
+    return;
   }
   ### unknown Command
   else
@@ -2914,6 +3031,9 @@ sub GroheOndusSmartDevice_Sense_Set($@)
       if($hash->{helper}{DEBUG} ne '0');
 
     $list .= 'debugRefreshState:noArg '
+      if($hash->{helper}{DEBUG} ne '0');
+
+    $list .= 'debugOverrideCheckTDT:0,1 '
       if($hash->{helper}{DEBUG} ne '0');
 
     return "Unknown argument $cmd, choose one of $list";
