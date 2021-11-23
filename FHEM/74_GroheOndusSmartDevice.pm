@@ -291,6 +291,14 @@ sub GroheOndusSmartDevice_Define($$)
 
   Log3($name, 3, "GroheOndusSmartDevice ($name) - defined GroheOndusSmartDevice with DEVICEID: $deviceId");
 
+  # read MeasurementDataTimestamp from store
+  my ($getKeyError, $lastProcessedMeasurementTimestamp) = getKeyValue("MeasurementDataTimestamp");
+  $lastProcessedMeasurementTimestamp = ""
+    if(defined($getKeyError) or
+    not defined ($lastProcessedMeasurementTimestamp ));
+    
+  $hash->{helper}{lastProcessedMeasurementTimestamp} = $lastProcessedMeasurementTimestamp;
+
   readingsSingleUpdate( $hash, 'state', 'initialized', 1 );
 
   $modules{GroheOndusSmartDevice}{defptr}{$deviceId} = $hash;
@@ -695,6 +703,7 @@ sub GroheOndusSmartDevice_Debug_Update($)
     $hash->{DEBUG_IsDisabled} = $hash->{helper}{IsDisabled};
     $hash->{DEBUG_applianceTDT} = $hash->{helper}{applianceTDT};
     $hash->{DEBUG_OverrideCheckTDT} = $hash->{helper}{OverrideCheckTDT};
+    $hash->{DEBUG_lastProcessedMeasurementTimestamp} = $hash->{helper}{lastProcessedMeasurementTimestamp};
     
     my @retrystring_keys =  grep /TELEGRAM_/, keys %{$hash->{helper}};
     foreach (@retrystring_keys)
@@ -2776,22 +2785,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
         {
           $hash->{helper}{applianceTDT} = $callbackparam->{applianceTDT};
 
-          my ($getKeyError, $lastProcessedMeasurementTimestamp) = getKeyValue("MeasurementDataTimestamp");
-
-          # on error get value from reading
-          if(defined($getKeyError))
-          {
-            $lastProcessedMeasurementTimestamp = ReadingsVal($name, "MeasurementDataTimestamp", "");
-            Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - getKeyValue error: $getKeyError");
-          }
-          elsif (not defined ($lastProcessedMeasurementTimestamp ))
-          {
-            $lastProcessedMeasurementTimestamp = ReadingsVal($name, "MeasurementDataTimestamp", "");
-          }
-          else
-          {
-            Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData($name) - getKeyValue: $lastProcessedMeasurementTimestamp");
-          }
+          my $lastProcessedMeasurementTimestamp = $hash->{helper}{lastProcessedMeasurementTimestamp};
 
           # get entry with latest timestamp
           my $dataTimestamp = undef;
@@ -2822,16 +2816,6 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
                   if ( defined($currentDataTemperature) );
 
                 readingsEndUpdate( $hash, 1 );
-
-                my $setKeyError = setKeyValue("MeasurementDataTimestamp", $currentDataTimestamp);
-                if(defined($setKeyError))
-                {
-                  Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue error: " . $setKeyError);
-                }
-                else
-                {
-                  Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue: $currentDataTimestamp");
-                }
               }
               
               # is timestamp newer?
@@ -2844,6 +2828,18 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
               }
             }
             $loopCounter++;
+          }
+
+          # save last TimeStamp in store
+          $hash->{helper}{lastProcessedMeasurementTimestamp} = $dataTimestamp;
+          my $setKeyError = setKeyValue("MeasurementDataTimestamp", $dataTimestamp);
+          if(defined($setKeyError))
+          {
+            Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue error: " . $setKeyError);
+          }
+          else
+          {
+            Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue: $dataTimestamp");
           }
 
           $hash->{STATISTICDATALOOPCOUNTER} = $loopCounter;
