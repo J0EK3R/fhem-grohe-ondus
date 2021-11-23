@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = '3.0.17';
+my $VERSION = '3.0.18';
 
 use strict;
 use warnings;
@@ -216,7 +216,8 @@ sub GroheOndusSmartDevice_Define($$)
   $hash->{helper}{DEBUG}            = '0';
   $hash->{helper}{IsDisabled}       = '0';
   $hash->{helper}{OverrideCheckTDT} = '0';
-  
+  $hash->{helper}{applianceTDT}     = "";
+    
   # set model depending defaults
   ### sense_guard
   if ( $model eq 'sense_guard' )
@@ -2782,6 +2783,10 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
           {
             $lastProcessedMeasurementTimestamp = ReadingsVal($name, "MeasurementDataTimestamp", "");
             Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - getKeyValue error: $getKeyError");
+          }
+          elsif (not defined ($lastProcessedMeasurementTimestamp ))
+          {
+            $lastProcessedMeasurementTimestamp = ReadingsVal($name, "MeasurementDataTimestamp", "");
           }
           else
           {
