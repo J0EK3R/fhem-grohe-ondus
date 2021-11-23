@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = '3.0.18';
+my $VERSION = '3.0.19';
 
 use strict;
 use warnings;
@@ -2819,8 +2819,8 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
               }
               
               # is timestamp newer?
-              if ( not defined($dataTimestamp)
-                or $currentDataTimestamp gt $dataTimestamp )
+              if ( not defined($dataTimestamp) or 
+                $currentDataTimestamp gt $dataTimestamp )
               {
                 $dataTimestamp   = $currentDataTimestamp;
                 $dataHumidity    = $currentDataHumidity;
@@ -2830,30 +2830,41 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
             $loopCounter++;
           }
 
-          # save last TimeStamp in store
-          $hash->{helper}{lastProcessedMeasurementTimestamp} = $dataTimestamp;
-          my $setKeyError = setKeyValue("MeasurementDataTimestamp", $dataTimestamp);
-          if(defined($setKeyError))
+          if ( defined($dataTimestamp) )
           {
-            Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue error: " . $setKeyError);
+            # save last TimeStamp in store
+            $hash->{helper}{lastProcessedMeasurementTimestamp} = $dataTimestamp;
+            my $setKeyError = setKeyValue("MeasurementDataTimestamp", $dataTimestamp);
+            if(defined($setKeyError))
+            {
+              Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue error: " . $setKeyError);
+            }
+            else
+            {
+              Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue: $dataTimestamp");
+            }
+
+            $hash->{STATISTICDATALOOPCOUNTER} = $loopCounter;
+
+            readingsBeginUpdate($hash);
+
+            readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $dataTimestamp );
+            readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $dataTimestamp );
+          
+            if ( defined($dataHumidity) )
+            {
+              readingsBulkUpdateIfChanged( $hash, "LastHumidity", $dataHumidity );
+              readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $dataTimestamp . " " . $dataHumidity );
+            }
+          
+            if ( defined($dataTemperature) )
+            {
+              readingsBulkUpdateIfChanged( $hash, "LastTemperature", $dataTemperature );
+              readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $dataTimestamp . " " . $dataTemperature );
+            }
+
+            readingsEndUpdate( $hash, 1 );
           }
-          else
-          {
-            Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue: $dataTimestamp");
-          }
-
-          $hash->{STATISTICDATALOOPCOUNTER} = $loopCounter;
-
-          readingsBeginUpdate($hash);
-
-          readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $dataTimestamp )
-            if ( defined($dataTimestamp) );
-          readingsBulkUpdateIfChanged( $hash, "LastHumidity", $dataHumidity )
-            if ( defined($dataHumidity) );
-          readingsBulkUpdateIfChanged( $hash, "LastTemperature", $dataTemperature )
-            if ( defined($dataTemperature) );
-
-          readingsEndUpdate( $hash, 1 );
 
           $hash->{helper}{TELEGRAM_DATACOUNTER}++;
         }
@@ -2918,7 +2929,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
     }
   }; 
 
-  my $deviceId = $hash->{DEVICEID};
+  my $deviceId          = $hash->{DEVICEID};
   my $device_locationId = $hash->{location_id};
   my $device_roomId     = $hash->{room_id};
 
@@ -3017,6 +3028,13 @@ sub GroheOndusSmartDevice_Sense_Set($@)
     GroheOndusSmartDevice_Debug_Update($hash);
     return;
   }
+  ### Command 'debugResetProcessedMeasurementTimestamp'
+  elsif ( lc $cmd eq lc 'debugResetProcessedMeasurementTimestamp' )
+  {
+    $hash->{helper}{lastProcessedMeasurementTimestamp} = "";
+    GroheOndusSmartDevice_Debug_Update($hash);
+    return;
+  }
   ### unknown Command
   else
   {
@@ -3035,6 +3053,9 @@ sub GroheOndusSmartDevice_Sense_Set($@)
       if($hash->{helper}{DEBUG} ne '0');
 
     $list .= 'debugOverrideCheckTDT:0,1 '
+      if($hash->{helper}{DEBUG} ne '0');
+
+    $list .= 'debugResetProcessedMeasurementTimestamp:noArg '
       if($hash->{helper}{DEBUG} ne '0');
 
     return "Unknown argument $cmd, choose one of $list";
