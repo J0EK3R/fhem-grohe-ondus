@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = '3.0.19';
+my $VERSION = '3.0.20';
 
 use strict;
 use warnings;
@@ -2939,9 +2939,10 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
     my $lastTDT = $hash->{helper}{applianceTDT};
     my $applianceTDT = ReadingsVal($name, "ApplianceTDT", "none");
     
-    if($hash->{helper}{OverrideCheckTDT} eq "0" and
-      $lastTDT eq $applianceTDT)
-    {
+    if($hash->{helper}{lastProcessedMeasurementTimestamp} ne "" and # if not empty
+      $hash->{helper}{OverrideCheckTDT} eq "0" and                  # if check is disabled 
+      $lastTDT eq $applianceTDT)                                    # if TDT is processed 
+    {                                                               # -> don't get new data
       Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - no new TDT");
 
       # if there is a callback then call it
@@ -3035,6 +3036,15 @@ sub GroheOndusSmartDevice_Sense_Set($@)
     GroheOndusSmartDevice_Debug_Update($hash);
     return;
   }
+  ### Command 'debugForceUpdate'
+  elsif ( lc $cmd eq lc 'debugForceUpdate' )
+  {
+    $hash->{helper}{lastProcessedMeasurementTimestamp} = "";
+    GroheOndusSmartDevice_Debug_Update($hash);
+    
+    GroheOndusSmartDevice_TimerExecute($hash);
+    return;
+  }
   ### unknown Command
   else
   {
@@ -3056,6 +3066,9 @@ sub GroheOndusSmartDevice_Sense_Set($@)
       if($hash->{helper}{DEBUG} ne '0');
 
     $list .= 'debugResetProcessedMeasurementTimestamp:noArg '
+      if($hash->{helper}{DEBUG} ne '0');
+
+    $list .= 'debugForceUpdate:noArg '
       if($hash->{helper}{DEBUG} ne '0');
 
     return "Unknown argument $cmd, choose one of $list";
