@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = '3.0.20';
+my $VERSION = '3.0.21';
 
 use strict;
 use warnings;
@@ -78,6 +78,8 @@ sub GroheOndusSmartDevice_Sense_Set($@);
 sub GroheOndusSmartDevice_GetUTCOffset();
 sub GroheOndusSmartDevice_GetUTCMidnightDate($);
 
+sub GroheOndusSmartDevice_PostFn($$);
+
 my $SenseGuard_DefaultInterval = 60; # default value for the polling interval in seconds
 my $Sense_DefaultInterval = 600;     # default value for the polling interval in seconds
 
@@ -88,6 +90,8 @@ my $Sense_DefaultStateFormat =       "State: state<br/>Temperature: LastTemperat
 my $Sense_DefaultWebCmdFormat =      "update";
 
 my $TimeStampFormat = '%Y-%m-%dT%I:%M:%S';
+
+my $ForcedTimeStampLength = 10;
 
 # AttributeList for all types of GroheOndusSmartDevice 
 my $GroheOndusSmartDevice_AttrList = 
@@ -217,7 +221,7 @@ sub GroheOndusSmartDevice_Define($$)
   $hash->{helper}{IsDisabled}       = '0';
   $hash->{helper}{OverrideCheckTDT} = '0';
   $hash->{helper}{applianceTDT}     = "";
-    
+
   # set model depending defaults
   ### sense_guard
   if ( $model eq 'sense_guard' )
@@ -388,7 +392,7 @@ sub GroheOndusSmartDevice_Attr(@)
 
       GroheOndusSmartDevice_TimerExecute( $hash );
 
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User interval and set default: 60");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete interval and set default: 60");
     }
   }
 
@@ -417,11 +421,10 @@ sub GroheOndusSmartDevice_Attr(@)
     if ( $cmd eq 'set' )
     {
       Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterCost: $attrVal");
-      
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetWaterCost and set default: 0");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetWaterCost and set default: 0");
     }
     
     GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
@@ -434,11 +437,10 @@ sub GroheOndusSmartDevice_Attr(@)
     if ( $cmd eq 'set' )
     {
       Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetHotWaterShare: $attrVal");
-      
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetHotWaterShare and set default: 0");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetHotWaterShare and set default: 0");
     }
     
     GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
@@ -451,11 +453,10 @@ sub GroheOndusSmartDevice_Attr(@)
     if ( $cmd eq 'set' )
     {
       Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetEnergyCost: $attrVal");
-      
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetEnergyCost and set default: 0");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetEnergyCost and set default: 0");
     }
     
     GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
@@ -468,11 +469,10 @@ sub GroheOndusSmartDevice_Attr(@)
     if ( $cmd eq 'set' )
     {
       Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterConsumption: $attrVal");
-      
     } 
     elsif ( $cmd eq 'del' )
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete User offsetWaterConsumption and set default: 0");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetWaterConsumption and set default: 0");
     }
     
     GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
@@ -2796,9 +2796,9 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
           foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
           {
             # is this the correct dataset?
-            if ( defined( $currentData->{timestamp} )
-              and defined( $currentData->{humidity} )
-              and defined( $currentData->{temperature} ) )
+            if ( defined( $currentData->{timestamp} ) and 
+              defined( $currentData->{humidity} ) and 
+              defined( $currentData->{temperature} ) )
             {
               my $currentDataTimestamp   = $currentData->{timestamp};
               my $currentDataHumidity    = $currentData->{humidity};
@@ -2806,13 +2806,17 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
               
               if($currentDataTimestamp gt $lastProcessedMeasurementTimestamp)
               {
+                # force the timestamp-seconds-string to have a well known length
+                # fill with leading zeros
+                my $dataTimestamp_s = sprintf ("%0${ForcedTimeStampLength}d", time_str2num(substr($currentDataTimestamp, 0, 18)) );
+                
                 readingsBeginUpdate($hash);
 
-                readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $currentDataTimestamp )
+                readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $dataTimestamp_s . " " . $currentDataTimestamp )
                   if ( defined($currentDataTimestamp) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $currentDataTimestamp . " " . $currentDataHumidity )
+                readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $dataTimestamp_s . $currentDataHumidity )
                   if ( defined($currentDataHumidity) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $currentDataTimestamp . " " . $currentDataTemperature )
+                readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $dataTimestamp_s . $currentDataTemperature )
                   if ( defined($currentDataTemperature) );
 
                 readingsEndUpdate( $hash, 1 );
@@ -2849,18 +2853,15 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
             readingsBeginUpdate($hash);
 
             readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $dataTimestamp );
-            readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $dataTimestamp );
           
             if ( defined($dataHumidity) )
             {
               readingsBulkUpdateIfChanged( $hash, "LastHumidity", $dataHumidity );
-              readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $dataTimestamp . " " . $dataHumidity );
             }
           
             if ( defined($dataTemperature) )
             {
               readingsBulkUpdateIfChanged( $hash, "LastTemperature", $dataTemperature );
-              readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $dataTimestamp . " " . $dataTemperature );
             }
 
             readingsEndUpdate( $hash, 1 );
@@ -3132,6 +3133,29 @@ sub GroheOndusSmartDevice_GetUTCMidnightDate($)
   my $gmtMidnightDate = sprintf( "%04d-%02d-%02dT%02d:00:00", $year + 1900, $month + 1, $mday, $hour );
 
   return $gmtMidnightDate;
+}
+
+
+##################################
+# GroheOndusSmartDevice_PostFn
+# This function splits a raw-value string containing a timestamp in seconds and 
+# a value with a well known timestamp length in the timestamp and the value and
+# puts them into the point structure for a plot 
+sub GroheOndusSmartDevice_PostFn($$)
+{      
+  my($devspec, $array) = @_; 
+  
+  foreach my $point ( @{$array} ) 
+  {
+    my $timeStamp_Value = $point->[1]; # take raw-value i.e. "163780529817.3"
+
+    # first part of the raw-value is the timestamp in seconds (it has a well known length) -> 1637805298
+    # second part - the rest - of the raw-value is the value                               -> 17.3
+    $point->[0] = substr($timeStamp_Value, 0, $ForcedTimeStampLength);
+    $point->[1] = substr($timeStamp_Value, $ForcedTimeStampLength);
+  }    
+
+  return $array;
 }
 
 1;
