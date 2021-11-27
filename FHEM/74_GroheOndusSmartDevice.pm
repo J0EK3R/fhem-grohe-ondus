@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = '3.0.22';
+my $VERSION = '3.0.23';
 
 use strict;
 use warnings;
@@ -3153,7 +3153,7 @@ sub GroheOndusSmartDevice_PostFn($$)
     # first 2 numbers are the version information
     my $measurementFormatVersion = $point->[0] = substr($timeStamp_Value, 0, 2);
 
-    # no version information: Format: <10 timettamp><rest value>
+    # no version information: Format: <10 timetstamp><rest value>
     if($measurementFormatVersion eq "16")
     {
       # first part of the raw-value is the timestamp in seconds (it has a well known length) -> 1637805298
@@ -3263,6 +3263,10 @@ sub GroheOndusSmartDevice_PostFn($$)
         <i>SenseGuard only</i><br>
         Update the command-state.
       </li>
+      <br>
+      <li><B>debugForceUpdate</B><a name="GroheOndusSmartDevicedebugForceUpdate"></a><br>
+        Forced update of last measurements.
+      </li>
     </ul>
     <br>
     <a name="GroheOndusSmartDeviceattr"></a><b>Attributes</b><br>
@@ -3305,7 +3309,66 @@ sub GroheOndusSmartDevice_PostFn($$)
         Offset value for calculating reading TotalHotWaterShare.<br>
       </li>
     </ul><br>
-    <br><br>
+    <br>
+    <a name="GroheOndusSmartDevicereadings"></a><b>Readings</b><br>
+    <ul>
+      <li><a name="GroheOndusSmartDeviceMeasurementDataTimestamp">MeasurementDataTimestamp</a><br>
+        Example: 001637985182 2021-11-27T04:53:26.000+01:00<br>
+        This reading's value consists of two parts: format version and timestamp in seconds and human readable timestamp in utc format<br>
+        <b>00</b> first two chars are the format version information<br>
+        <b>1637985182</b> the following ten chars are the timestamp in seconds<br>
+        space as delimiter<br>
+        <b>2021-11-27T04:53:26.000+01:00</b> timestamp in utc format.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDeviceMeasurementHumidity">MeasurementHumidity</a><br>
+        Example: 00163798518248<br>
+        This reading's value contains a number that consists of version, timestamp in seconds and value<br>
+        <b>00</b> first two chars are the format version information<br>
+        <b>1637985182</b> following ten chars are the timestamp in seconds<br>
+        <b>48</b> the rest is the measurement value.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDeviceMeasurementTemperature">MeasurementTemperature</a><br>
+        Example: 00163798518216.9<br>
+        This reading's value contains a number that consists of version, timestamp in seconds and value<br>
+        <b>00</b> first two chars are the format version information<br>
+        <b>1637985182</b> following ten chars are the timestamp in seconds<br>
+        <b>16.9</b> the rest is the measurement value.<br>
+      </li>
+    </ul><br>
+    <br>
+    <a name="GroheOndusSmartDeviceexample"></a><b>Plot Example</b><br>
+    <br>
+    Here is an example of a <b>gplotfile</b> using the included postFn <b>GroheOndusSmartDevice_PostFn</b> to split the data of the readings MeasurementTemperature and MeasurementHumidity.<br>
+    To use this gplotfile you have to define a <b><a href="https://wiki.fhem.de/wiki/LogProxy">logProxy</a></b> device.<br>
+    <br>
+    Just replace <b>FileLog_KG_Heizraum_Sense</b> with your <b><a href="https://wiki.fhem.de/wiki/FileLog">FileLog</a></b> device containing the Data of the readings MeasurementTemperature and MeasurementHumidity.<br>
+    <br>
+    <code>
+      # Created by FHEM/98_SVG.pm, 2021-11-26 09:03:29<br>
+      set terminal png transparent size &lt;SIZE&gt; crop<br>
+      set output '&lt;OUT&gt;.png'<br>
+      set xdata time<br>
+      set timefmt "%Y-%m-%d_%H:%M:%S"<br>
+      set xlabel " "<br>
+      set title '&lt;TL&gt;'<br>
+      set ytics<br>
+      set y2tics<br>
+      set grid<br>
+      set ylabel "Humidity"<br>
+      set y2label "Temperature"<br>
+      set yrange [40:60]<br>
+      set y2range [10:20]<br>
+      <br>
+      #logProxy FileLog:FileLog_KG_Heizraum_Sense,postFn='GroheOndusSmartDevice_PostFn':4:KG_Heizraum_Sense.MeasurementTemperature\x3a::<br>
+      #logProxy FileLog:FileLog_KG_Heizraum_Sense,postFn='GroheOndusSmartDevice_PostFn':4:KG_Heizraum_Sense.MeasurementHumidity\x3a::<br>
+      <br>
+      plot "&lt;IN&gt;" using 1:2 axes x1y2 title 'Temperature' ls l0 lw 1 with lines,\<br>
+           "&lt;IN&gt;" using 1:2 axes x1y1 title 'Humidity' ls l2 lw 1 with lines<br>
+    </code>
+    <ul>
+    </ul><br>
 </ul>
 
 =end html
