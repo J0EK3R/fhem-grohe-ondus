@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = '3.0.21';
+my $VERSION = '3.0.22';
 
 use strict;
 use warnings;
@@ -92,6 +92,7 @@ my $Sense_DefaultWebCmdFormat =      "update";
 my $TimeStampFormat = '%Y-%m-%dT%I:%M:%S';
 
 my $ForcedTimeStampLength = 10;
+my $CurrentMeasurementFormatVersion = "00";
 
 # AttributeList for all types of GroheOndusSmartDevice 
 my $GroheOndusSmartDevice_AttrList = 
@@ -2812,11 +2813,11 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
                 
                 readingsBeginUpdate($hash);
 
-                readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $dataTimestamp_s . " " . $currentDataTimestamp )
+                readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $dataTimestamp_s . " " . $currentDataTimestamp )
                   if ( defined($currentDataTimestamp) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $dataTimestamp_s . $currentDataHumidity )
+                readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $CurrentMeasurementFormatVersion . $dataTimestamp_s . $currentDataHumidity )
                   if ( defined($currentDataHumidity) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $dataTimestamp_s . $currentDataTemperature )
+                readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $CurrentMeasurementFormatVersion . $dataTimestamp_s . $currentDataTemperature )
                   if ( defined($currentDataTemperature) );
 
                 readingsEndUpdate( $hash, 1 );
@@ -3149,10 +3150,33 @@ sub GroheOndusSmartDevice_PostFn($$)
   {
     my $timeStamp_Value = $point->[1]; # take raw-value i.e. "163780529817.3"
 
-    # first part of the raw-value is the timestamp in seconds (it has a well known length) -> 1637805298
-    # second part - the rest - of the raw-value is the value                               -> 17.3
-    $point->[0] = substr($timeStamp_Value, 0, $ForcedTimeStampLength);
-    $point->[1] = substr($timeStamp_Value, $ForcedTimeStampLength);
+    # first 2 numbers are the version information
+    my $measurementFormatVersion = $point->[0] = substr($timeStamp_Value, 0, 2);
+
+    # no version information: Format: <10 timettamp><rest value>
+    if($measurementFormatVersion eq "16")
+    {
+      # first part of the raw-value is the timestamp in seconds (it has a well known length) -> 1637805298
+      # second part - the rest - of the raw-value is the value                               -> 17.3
+      $point->[0] = substr($timeStamp_Value, 0, 10);
+      $point->[1] = substr($timeStamp_Value, 10);
+    }
+    # with version information:  Format: <2 Version><10 timestamp><rest value>
+    elsif($measurementFormatVersion eq "00")
+    {
+      # first part of the raw-value is the timestamp in seconds (it has a well known length) -> 1637805298
+      # second part - the rest - of the raw-value is the value                               -> 17.3
+      $point->[0] = substr($timeStamp_Value, 2, 10);
+      $point->[1] = substr($timeStamp_Value, 12);
+    }
+    # default
+    else
+    {
+      # first part of the raw-value is the timestamp in seconds (it has a well known length) -> 1637805298
+      # second part - the rest - of the raw-value is the value                               -> 17.3
+      $point->[0] = substr($timeStamp_Value, 0, 10);
+      $point->[1] = substr($timeStamp_Value, 10);
+    }
   }    
 
   return $array;
