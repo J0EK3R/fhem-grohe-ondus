@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = '3.0.23';
+my $VERSION = '3.0.24';
 
 use strict;
 use warnings;
@@ -3265,7 +3265,16 @@ sub GroheOndusSmartDevice_PostFn($$)
       </li>
       <br>
       <li><B>debugForceUpdate</B><a name="GroheOndusSmartDevicedebugForceUpdate"></a><br>
-        Forced update of last measurements.
+        Forced update of last measurements (includes debugOverrideCheckTDT and debugResetProcessedMeasurementTimestamp).
+      </li>
+      <br>
+      <li><B>debugOverrideCheckTDT</B><a name="GroheOndusSmartDevicedebugOverrideCheckTDT"></a><br>
+        If <b>0</b> (default) TDT check is done<br>
+        If <b>1</b> no TDT check is done so poll data each configured interval<br>
+      </li>
+      <br>
+      <li><B>debugResetProcessedMeasurementTimestamp</B><a name="GroheOndusSmartDevicedebugResetProcessedMeasurementTimestamp"></a><br>
+        Reset ProcessedMeasurementTimestamp to force complete update of measurements.
       </li>
     </ul>
     <br>
@@ -3318,7 +3327,7 @@ sub GroheOndusSmartDevice_PostFn($$)
         <b>00</b> first two chars are the format version information<br>
         <b>1637985182</b> the following ten chars are the timestamp in seconds<br>
         space as delimiter<br>
-        <b>2021-11-27T04:53:26.000+01:00</b> timestamp in utc format.<br>
+        <b>2021-11-27T04:53:26.000+01:00</b> timestamp in utc format<br>
       </li>
       <br>
       <li><a name="GroheOndusSmartDeviceMeasurementHumidity">MeasurementHumidity</a><br>
@@ -3326,7 +3335,7 @@ sub GroheOndusSmartDevice_PostFn($$)
         This reading's value contains a number that consists of version, timestamp in seconds and value<br>
         <b>00</b> first two chars are the format version information<br>
         <b>1637985182</b> following ten chars are the timestamp in seconds<br>
-        <b>48</b> the rest is the measurement value.<br>
+        <b>48</b> the rest is the measurement value<br>
       </li>
       <br>
       <li><a name="GroheOndusSmartDeviceMeasurementTemperature">MeasurementTemperature</a><br>
@@ -3334,7 +3343,7 @@ sub GroheOndusSmartDevice_PostFn($$)
         This reading's value contains a number that consists of version, timestamp in seconds and value<br>
         <b>00</b> first two chars are the format version information<br>
         <b>1637985182</b> following ten chars are the timestamp in seconds<br>
-        <b>16.9</b> the rest is the measurement value.<br>
+        <b>16.9</b> the rest is the measurement value<br>
       </li>
     </ul><br>
     <br>
