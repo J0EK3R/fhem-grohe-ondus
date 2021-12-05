@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.0.28";
+my $VERSION = "3.0.29";
 
 use strict;
 use warnings;
@@ -98,7 +98,7 @@ my $Sense_DefaultStateFormat =       "State: state<br/>Temperature: LastTemperat
 my $Sense_DefaultWebCmdFormat =      "update";
 
 my $DefaultLogfilePattern = "%L/<name>-Data-%Y-%m.log";
-my $DefaultLogfileFormat  = "MeasureValue";
+my $DefaultLogfileFormat  = "Measurement";
 
 my $TimeStampFormat = "%Y-%m-%dT%I:%M:%S";
 
@@ -3405,8 +3405,9 @@ sub GroheOndusSmartDevice_Sense_Set($@)
     my $applianceInstallationDate = ReadingsVal($name, "ApplianceInstallationDate", "none");
     if($applianceInstallationDate ne "none")
     {
-      $hash->{helper}{lastProcessedHistoricMeasurementTimestamp} = "";
-      $hash->{helper}{HistoricGetCampain}++;
+      $hash->{helper}{LogFileName} = "";                                # reset internal to delete existing file
+      $hash->{helper}{lastProcessedHistoricMeasurementTimestamp} = "";  # reset internal to restart processing
+      $hash->{helper}{HistoricGetCampain}++;                            # new campain-counter to stop current running old campains
   
       my $timeStampFrom = substr($applianceInstallationDate, 0, 19);
       GroheOndusSmartDevice_Sense_GetHistoricData($hash, $timeStampFrom);
@@ -3608,7 +3609,7 @@ sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$@)
       $measureValueString .= "$timestampString $name $reading: $value\n";
     }
   }
-  elsif($logfileFormat eq "Measurement")
+  else # default: elsif($logfileFormat eq "Measurement")
   {
     $measureValueString .= "$timestampString $name Measurement:";
     
@@ -3775,7 +3776,7 @@ sub GroheOndusSmartDevice_PostFn($$)
     <b>Problem:</b><br>
     When setting the received new data to this module's readings FHEM's logging-mechanism (<a href="#FileLog">FileLog</a>, <a href="#DbLog">DbLog</a>) will take the current <b>system time</b> - not the timestamps of the measurements - to store the readings' values.<br>
     <br>
-    To solve the timestamp-problem this module writes a timestamp-measurevalue-combination to the addinional <b>"Measurement"-readings</b> und a plot has to split that combination again to get the plot-points.<br>
+    To solve the timestamp-problem this module writes a timestamp-measurevalue-combination to the additional <b>"Measurement"-readings</b> and a plot has to split that combination again to get the plot-points.<br>
     See Plot Example below.<br>
     <br>
     Another solution to solve this problem is to enable the <b>LogFile-Mode</b> by setting the attribute <b>logFileModeEnabled</b> to <b>"1"</b>.<br>
@@ -3973,12 +3974,12 @@ sub GroheOndusSmartDevice_PostFn($$)
         Format of the data writen to the logfile.<br>
         <ul>
           <li>
-            <b>MeasureValue</b> - each measurevalue is written to a seperate line<br>
-            Format: <b>&lt;timestamp&gt; &lt;devicename&gt; &lt;readingname&gt;: &lt;value&gt;</b>
+            <b>Measurement</b> (Default) - each measurement is written with all it's measurevalues to one line<br>  
+            Format: <b>&lt;timestamp&gt; &lt;devicename&gt; Measurement: &lt;measurevalue_1&gt; &lt;measurevalue_2&gt; .. &lt;measurevalue_n&gt;</b>
           </li>
           <li>
-            <b>Measurement</b> - each measurement is written with all it's measurevalues to one line<br>  
-            Format: <b>&lt;timestamp&gt; &lt;devicename&gt; Measurement: &lt;measurevalue_1&gt; &lt;measurevalue_2&gt; .. &lt;measurevalue_n&gt;</b>
+            <b>MeasureValue</b> - each measurevalue is written to a seperate line<br>
+            Format: <b>&lt;timestamp&gt; &lt;devicename&gt; &lt;readingname&gt;: &lt;value&gt;</b>
           </li>
         </ul><br>
       </li>
