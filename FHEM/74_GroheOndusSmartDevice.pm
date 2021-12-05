@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.0.26";
+my $VERSION = "3.0.27";
 
 use strict;
 use warnings;
@@ -80,6 +80,7 @@ sub GroheOndusSmartDevice_Sense_Set($@);
 
 sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$@);
 sub GroheOndusSmartDevice_FileLog_Delete($$);
+sub GroheOndusSmartDevice_FileLog_Create_FileLogDevice($;$);
 
 sub GroheOndusSmartDevice_GetUTCOffset();
 sub GroheOndusSmartDevice_GetUTCMidnightDate($);
@@ -2105,7 +2106,7 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
   elsif ( lc $cmd eq lc "buzzer" )
   {
     # parameter is "on" or "off" so convert to "true" : "false"
-    my $onoff = join( " ", @args ) eq "on" ? "true" : "false";
+    my $onoff = lc join( " ", @args ) eq lc "on" ? "true" : "false";
 
     GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "buzzer_on", $onoff);
     return;
@@ -2114,7 +2115,7 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
   elsif ( lc $cmd eq lc "valve" )
   {
     # parameter is "on" or "off" so convert to "true" : "false"
-    my $onoff = join( " ", @args ) eq "on" ? "true" : "false";
+    my $onoff = lc join( " ", @args ) eq lc "on" ? "true" : "false";
 
     GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", $onoff);
     return;
@@ -3388,6 +3389,21 @@ sub GroheOndusSmartDevice_Sense_Set($@)
     }
     return;
   }
+  ### Command "logFileCreateFileLogDevice"
+  elsif ( lc $cmd eq lc "logFileCreateFileLogDevice" )
+  {
+    my $logFileName = "";
+    
+    return "usage: $cmd [<devicename>]"
+      if ( @args > 1 );
+    
+    $logFileName = ($args[0] =~ tr/ //ds)         # trim whitespaces
+      if ( @args == 1 );
+    
+    GroheOndusSmartDevice_FileLog_Create_FileLogDevice($hash, $logFileName);
+    
+    return;
+  }
   ### Command "debugRefreshValues"
   elsif ( lc $cmd eq lc "debugRefreshValues" )
   {
@@ -3443,6 +3459,9 @@ sub GroheOndusSmartDevice_Sense_Set($@)
       -e $hash->{helper}{LogFileName});              # check if file exists
 
     $list .= "logFileGetHistoricData:noArg "
+      if($hash->{helper}{LogFileEnabled} ne "0");     # check if in logfile mode
+
+    $list .= "logFileCreateFileLogDevice "
       if($hash->{helper}{LogFileEnabled} ne "0");     # check if in logfile mode
 
     $list .= "debugRefreshConfig:noArg "
@@ -3587,6 +3606,35 @@ sub GroheOndusSmartDevice_FileLog_Delete($$)
 }
 
 ##################################
+# GroheOndusSmartDevice_FileLog_Create_FileLogDevice
+sub GroheOndusSmartDevice_FileLog_Create_FileLogDevice($;$)
+{
+  my ( $hash, $logFileName ) = @_;
+  my $name = $hash->{NAME};
+  
+  $logFileName = "FileLog_" . $name . "_Data"
+    if(not defined($logFileName) or
+      $logFileName eq "");         # is empty?
+  
+  my $filenamePattern = $hash->{helper}{LogFilePattern};
+  my $logFilePath = ResolveDateWildcards("%L", localtime());
+  $filenamePattern = $filenamePattern =~ s/<name>/$name/r;    # replace placeholder with $name
+  $filenamePattern = $filenamePattern =~ s/%L/$logFilePath/r; # replace %L with logfilepath
+  
+  my $fhemCommand = "defmod $logFileName FileLog $filenamePattern readonly";
+  fhem($fhemCommand, 1);
+
+  Log3($name, 4, "GroheOndusSmartDevice_FileLog_Create_FileLogDevice($name) - $fhemCommand");
+
+  # set FileLog device in same room like this
+  my $room = AttrVal( $name, "room", "none" );
+  if ( $room ne "none" )
+  {
+    CommandAttr( undef, $logFileName . " room " . $room );
+  }
+}
+
+##################################
 # GroheOndusSmartDevice_PostFn
 # This function splits a raw-value string containing a timestamp in seconds and 
 # a value with a well known timestamp length in the timestamp and the value and
@@ -3701,21 +3749,41 @@ sub GroheOndusSmartDevice_PostFn($$)
     <a name="GroheOndusSmartDevice"></a><b>Set</b>
     <ul>
       <li><a name="GroheOndusSmartDeviceupdate">update</a><br>
-        Update configuration and values.
+        Update configuration and values.<br>
+        <br>
+        <code>
+          set &lt;name&gt; update
+        </code>
       </li>
       <br>
       <li><a name="GroheOndusSmartDeviceclearreadings">clearreadings</a><br>
-        Clear all readings of the module.
+        Clear all readings of the module.<br>
+        <br>
+        <code>
+          set &lt;name&gt; clearreadings
+        </code>
       </li>
       <br>
       <b><i>SenseGuard-only</i></b><br>
       <br>
       <li><a name="GroheOndusSmartDevicebuzzer">buzzer</a><br>
-        <b>off</b> stop buzzer.<br>
-        <b>on</b> enable buzzer.<br>
+        <br>
+        <code>
+          set &lt;name&gt; buzzer &lt;on&gt;|&lt;off&gt;
+        </code>
+        <br>
+        <br>
+        <b>on</b> buzzer is turned on.<br>
+        <b>off</b> buzzer is turned off.<br>
       </li>
       <br>
       <li><a name="GroheOndusSmartDevicevalve">valve</a><br>
+        <br>
+        <code>
+          set &lt;name&gt; valve &lt;on&gt;|&lt;off&gt;
+        </code>
+        <br>
+        <br>
         <b>on</b> open valve.<br>
         <b>off</b> close valve.<br>
       </li>
@@ -3725,44 +3793,90 @@ sub GroheOndusSmartDevice_PostFn($$)
       <i>Hint: Set logfile-name pattern with attribute logFilePattern</i><br>
       <br>
       <li><a name="GroheOndusSmartDevicelogFileGetHistoricData">logFileGetHistoricData</a><br>
-        Write all historic data since ApplianceInstallationDate to the logfile(s).
+        Write all historic data since ApplianceInstallationDate to the logfile(s).<br>
+        <br>
+        <code>
+          set &lt;name&gt; logFileGetHistoricData
+        </code>
+        <br>
       </li>
       <br>
       <li><a name="GroheOndusSmartDevicelogFileDelete">logFileDelete</a><br>
         <i>only visible if current logfile exists</i><br>
-        Remove the current logfile.
+        Remove the current logfile.<br>
+        <br>
+        <code>
+          set &lt;name&gt; logFileDelete
+        </code>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDevicelogFileCreateFileLogDevice">logFileCreateFileLogDevice</a><br>
+        Create a new <b>readonly</b>-mode <b>FileLog</b> device  in fhem matching this module's <b>logFilePattern</b>.<br>
+        <br>
+        <code>
+          set &lt;name&gt; logFileCreateFileLogDevice [&lt;fileLogName&gt;]
+        </code>
+        <br>
+        <br>
+        Parameter [&lt;fileLogName&gt;] is optionally - if empty <b>FileLog_&lt;name&gt;_Data</b> is used
       </li>
       <br>
       <b><i>Debug-mode</i></b><br>
       <br>
       <li><a name="GroheOndusSmartDevicedebugRefreshConfig">debugRefreshConfig</a><br>
-        Update the configuration.
+        Update the configuration.<br>
+        <br>
+        <code>
+          set &lt;name&gt; debugRefreshConfig
+        </code>
       </li>
       <br>
       <li><a name="GroheOndusSmartDevicedebugRefreshValues">debugRefreshValues</a><br>
-        Update the values.
+        Update the values.<br>
+        <br>
+        <code>
+          set &lt;name&gt; debugRefreshValues
+        </code>
       </li>
       <br>
       <li><a name="GroheOndusSmartDevicedebugRefreshState">debugRefreshState</a><br>
-        Update the state.
+        Update the state.<br>
       </li>
       <br>
       <li><a name="GroheOndusSmartDevicedebugGetApplianceCommand">debugGetApplianceCommand</a><br>
         <i>SenseGuard only</i><br>
-        Update the command-state.
+        Update the command-state.<br>
+        <br>
+        <code>
+          set &lt;name&gt; debugGetApplianceCommand
+        </code>
       </li>
       <br>
       <li><a name="GroheOndusSmartDevicedebugForceUpdate">debugForceUpdate</a><br>
-        Forced update of last measurements (includes debugOverrideCheckTDT and debugResetProcessedMeasurementTimestamp).
+        Forced update of last measurements (includes debugOverrideCheckTDT and debugResetProcessedMeasurementTimestamp).<br>
+        <br>
+        <code>
+          set &lt;name&gt; debugForceUpdate
+        </code>
       </li>
       <br>
       <li><a name="GroheOndusSmartDevicedebugOverrideCheckTDT">debugOverrideCheckTDT</a><br>
+        <br>
+        <code>
+          set &lt;name&gt; debugOverrideCheckTDT
+        </code>
+        <br>
+        <br>
         If <b>0</b> (default) TDT check is done<br>
         If <b>1</b> no TDT check is done so poll data each configured interval<br>
       </li>
       <br>
       <li><a name="GroheOndusSmartDevicedebugResetProcessedMeasurementTimestamp">debugResetProcessedMeasurementTimestamp</a><br>
-        Reset ProcessedMeasurementTimestamp to force complete update of measurements.
+        Reset ProcessedMeasurementTimestamp to force complete update of measurements.<br>
+        <br>
+        <code>
+          set &lt;name&gt; debugResetProcessedMeasurementTimestamp
+        </code>
       </li>
     </ul>
     <br>
