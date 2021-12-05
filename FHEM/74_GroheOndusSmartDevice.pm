@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.0.27";
+my $VERSION = "3.0.28";
 
 use strict;
 use warnings;
@@ -98,6 +98,7 @@ my $Sense_DefaultStateFormat =       "State: state<br/>Temperature: LastTemperat
 my $Sense_DefaultWebCmdFormat =      "update";
 
 my $DefaultLogfilePattern = "%L/<name>-Data-%Y-%m.log";
+my $DefaultLogfileFormat  = "MeasureValue";
 
 my $TimeStampFormat = "%Y-%m-%dT%I:%M:%S";
 
@@ -126,6 +127,7 @@ my $GroheOndusSmartDevice_SenseGuard_AttrList =
 # AttributeList for Sense
 my $GroheOndusSmartDevice_Sense_AttrList = 
     "logFileEnabled:0,1 " .
+    "logFileFormat:MeasureValue,Measurement " . 
     "logFilePattern "; 
 
 #####################################
@@ -215,8 +217,9 @@ sub GroheOndusSmartDevice_Define($$)
   $hash->{helper}{OverrideCheckTDT}       = "0";
   $hash->{helper}{ApplianceTDT}           = "";
   $hash->{helper}{LogFileEnabled}         = "1";
-  $hash->{helper}{LogFilePattern}         = $DefaultLogfilePattern; # =~ s/%name/$name/r; # replace placeholder with $name
+  $hash->{helper}{LogFilePattern}         = $DefaultLogfilePattern;
   $hash->{helper}{LogFileName}            = undef;
+  $hash->{helper}{LogFileFormat}          = $DefaultLogfileFormat;
   $hash->{helper}{HistoricGetTimespan}    = 60 * 60 * 24 * 30;
   $hash->{helper}{HistoricGetInProgress}  = "0";
   $hash->{helper}{HistoricGetCampain}     = 0;
@@ -528,7 +531,26 @@ sub GroheOndusSmartDevice_Attr(@)
     {
       Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - delete logFilePattern and set default");
 
-      $hash->{helper}{LogFilePattern}   = $DefaultLogfilePattern =~ s/%name/$name/r;
+      $hash->{helper}{LogFilePattern} = $DefaultLogfilePattern;
+      GroheOndusSmartDevice_UpdateInternals($hash);
+    }
+  }
+
+  # Attribute "logFileFormat"
+  elsif ( $attrName eq "logFileFormat" )
+  {
+    if ( $cmd eq "set" )
+    {
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - logFileFormat $attrVal");
+
+      $hash->{helper}{LogFileFormat} = "$attrVal";
+      GroheOndusSmartDevice_UpdateInternals($hash);
+    } 
+    elsif ( $cmd eq "del" )
+    {
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - delete logFileFormat and set default");
+
+      $hash->{helper}{LogFileFormat} = $DefaultLogfileFormat;
       GroheOndusSmartDevice_UpdateInternals($hash);
     }
   }
@@ -769,9 +791,11 @@ sub GroheOndusSmartDevice_UpdateInternals($)
     $hash->{DEBUG_ApplianceTDT} = $hash->{helper}{ApplianceTDT};
     $hash->{DEBUG_OverrideCheckTDT} = $hash->{helper}{OverrideCheckTDT};
     $hash->{DEBUG_LastProcessedMeasurementTimestamp} = $hash->{helper}{LastProcessedMeasurementTimestamp};
+    
     $hash->{DEBUG_LogFileEnabled} = $hash->{helper}{LogFileEnabled};
     $hash->{DEBUG_LogFilePattern} = $hash->{helper}{LogFilePattern};
     $hash->{DEBUG_LogFileName} = $hash->{helper}{LogFileName};
+    $hash->{DEBUG_LogFileFormat} = $hash->{helper}{LogFileFormat};
     
     $hash->{DEBUG_HistoricGetInProgress} = $hash->{helper}{HistoricGetInProgress};
     $hash->{DEBUG_HistoricGetTimespan} = $hash->{helper}{HistoricGetTimespan};
@@ -3561,7 +3585,6 @@ sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$@)
   my @t = localtime($timestamp_s);
   
   my $fileName = ResolveDateWildcards($filenamePattern, @t);
-
   my $oldLogFileName = $hash->{helper}{LogFileName};
 
   # filename has changed
@@ -3574,14 +3597,31 @@ sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$@)
 
   my $timestampString = sprintf("%04d-%02d-%02d_%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
 
-  open(my $fileHandle, ">>", $fileName);
+  my $logfileFormat = $hash->{helper}{LogFileFormat};
+  my $measureValueString = ""; 
 
-  foreach my $currentData ( @valueTupleList )
+  if($logfileFormat eq "MeasureValue")
   {
-    my ($reading, $value ) = @$currentData;
-
-    print $fileHandle "$timestampString $name $reading: $value\n";
+    foreach my $currentData ( @valueTupleList )
+    {
+      my ($reading, $value ) = @$currentData;
+      $measureValueString .= "$timestampString $name $reading: $value\n";
+    }
   }
+  elsif($logfileFormat eq "Measurement")
+  {
+    $measureValueString .= "$timestampString $name Measurement:";
+    
+    foreach my $currentData ( @valueTupleList )
+    {
+      my ($reading, $value ) = @$currentData;
+      $measureValueString .=  " $value";
+    }
+    $measureValueString .= "\n";
+  }
+
+  open(my $fileHandle, ">>", $fileName);
+  print $fileHandle $measureValueString;
   close $fileHandle;
 
   if(not defined($hash->{helper}{LogFileName}) or
@@ -3927,6 +3967,20 @@ sub GroheOndusSmartDevice_PostFn($$)
           <li>%W week number of year with Monday as first day of week (00..53)</li>
         </ul><br>
         FHEM also replaces %L by the value of the global logdir attribute.<br>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDevicelogFileFormat">logFileFormat</a><br>
+        Format of the data writen to the logfile.<br>
+        <ul>
+          <li>
+            <b>MeasureValue</b> - each measurevalue is written to a seperate line<br>
+            Format: <b>&lt;timestamp&gt; &lt;devicename&gt; &lt;readingname&gt;: &lt;value&gt;</b>
+          </li>
+          <li>
+            <b>Measurement</b> - each measurement is written with all it's measurevalues to one line<br>  
+            Format: <b>&lt;timestamp&gt; &lt;devicename&gt; Measurement: &lt;measurevalue_1&gt; &lt;measurevalue_2&gt; .. &lt;measurevalue_n&gt;</b>
+          </li>
+        </ul><br>
       </li>
       <br>
       <b><i>SenseGuard-only</i></b><br>
