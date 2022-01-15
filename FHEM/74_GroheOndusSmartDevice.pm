@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.0.29";
+my $VERSION = "3.1.0";
 
 use strict;
 use warnings;
@@ -38,6 +38,7 @@ use warnings;
 my $missingModul = "";
 
 use FHEM::Meta;
+use Date::Parse;
 use Time::Local;
 use Time::HiRes qw(gettimeofday);
 eval {use JSON;1 or $missingModul .= "JSON "};
@@ -48,6 +49,7 @@ sub GroheOndusSmartDevice_Initialize($);
 sub GroheOndusSmartDevice_Define($$);
 sub GroheOndusSmartDevice_Undef($$);
 sub GroheOndusSmartDevice_Delete($$);
+sub GroheOndusSmartDevice_Rename($$);
 sub GroheOndusSmartDevice_Attr(@);
 sub GroheOndusSmartDevice_Notify($$);
 sub GroheOndusSmartDevice_Set($@);
@@ -64,71 +66,106 @@ sub GroheOndusSmartDevice_IOWrite($$);
 sub GroheOndusSmartDevice_SenseGuard_Update($);
 sub GroheOndusSmartDevice_SenseGuard_GetState($;$$);
 sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$);
-sub GroheOndusSmartDevice_SenseGuard_GetData($;$$);
-sub GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($);
-sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$);
 sub GroheOndusSmartDevice_SenseGuard_Set($@);
+
+sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$);
+sub GroheOndusSmartDevice_SenseGuard_GetData_Last($;$$);
+sub GroheOndusSmartDevice_SenseGuard_GetData_Stop($);
+sub GroheOndusSmartDevice_SenseGuard_GetData_StartCampain($$;$$);
+sub GroheOndusSmartDevice_SenseGuard_GetData_TimerExecute($);
+sub GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove($);
+sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$);
 
 sub GroheOndusSmartDevice_Sense_Update($);
 sub GroheOndusSmartDevice_Sense_GetState($;$$);
 sub GroheOndusSmartDevice_Sense_GetConfig($;$$);
-sub GroheOndusSmartDevice_Sense_GetData($;$$);
-sub GroheOndusSmartDevice_Sense_GetHistoricData($$;$$);
-sub GroheOndusSmartDevice_Sense_GetHistoricData_TimerExecute($);
-sub GroheOndusSmartDevice_Sense_GetHistoricData_TimerRemove($);
 sub GroheOndusSmartDevice_Sense_Set($@);
 
-sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$@);
+sub GroheOndusSmartDevice_Sense_GetData($$;$$);
+sub GroheOndusSmartDevice_Sense_GetData_Last($;$$);
+sub GroheOndusSmartDevice_Sense_GetData_Stop($);
+sub GroheOndusSmartDevice_Sense_GetData_StartCampain($$;$$);
+sub GroheOndusSmartDevice_Sense_GetData_TimerExecute($);
+sub GroheOndusSmartDevice_Sense_GetData_TimerRemove($);
+
+sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$$@);
 sub GroheOndusSmartDevice_FileLog_Delete($$);
 sub GroheOndusSmartDevice_FileLog_Create_FileLogDevice($;$);
 
-sub GroheOndusSmartDevice_GetUTCOffset();
+sub GroheOndusSmartDevice_Store($$$$);
+sub GroheOndusSmartDevice_Restore($$$$);
+sub GroheOndusSmartDevice_StoreRename($$$$);
+
+sub GroheOndusSmartDevice_GetLTZStringFromLUTC($);
+sub GroheOndusSmartDevice_GetLTZFromLUTC($);
+sub GroheOndusSmartDevice_GetUTCFromLUTC($);
+sub GroheOndusSmartDevice_GetUTCFromLTZ($);
+
 sub GroheOndusSmartDevice_GetUTCMidnightDate($);
+sub GroheOndusSmartDevice_GetLTZMidnightDate();
+
+sub GroheOndusSmartDevice_Getnum($);
 
 sub GroheOndusSmartDevice_PostFn($$);
 
-my $SenseGuard_DefaultInterval = 60; # default value for the polling interval in seconds
-my $Sense_DefaultInterval = 600;     # default value for the polling interval in seconds
-my $GetHistoricDataInterval = 1;     #
+#########################
+# Constants
 
-my $SenseGuard_DefaultStateFormat =  "State: state<br/>Valve: CmdValveState<br/>Consumption: TodayWaterConsumption l<br/>Temperature: LastTemperature Grad C<br/>Pressure: LastPressure bar";
-my $SenseGuard_DefaultWebCmdFormat = "update:valve on:valve off";
+my $GetLoopDataInterval                   = 1;     # interval of the data-get-timer
 
-my $Sense_DefaultStateFormat =       "State: state<br/>Temperature: LastTemperature Grad C<br/>Humidity: LastHumidity %";
-my $Sense_DefaultWebCmdFormat =      "update";
+my $SenseGuard_DefaultInterval            = 60 * 1; # default value for the polling interval in seconds
+my $SenseGuard_DefaultStateFormat         =  "State: state<br/>Valve: CmdValveState<br/>Consumption: TodayWaterConsumption l<br/>Temperature: LastTemperature Grad C<br/>Pressure: LastPressure bar";
+my $SenseGuard_DefaultWebCmdFormat        = "valve on:valve off"; # "update:valve on:valve off"
+my $SenseGuard_DefaultGetTimespan         = 60 * 60 * 24 * 1; # 1 days
 
-my $DefaultLogfilePattern = "%L/<name>-Data-%Y-%m.log";
-my $DefaultLogfileFormat  = "Measurement";
+my $Sense_DefaultInterval                 = 60 * 10;     # default value for the polling interval in seconds
+my $Sense_DefaultStateFormat              = "State: state<br/>Temperature: LastTemperature Grad C<br/>Humidity: LastHumidity %";
+my $Sense_DefaultWebCmdFormat             = ""; # "update"
+my $Sense_DefaultGetTimespan              = 60 * 60 * 24 * 30; # 30 days
 
-my $TimeStampFormat = "%Y-%m-%dT%I:%M:%S";
+my $DefaultLogfilePattern                 = "%L/<name>-Data-%Y-%m.log";
+my $DefaultLogfileFormat                  = "Measurement";
 
-my $ForcedTimeStampLength = 10;
-my $CurrentMeasurementFormatVersion = "00";
+my $TimeStampFormat                       = "%Y-%m-%dT%I:%M:%S";
+
+my $ForcedTimeStampLength                 = 10;
+my $CurrentMeasurementFormatVersion       = "00";
+
+my %replacechartable = ("ä" => "ae", "Ä" => "Ae", "ü" => "ue", "Ü" => "Ue", "ö" => "oe", "Ö" => "Oe", "ß" => "ss" );
+my $replacechartablekeys = join ("|", keys(%replacechartable));
 
 # AttributeList for all types of GroheOndusSmartDevice 
 my $GroheOndusSmartDevice_AttrList = 
     "debug:0,1 " . 
     "debugJSON:0,1 " . 
     "disable:0,1 " . 
-    "interval ";
+    "interval " .
+    ""; 
 
-# AttributeList with deprecated attributes
+# AttributeList including deprecated attributes
 my $GroheOndusSmartDevice_AttrList_Deprecated = 
     "model:sense,sense_guard " . 
     "IODev "; 
 
 # AttributeList for SenseGuard
 my $GroheOndusSmartDevice_SenseGuard_AttrList = 
-    "offsetEnergyCost " . 
-    "offsetWaterCost " . 
-    "offsetWaterConsumption " . 
-    "offsetHotWaterShare "; 
+    "offsetTotalEnergyCost " . 
+    "offsetTotalWaterCost " . 
+    "offsetTotalWaterConsumption " . 
+    "offsetTotalHotWaterShare " .
+    "logFileEnabled:0,1 " .
+    "logFileFormat:MeasureValue,Measurement " . 
+    "logFilePattern " .
+    "logFileGetDataStartDate " .
+    ""; 
 
 # AttributeList for Sense
 my $GroheOndusSmartDevice_Sense_AttrList = 
     "logFileEnabled:0,1 " .
     "logFileFormat:MeasureValue,Measurement " . 
-    "logFilePattern "; 
+    "logFilePattern " .
+    "logFileGetDataStartDate " .
+    ""; 
 
 #####################################
 # GroheOndusSmartDevice_Initialize( $hash )
@@ -139,6 +176,7 @@ sub GroheOndusSmartDevice_Initialize($)
   $hash->{DefFn}    = \&GroheOndusSmartDevice_Define;
   $hash->{UndefFn}  = \&GroheOndusSmartDevice_Undef;
   $hash->{DeleteFn} = \&GroheOndusSmartDevice_Delete;
+  $hash->{RenameFn} = \&GroheOndusSmartDevice_Rename;
   $hash->{AttrFn}   = \&GroheOndusSmartDevice_Attr;
   $hash->{NotifyFn} = \&GroheOndusSmartDevice_Notify;
   $hash->{SetFn}    = \&GroheOndusSmartDevice_Set;
@@ -146,7 +184,7 @@ sub GroheOndusSmartDevice_Initialize($)
 
   $hash->{Match} = "^GROHEONDUSSMARTDEVICE_.*";
   
-  # list of attributes has changed from v2 -> v3
+  # list of attributes has changed from V2 -> V3
   # -> the redefinition is done automatically
   # old attribute list is set to be able to get the deprecated attribute values
   # on global event "INITIALIZED" the new attribute list is set 
@@ -167,14 +205,17 @@ sub GroheOndusSmartDevice_Initialize($)
 # GroheOndusSmartDevice_Define( $hash, $def )
 sub GroheOndusSmartDevice_Define($$)
 {
-  my ( $hash, $def ) = @_;
-  my @a = split( "[ \t]+", $def );
+  my ($hash, $def) = @_;
+  my @a = split("[ \t]+", $def);
 
   return $@
-    unless ( FHEM::Meta::SetInternals($hash) );
+    unless(FHEM::Meta::SetInternals($hash));
 
   return "Cannot define GroheOndusSmartDevice. Perl modul $missingModul is missing."
-    if ($missingModul);
+    if($missingModul);
+
+  # set marker to prevent actions while define is running
+  $hash->{helper}{DefineRunning} = "Running";
 
   my $name;
   my $bridge = undef;
@@ -188,10 +229,10 @@ sub GroheOndusSmartDevice_Define($$)
     $deviceId = $a[2];
     $model    = $a[3];
     
-    CommandAttr( undef, "$name IODev $modules{GroheOndusSmartBridge}{defptr}{BRIDGE}->{NAME}" )
-      if ( AttrVal( $name, "IODev", "none" ) eq "none" );
+    CommandAttr(undef, "$name IODev $modules{GroheOndusSmartBridge}{defptr}{BRIDGE}->{NAME}")
+      if(AttrVal( $name, "IODev", "none" ) eq "none");
 
-    $bridge = AttrVal( $name, "IODev", "none" );
+    $bridge = AttrVal($name, "IODev", "none");
     
     $hash->{DEF} = "$bridge $deviceId $model";
   }
@@ -207,74 +248,156 @@ sub GroheOndusSmartDevice_Define($$)
     return "wrong number of parameters: define <NAME> GroheOndusSmartDevice <bridge> <deviceId> <model>"
   }
 
-  $hash->{DEVICEID}                       = $deviceId;
-  $hash->{ApplianceModel}                 = $model;
-  $hash->{VERSION}                        = $VERSION;
-  $hash->{NOTIFYDEV}                      = "global,$name,$bridge";
-  $hash->{RETRIES}                        = 3;
-  $hash->{helper}{DEBUG}                  = "0";
-  $hash->{helper}{IsDisabled}             = "0";
-  $hash->{helper}{OverrideCheckTDT}       = "0";
-  $hash->{helper}{ApplianceTDT}           = "";
-  $hash->{helper}{LogFileEnabled}         = "1";
-  $hash->{helper}{LogFilePattern}         = $DefaultLogfilePattern;
-  $hash->{helper}{LogFileName}            = undef;
-  $hash->{helper}{LogFileFormat}          = $DefaultLogfileFormat;
-  $hash->{helper}{HistoricGetTimespan}    = 60 * 60 * 24 * 30;
-  $hash->{helper}{HistoricGetInProgress}  = "0";
-  $hash->{helper}{HistoricGetCampain}     = 0;
-  
   # set model depending defaults
   ### sense_guard
-  if ( $model eq "sense_guard" )
+  if($model eq "sense_guard")
   {
     # the SenseGuard devices update every 15 minutes
     $hash->{".DEFAULTINTERVAL"} = $SenseGuard_DefaultInterval;
+    $hash->{".DEFAULTGETTIMESPAN"}  = $SenseGuard_DefaultGetTimespan;
     $hash->{".AttrList"} =
       $GroheOndusSmartDevice_AttrList .
       $GroheOndusSmartDevice_SenseGuard_AttrList . 
       $readingFnAttributes;
-    
-    
-    $hash->{DataTimerInterval} = $hash->{".DEFAULTINTERVAL"};
 
-    $hash->{helper}{Telegram_ConfigCounter}  = 0;
-    $hash->{helper}{Telegram_StatusCounter}  = 0;
-    $hash->{helper}{Telegram_DataCounter}    = 0;
-    $hash->{helper}{Telegram_COMMANDCounter} = 0;
+    $hash->{helper}{Telegram_GetConfigCounter}  = 0;
+    $hash->{helper}{Telegram_GetStateCounter}   = 0;
+    $hash->{helper}{Telegram_GetDataCounter}    = 0;
+    $hash->{helper}{Telegram_GetCommandCounter} = 0;
+    $hash->{helper}{Telegram_SetCommandCounter} = 0;
 
-    CommandAttr( undef, $name . " stateFormat " . $SenseGuard_DefaultStateFormat )
-      if ( AttrVal( $name, "stateFormat", "none" ) eq "none" );
+    $hash->{helper}{OffsetEnergyCost}           = 0;
+    $hash->{helper}{OffsetWaterCost}            = 0;
+    $hash->{helper}{OffsetWaterConsumption}     = 0; 
+    $hash->{helper}{OffsetHotWaterShare}        = 0;
 
-    CommandAttr( undef, $name . " webCmd " . $SenseGuard_DefaultWebCmdFormat )
-      if ( AttrVal( $name, "webCmd", "none" ) eq "none" );
+    # set defaults
+    $hash->{helper}{GetSuspendReadings}                     = "0";
+    $hash->{helper}{LastProcessedWithdrawalTimestamp_LUTC}  = "";
+    $hash->{helper}{LastProcessedTimestamp_LUTC}            = "";
+
+    $hash->{helper}{TotalAnalyzeStartTimestamp}             = "";
+    $hash->{helper}{TotalAnalyzeEndTimestamp}               = "";
+    $hash->{helper}{TotalWithdrawalCount}                   = 0;
+    $hash->{helper}{TotalWaterConsumption}                  = 0;
+    $hash->{helper}{TotalHotWaterShare}                     = 0;
+    $hash->{helper}{TotalWaterCost}                         = 0;
+    $hash->{helper}{TotalEnergyCost}                        = 0;
+
+    $hash->{helper}{TodayAnalyzeStartTimestamp}             = "";
+    $hash->{helper}{TodayAnalyzeEndTimestamp}               = "";
+    $hash->{helper}{TodayWithdrawalCount}                   = 0;
+    $hash->{helper}{TodayWaterConsumption}                  = 0;
+    $hash->{helper}{TodayHotWaterShare}                     = 0;
+    $hash->{helper}{TodayWaterCost}                         = 0;
+    $hash->{helper}{TodayEnergyCost}                        = 0;
+    $hash->{helper}{TodayMaxFlowrate}                       = 0;
+
+    if($init_done)
+    {
+      # device is created *after* fhem has started -> don't restore old values
+      Log3($name, 5, "GroheOndusSmartDevice_Define($name) - device is created after fhem has started -> don't restore old values");
+    }
+    else
+    {
+      # device is created *while* fhem is starting -> restore old values
+      Log3($name, 5, "GroheOndusSmartDevice_Define($name) - device is created while fhem is starting -> restore old values");
+
+      $hash->{helper}{GetSuspendReadings}                     = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "GetSuspendReadings", $hash->{helper}{GetSuspendReadings});
+      $hash->{helper}{LastProcessedWithdrawalTimestamp_LUTC}  = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "LastProcessedWithdrawalTimestamp_LUTC", $hash->{helper}{LastProcessedWithdrawalTimestamp_LUTC});
+      $hash->{helper}{LastProcessedTimestamp_LUTC}            = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "LastProcessedTimestamp_LUTC", $hash->{helper}{LastProcessedTimestamp_LUTC});
+
+      $hash->{helper}{TotalAnalyzeStartTimestamp}             = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TotalAnalyzeStartTimestamp", $hash->{helper}{TotalAnalyzeStartTimestamp});
+      $hash->{helper}{TotalAnalyzeEndTimestamp}               = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TotalAnalyzeEndTimestamp", $hash->{helper}{TotalAnalyzeEndTimestamp});
+      $hash->{helper}{TotalWithdrawalCount}                   = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TotalWithdrawalCount", $hash->{helper}{TotalWithdrawalCount});
+      $hash->{helper}{TotalWaterConsumption}                  = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TotalWaterConsumption", $hash->{helper}{TotalWaterConsumption});
+      $hash->{helper}{TotalHotWaterShare}                     = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TotalHotWaterShare", $hash->{helper}{TotalHotWaterShare});
+      $hash->{helper}{TotalWaterCost}                         = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TotalWaterCost", $hash->{helper}{TotalWaterCost});
+      $hash->{helper}{TotalEnergyCost}                        = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TotalEnergyCost", $hash->{helper}{TotalEnergyCost});
+  
+      $hash->{helper}{TodayAnalyzeStartTimestamp}             = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TodayAnalyzeStartTimestamp", $hash->{helper}{TodayAnalyzeStartTimestamp});
+      $hash->{helper}{TodayAnalyzeEndTimestamp}               = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TodayAnalyzeEndTimestamp", $hash->{helper}{TodayAnalyzeEndTimestamp});
+      $hash->{helper}{TodayWithdrawalCount}                   = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TodayWithdrawalCount", $hash->{helper}{TodayWithdrawalCount});
+      $hash->{helper}{TodayWaterConsumption}                  = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TodayWaterConsumption", $hash->{helper}{TodayWaterConsumption});
+      $hash->{helper}{TodayHotWaterShare}                     = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TodayHotWaterShare", $hash->{helper}{TodayHotWaterShare});
+      $hash->{helper}{TodayWaterCost}                         = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TodayWaterCost", $hash->{helper}{TodayWaterCost});
+      $hash->{helper}{TodayEnergyCost}                        = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TodayEnergyCost", $hash->{helper}{TodayEnergyCost});
+      $hash->{helper}{TodayMaxFlowrate}                       = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "TodayMaxFlowrate", $hash->{helper}{TodayMaxFlowrate});
+    }
+
+    CommandAttr(undef, $name . " stateFormat " . $SenseGuard_DefaultStateFormat)
+      if(AttrVal($name, "stateFormat", "none") eq "none" and
+        $SenseGuard_DefaultStateFormat ne "");
+
+    CommandAttr(undef, $name . " webCmd " . $SenseGuard_DefaultWebCmdFormat)
+      if( AttrVal($name, "webCmd", "none") eq "none" and
+        $SenseGuard_DefaultWebCmdFormat ne "");
   }
   ### sense
-  elsif ( $model eq "sense" )
+  elsif( $model eq "sense" )
   {
     # the Sense devices update just once a day
-    $hash->{".DEFAULTINTERVAL"} = $Sense_DefaultInterval;
+    $hash->{".DEFAULTINTERVAL"}             = $Sense_DefaultInterval;
+    $hash->{".DEFAULTGETTIMESPAN"}  = $Sense_DefaultGetTimespan;
     $hash->{".AttrList"} = 
       $GroheOndusSmartDevice_AttrList .
       $GroheOndusSmartDevice_Sense_AttrList . 
       $readingFnAttributes;
 
-    $hash->{DataTimerInterval} = $hash->{".DEFAULTINTERVAL"};
+    $hash->{helper}{Telegram_GetConfigCounter}    = 0;
+    $hash->{helper}{Telegram_GetStateCounter}     = 0;
+    $hash->{helper}{Telegram_GetDataCounter}      = 0;
 
-    $hash->{helper}{Telegram_ConfigCounter} = 0;
-    $hash->{helper}{Telegram_StatusCounter} = 0;
-    $hash->{helper}{Telegram_DataCounter}   = 0;
+    # set defaults
+    $hash->{helper}{GetSuspendReadings}           = "0";
+    $hash->{helper}{LastProcessedTimestamp_LUTC}  = "";
 
-    CommandAttr( undef, $name . " stateFormat " . $Sense_DefaultStateFormat )
-      if ( AttrVal( $name, "stateFormat", "none" ) eq "none" );
+    if($init_done)
+    {
+      # device is created *after* fhem has started -> don't restore old values
+      Log3($name, 5, "GroheOndusSmartDevice_Define($name) - device is created after fhem has started -> don't restore old values");
+    }
+    else
+    {
+      # device is created *while* fhem is starting -> restore old values
+      Log3($name, 5, "GroheOndusSmartDevice_Define($name) - device is created while fhem is starting -> restore old values");
 
-    CommandAttr( undef, $name . " webCmd " . $Sense_DefaultWebCmdFormat )
-      if ( AttrVal( $name, "webCmd", "none" ) eq "none" );
+      $hash->{helper}{GetSuspendReadings}           = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "GetSuspendReadings", $hash->{helper}{GetSuspendReadings});
+      $hash->{helper}{LastProcessedTimestamp_LUTC}  = GroheOndusSmartDevice_Restore( $hash, "GroheOndusSmartDevice_Define", "LastProcessedTimestamp_LUTC", $hash->{helper}{LastProcessedTimestamp_LUTC});
+    }
+
+    CommandAttr(undef, $name . " stateFormat " . $Sense_DefaultStateFormat)
+      if( AttrVal($name, "stateFormat", "none" ) eq "none" and
+        $Sense_DefaultStateFormat ne "");
+
+    CommandAttr(undef, $name . " webCmd " . $Sense_DefaultWebCmdFormat)
+      if(AttrVal($name, "webCmd", "none") eq "none" and
+        $Sense_DefaultWebCmdFormat ne "");
   }
   else
   {
     return "unknown model $model"
   }
+
+  $hash->{DEVICEID}                                     = $deviceId;
+  $hash->{ApplianceModel}                               = $model;
+  $hash->{VERSION}                                      = $VERSION;
+  $hash->{NOTIFYDEV}                                    = "global,$name,$bridge";
+  $hash->{RETRIES}                                      = 3;
+  $hash->{DataTimerInterval}                            = $hash->{".DEFAULTINTERVAL"};
+  $hash->{helper}{DEBUG}                                = "0";
+  $hash->{helper}{IsDisabled}                           = "0";
+  $hash->{helper}{OverrideCheckTDT}                     = "0";
+  $hash->{helper}{ApplianceTDT_LUTC}                    = "";
+  $hash->{helper}{ApplianceTDT_LUTC_GetData}            = "";
+  $hash->{helper}{LogFileEnabled}                       = "1";
+  $hash->{helper}{LogFilePattern}                       = $DefaultLogfilePattern;
+  $hash->{helper}{LogFileName}                          = undef;
+  $hash->{helper}{LogFileFormat}                        = $DefaultLogfileFormat;
+  $hash->{helper}{LogFileGetDataStartDate_LTZ}          = "";
+  $hash->{helper}{GetTimespan}                          = $hash->{".DEFAULTGETTIMESPAN"};
+  $hash->{helper}{GetInProgress}                        = "0";
+  $hash->{helper}{GetCampain}                           = 0;
 
   AssignIoPort( $hash, $bridge );
 
@@ -283,45 +406,31 @@ sub GroheOndusSmartDevice_Define($$)
   my $d = $modules{GroheOndusSmartDevice}{defptr}{$deviceId};
 
   return "GroheOndusSmartDevice device $name on GroheOndusSmartBridge $iodev already defined."
-    if (defined($d) and 
+    if(defined($d) and 
       $d->{IODev} == $hash->{IODev} and 
       $d->{NAME} ne $name );
 
   # ensure attribute room is present
-  if ( AttrVal( $name, "room", "none" ) eq "none" )
+  if(AttrVal($name, "room", "none") eq "none")
   {
-    my $room = AttrVal( $iodev, "room", "GroheOndusSmart" );
-    CommandAttr( undef, $name . " room " . $room );
+    my $room = AttrVal($iodev, "room", "GroheOndusSmart");
+    CommandAttr(undef, $name . " room " . $room);
   }
   
   # ensure attribute inerval is present
-  CommandAttr( undef, $name . " interval " . $hash->{DataTimerInterval} )
-    if ( AttrVal( $name, "interval", "none" ) eq "none" );
-
-  Log3($name, 3, "GroheOndusSmartDevice ($name) - defined GroheOndusSmartDevice with DEVICEID: $deviceId");
-
-  # read MeasurementDataTimestamp from store
+  if(AttrVal($name, "interval", "none") eq "none")
   {
-    my ($getKeyError, $lastProcessedMeasurementTimestamp) = getKeyValue("MeasurementDataTimestamp");
-    $lastProcessedMeasurementTimestamp = ""
-      if(defined($getKeyError) or
-      not defined ($lastProcessedMeasurementTimestamp ));
-      
-    $hash->{helper}{LastProcessedMeasurementTimestamp} = $lastProcessedMeasurementTimestamp;
+    CommandAttr(undef, $name . " interval " . $hash->{DataTimerInterval})
   }
-  
-  # read HistoricMeasurementDataTimestamp from store
-  {
-    my ($getKeyError, $lastProcessedHistoricMeasurementTimestamp) = getKeyValue("HistoricMeasurementDataTimestamp");
-    $lastProcessedHistoricMeasurementTimestamp = ""
-      if(defined($getKeyError) or
-      not defined ($lastProcessedHistoricMeasurementTimestamp ));
-      
-    $hash->{helper}{lastProcessedHistoricMeasurementTimestamp} = $lastProcessedHistoricMeasurementTimestamp;
-  }
-  readingsSingleUpdate( $hash, "state", "initialized", 1 );
+
+  Log3($name, 3, "GroheOndusSmartDevice_Define($name) - defined GroheOndusSmartDevice with DEVICEID: $deviceId");
+
+  readingsSingleUpdate($hash, "state", "initialized", 1);
 
   $modules{GroheOndusSmartDevice}{defptr}{$deviceId} = $hash;
+
+  # remove marker value
+  $hash->{helper}{DefineRunning} = undef;
 
   return undef;
 }
@@ -334,9 +443,11 @@ sub GroheOndusSmartDevice_Undef($$)
   my $name     = $hash->{NAME};
   my $deviceId = $hash->{DEVICEID};
 
+  Log3($name, 4, "GroheOndusSmartDevice_Undef($name)");
+
   GroheOndusSmartDevice_TimerRemove($hash);
-  GroheOndusSmartDevice_Sense_GetHistoricData_TimerRemove($hash);
-  
+  GroheOndusSmartDevice_Sense_GetData_TimerRemove($hash);
+  GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove($hash);
 
   delete $modules{GroheOndusSmartDevice}{defptr}{$deviceId};
 
@@ -349,6 +460,61 @@ sub GroheOndusSmartDevice_Delete($$)
 {
   my ( $hash, $name ) = @_;
 
+  Log3($name, 4, "GroheOndusSmartDevice_Delete($name)");
+
+  # delete all stored values
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "LastProcessedTimestamp_LUTC", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "LastProcessedWithdrawalTimestamp_LUTC", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "GetSuspendReadings", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TotalAnalyzeStartTimestamp", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TotalAnalyzeEndTimestamp", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TotalWithdrawalCount", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TotalWaterConsumption", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TotalHotWaterShare", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TotalWaterCost", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TotalEnergyCost", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TodayAnalyzeStartTimestamp", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TodayAnalyzeEndTimestamp", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TodayWithdrawalCount", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TodayWaterConsumption", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TodayHotWaterShare", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TodayWaterCost", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TodayEnergyCost", undef);
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Delete", "TodayMaxFlowrate", undef);
+
+  return undef;
+}
+
+#####################################
+# GroheOndusSmartDevice_Rename($new_name, $old_name)
+sub GroheOndusSmartDevice_Rename($$)
+{
+  my ($new_name, $old_name) = @_;
+  my $hash = $defs{$new_name};
+  my $name = $hash->{NAME};
+
+  Log3($name, 4, "GroheOndusSmartDevice_Rename($name)");
+
+  # rename all stored values
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "LastProcessedTimestamp_LUTC");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "LastProcessedWithdrawalTimestamp_LUTC");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "GetSuspendReadings");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TotalAnalyzeStartTimestamp");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TotalAnalyzeEndTimestamp");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TotalWithdrawalCount");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TotalWaterConsumption");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TotalHotWaterShare");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TotalWaterCost");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TotalEnergyCost");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TodayAnalyzeStartTimestamp");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TodayAnalyzeEndTimestamp");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TodayWithdrawalCount");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TodayWaterConsumption");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TodayHotWaterShare");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TodayWaterCost");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TodayEnergyCost");
+  GroheOndusSmartDevice_StoreRename($hash, "GroheOndusSmartDevice_Rename", $old_name, "TodayMaxFlowrate");
+
   return undef;
 }
 
@@ -359,21 +525,22 @@ sub GroheOndusSmartDevice_Attr(@)
   my ( $cmd, $name, $attrName, $attrVal ) = @_;
   my $hash = $defs{$name};
 
-  Log3($name, 4, "GroheOndusSmartDevice_Attr($name) - Attr was called");
+  Log3($name, 4, "GroheOndusSmartDevice_Attr($name) - $attrName was called");
 
   # Attribute "disable"
-  if ( $attrName eq "disable" )
+  if( $attrName eq "disable" )
   {
-    if ( $cmd eq "set" and 
+    if( $cmd eq "set" and 
       $attrVal eq "1" )
     {
       $hash->{helper}{IsDisabled} = "1";
 
       GroheOndusSmartDevice_TimerRemove($hash);
-      GroheOndusSmartDevice_Sense_GetHistoricData_TimerRemove($hash);
+      GroheOndusSmartDevice_Sense_GetData_TimerRemove($hash);
+      GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove($hash);
 
       readingsSingleUpdate( $hash, "state", "inactive", 1 );
-      Log3($name, 3, "GroheOndusSmartDevice ($name) - disabled");
+      Log3($name, 3, "GroheOndusSmartDevice($name) - disabled");
     } 
     else
     {
@@ -381,51 +548,49 @@ sub GroheOndusSmartDevice_Attr(@)
 
       readingsSingleUpdate( $hash, "state", "active", 1 );
 
-      GroheOndusSmartDevice_TimerExecute( $hash );
-      Log3($name, 3, "GroheOndusSmartDevice ($name) - enabled");
+      GroheOndusSmartDevice_TimerExecute($hash)
+        if($init_done and
+          not $hash->{helper}{DefineRunning});
+      Log3($name, 3, "GroheOndusSmartDevice($name) - enabled");
     }
   }
 
   # Attribute "interval"
-  elsif ( $attrName eq "interval" )
+  elsif( $attrName eq "interval" )
   {
     # onchange event for attribute "interval" is handled in sub "Notify" -> calls "updateValues" -> Timer is reloaded
-    if ( $cmd eq "set" )
+    if($cmd eq "set")
     {
       return "Interval must be greater than 0"
-        unless ( $attrVal > 0 );
+        unless($attrVal > 0);
 
-      GroheOndusSmartDevice_TimerRemove($hash);
-    
       $hash->{DataTimerInterval} = $attrVal;
-
-      GroheOndusSmartDevice_TimerExecute( $hash );
 
       Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set interval: $attrVal");
     } 
-    elsif ( $cmd eq "del" )
+    elsif($cmd eq "del")
     {
-      GroheOndusSmartDevice_TimerRemove($hash);
-    
-    $hash->{DataTimerInterval} = $hash->{".DEFAULTINTERVAL"};
-
-      GroheOndusSmartDevice_TimerExecute( $hash );
+      $hash->{DataTimerInterval} = $hash->{".DEFAULTINTERVAL"};
 
       Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete interval and set default: 60");
     }
+
+    GroheOndusSmartDevice_TimerExecute($hash)
+      if($init_done and
+        not $hash->{helper}{DefineRunning});
   }
 
   # Attribute "debug"
-  elsif ( $attrName eq "debug" )
+  elsif($attrName eq "debug")
   {
-    if ( $cmd eq "set")
+    if($cmd eq "set")
     {
       Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - debugging enabled");
 
       $hash->{helper}{DEBUG} = "$attrVal";
       GroheOndusSmartDevice_UpdateInternals($hash);
     } 
-    elsif ( $cmd eq "del" )
+    elsif($cmd eq "del")
     {
       Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - debugging disabled");
 
@@ -434,81 +599,113 @@ sub GroheOndusSmartDevice_Attr(@)
     }
   }
 
-  # Attribute "offsetWaterCost"
-  elsif ( $attrName eq "offsetWaterCost" )
+  # Attribute "offsetTotalWaterCost"
+  elsif($attrName eq "offsetTotalWaterCost")
   {
-    if ( $cmd eq "set" )
+    if($cmd eq "set")
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterCost: $attrVal");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetTotalWaterCost: $attrVal");
+
+      $hash->{helper}{TotalWaterCost} -= $hash->{helper}{OffsetWaterCost};
+      $hash->{helper}{OffsetWaterCost} = $attrVal;
+      $hash->{helper}{TotalWaterCost} += $hash->{helper}{OffsetWaterCost};
     } 
-    elsif ( $cmd eq "del" )
+    elsif($cmd eq "del")
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetWaterCost and set default: 0");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetTotalWaterCost and set default: 0");
+
+      $hash->{helper}{TotalWaterCost} -= $hash->{helper}{OffsetWaterCost};
+      $hash->{helper}{OffsetWaterCost} = 0;
     }
-    
-    GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
-      if($init_done);
+
+    GroheOndusSmartDevice_UpdateInternals($hash);
+    GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalWaterCost", $hash->{helper}{TotalWaterCost});
+    readingsSingleUpdate($hash, "TotalWaterCost", $hash->{helper}{TotalWaterCost}, 1);
   }
   
-  # Attribute "offsetHotWaterShare"
-  elsif ( $attrName eq "offsetHotWaterShare" )
+  # Attribute "offsetTotalHotWaterShare"
+  elsif($attrName eq "offsetTotalHotWaterShare")
   {
-    if ( $cmd eq "set" )
+    if($cmd eq "set")
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetHotWaterShare: $attrVal");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetTotalHotWaterShare: $attrVal");
+
+      $hash->{helper}{TotalHotWaterShare} -= $hash->{helper}{OffsetHotWaterShare};
+      $hash->{helper}{OffsetHotWaterShare} = $attrVal;
+      $hash->{helper}{TotalHotWaterShare} += $hash->{helper}{OffsetHotWaterShare};
     } 
-    elsif ( $cmd eq "del" )
+    elsif( $cmd eq "del" )
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetHotWaterShare and set default: 0");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetTotalHotWaterShare and set default: 0");
+
+      $hash->{helper}{TotalHotWaterShare} -= $hash->{helper}{OffsetHotWaterShare};
+      $hash->{helper}{OffsetHotWaterShare} = 0;
     }
-    
-    GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
-      if($init_done); 
+
+    GroheOndusSmartDevice_UpdateInternals($hash);
+    GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalHotWaterShare", $hash->{helper}{TotalHotWaterShare});
+    readingsSingleUpdate($hash, "TotalHotWaterShare", $hash->{helper}{TotalHotWaterShare}, 1);
   }
   
-  # Attribute "offsetEnergyCost"
-  elsif ( $attrName eq "offsetEnergyCost" )
+  # Attribute "offsetTotalEnergyCost"
+  elsif( $attrName eq "offsetTotalEnergyCost" )
   {
-    if ( $cmd eq "set" )
+    if( $cmd eq "set" )
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetEnergyCost: $attrVal");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetTotalEnergyCost: $attrVal");
+
+      $hash->{helper}{TotalEnergyCost} -= $hash->{helper}{OffsetEnergyCost};
+      $hash->{helper}{OffsetEnergyCost} = $attrVal;
+      $hash->{helper}{TotalEnergyCost} += $hash->{helper}{OffsetEnergyCost};
     } 
-    elsif ( $cmd eq "del" )
+    elsif( $cmd eq "del" )
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetEnergyCost and set default: 0");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetTotalEnergyCost and set default: 0");
+
+      $hash->{helper}{TotalEnergyCost} -= $hash->{helper}{OffsetEnergyCost};
+      $hash->{helper}{OffsetEnergyCost} = 0;
     }
-    
-    GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
-      if($init_done);
+
+    GroheOndusSmartDevice_UpdateInternals($hash);
+    GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalEnergyCost", $hash->{helper}{TotalEnergyCost});
+    readingsSingleUpdate($hash, "TotalEnergyCost", $hash->{helper}{TotalEnergyCost}, 1);
   }
   
-  # Attribute "offsetWaterConsumption"
-  elsif ( $attrName eq "offsetWaterConsumption" )
+  # Attribute "offsetTotalWaterConsumption"
+  elsif( $attrName eq "offsetTotalWaterConsumption" )
   {
-    if ( $cmd eq "set" )
+    if( $cmd eq "set" )
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetWaterConsumption: $attrVal");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - set offsetTotalWaterConsumption: $attrVal");
+
+      $hash->{helper}{TotalWaterConsumption} -= $hash->{helper}{OffsetWaterConsumption};
+      $hash->{helper}{OffsetWaterConsumption} = $attrVal;
+      $hash->{helper}{TotalWaterConsumption} += $hash->{helper}{OffsetWaterConsumption};
     } 
-    elsif ( $cmd eq "del" )
+    elsif( $cmd eq "del" )
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetWaterConsumption and set default: 0");
+      Log3($name, 3, "GroheOndusSmartDevice_Attr($name) - delete offsetTotalWaterConsumption and set default: 0");
+
+      $hash->{helper}{TotalWaterConsumption} -= $hash->{helper}{OffsetWaterConsumption};
+      $hash->{helper}{OffsetWaterConsumption} = 0;
     }
-    
-    GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash)
-      if($init_done);
+
+    GroheOndusSmartDevice_UpdateInternals($hash);
+    GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalWaterConsumption", $hash->{helper}{TotalWaterConsumption});
+    readingsSingleUpdate($hash, "TotalWaterConsumption", $hash->{helper}{TotalWaterConsumption}, 1);
   }
 
   # Attribute "logFileEnabled"
-  elsif ( $attrName eq "logFileEnabled" )
+  elsif( $attrName eq "logFileEnabled" )
   {
-    if ( $cmd eq "set")
+    if( $cmd eq "set")
     {
       Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - logFileEnabled $attrVal");
 
       $hash->{helper}{LogFileEnabled} = "$attrVal";
       GroheOndusSmartDevice_UpdateInternals($hash);
     } 
-    elsif ( $cmd eq "del" )
+    elsif( $cmd eq "del" )
     {
       Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - logFileEnabled disabled");
 
@@ -518,16 +715,16 @@ sub GroheOndusSmartDevice_Attr(@)
   }
 
   # Attribute "logFilePattern"
-  elsif ( $attrName eq "logFilePattern" )
+  elsif( $attrName eq "logFilePattern" )
   {
-    if ( $cmd eq "set" )
+    if( $cmd eq "set" )
     {
       Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - logFilePattern $attrVal");
 
       $hash->{helper}{LogFilePattern} = "$attrVal";
       GroheOndusSmartDevice_UpdateInternals($hash);
     } 
-    elsif ( $cmd eq "del" )
+    elsif( $cmd eq "del" )
     {
       Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - delete logFilePattern and set default");
 
@@ -537,20 +734,44 @@ sub GroheOndusSmartDevice_Attr(@)
   }
 
   # Attribute "logFileFormat"
-  elsif ( $attrName eq "logFileFormat" )
+  elsif( $attrName eq "logFileFormat" )
   {
-    if ( $cmd eq "set" )
+    if( $cmd eq "set" )
     {
       Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - logFileFormat $attrVal");
 
       $hash->{helper}{LogFileFormat} = "$attrVal";
       GroheOndusSmartDevice_UpdateInternals($hash);
     } 
-    elsif ( $cmd eq "del" )
+    elsif( $cmd eq "del" )
     {
       Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - delete logFileFormat and set default");
 
       $hash->{helper}{LogFileFormat} = $DefaultLogfileFormat;
+      GroheOndusSmartDevice_UpdateInternals($hash);
+    }
+  }
+
+  # Attribute "logFileGetDataStartDate"
+  elsif( $attrName eq "logFileGetDataStartDate" )
+  {
+    if( $cmd eq "set" )
+    {
+      # parse value and try to expand to full format
+      my $timestampLocal_s = str2time($attrVal);
+      my @t = localtime($timestampLocal_s);
+      my $timestamp = sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+      
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - logFileGetDataStartDate $timestamp");
+
+      $hash->{helper}{LogFileGetDataStartDate_LTZ} = "$timestamp";
+      GroheOndusSmartDevice_UpdateInternals($hash);
+    } 
+    elsif( $cmd eq "del" )
+    {
+      Log3($name, 3, "GroheOndusSmartBridge_Attr($name) - delete logFileGetDataStartDate and set default");
+
+      $hash->{helper}{LogFileGetDataStartDate_LTZ} = "";
       GroheOndusSmartDevice_UpdateInternals($hash);
     }
   }
@@ -562,54 +783,50 @@ sub GroheOndusSmartDevice_Attr(@)
 # GroheOndusSmartDevice_Notify( $hash, $dev )
 sub GroheOndusSmartDevice_Notify($$)
 {
-  my ( $hash, $dev ) = @_;
-  my $name = $hash->{NAME};
+  my ($hash, $dev)  = @_;
+  my $name          = $hash->{NAME};
 
   return
-    if ( $hash->{helper}{IsDisabled} ne "0" );
+    if($hash->{helper}{IsDisabled} ne "0");
 
   my $devname = $dev->{NAME};
   my $devtype = $dev->{TYPE};
   my $events  = deviceEvents( $dev, 1 );
 
   return
-    if ( !$events );
+    if(!$events);
 
   Log3($name, 4, "GroheOndusSmartDevice_Notify($name) - DevType: \"$devtype\"");
 
   # process "global" events
-  if ( $devtype eq "Global" )
+  if($devtype eq "Global")
   {
     # global Initialization is done
-    if( grep /^INITIALIZED$/, @{$events} )
+    if(grep(m/^INITIALIZED|REREADCFG$/, @{$events}))
     {
       Log3($name, 3, "GroheOndusSmartDevice_Notify($name) - global event INITIALIZED was catched");
 
       GroheOndusSmartDevice_Upgrade($hash);
     }
-
-    if( $init_done )
-    {
-    }
   }
   
   # process events from Bridge
-  elsif ( $devtype eq "GroheOndusSmartBridge" )
+  elsif( $devtype eq "GroheOndusSmartBridge" )
   {
-    if ( grep /^state:.*$/, @{$events} )
+    if(grep /^state:.*$/, @{$events})
     {
       my $ioDeviceState =  ReadingsVal($hash->{IODev}->{NAME}, "state", "none");
       
       Log3($name, 4, "GroheOndusSmartDevice_Notify($name) - event \"state: $ioDeviceState\" from GroheOndusSmartBridge was catched");
 
-      if ( $ioDeviceState eq "connected to cloud" )
+      if($ioDeviceState eq "connected to cloud")
       {
       }
       else
       {
         readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged( $hash, "state", "bridge " . $ioDeviceState, 1 );
-        readingsEndUpdate( $hash, 1 );
+        readingsBulkUpdateIfChanged($hash, "state", "bridge " . $ioDeviceState, 1);
+        readingsEndUpdate($hash, 1);
       }
     }
     else
@@ -619,7 +836,7 @@ sub GroheOndusSmartDevice_Notify($$)
   }
   
   # process internal events
-  elsif ( $devtype eq "GroheOndusSmartDevice" )
+  elsif($devtype eq "GroheOndusSmartDevice")
   {
   }
 
@@ -633,7 +850,6 @@ sub GroheOndusSmartDevice_Set($@)
   my ( $hash, $name, $cmd, @args ) = @_;
 
   my $payload;
-#  my $model = AttrVal( $name, "model", "unknown" );
   my $model = $hash->{ApplianceModel};
 
   Log3($name, 4, "GroheOndusSmartDevice_Set($name): cmd= $cmd");
@@ -641,14 +857,14 @@ sub GroheOndusSmartDevice_Set($@)
   #########################################################
   ### sense_guard #########################################
   #########################################################
-  if ( $model eq "sense_guard" )
+  if( $model eq "sense_guard" )
   {
     return GroheOndusSmartDevice_SenseGuard_Set($hash, $name, $cmd, @args);
   }
   #########################################################
   ### sense ###############################################
   #########################################################
-  elsif ( $model eq "sense" )
+  elsif( $model eq "sense" )
   {
     return GroheOndusSmartDevice_Sense_Set($hash, $name, $cmd, @args);
   }
@@ -663,63 +879,69 @@ sub GroheOndusSmartDevice_Set($@)
 # GroheOndusSmartDevice_Parse( $io_hash, $match )
 sub GroheOndusSmartDevice_Parse($$)
 {
-  my ( $io_hash, $match ) = @_;
+  my ($io_hash, $match) = @_;
   my $io_name = $io_hash->{NAME};
 
   # to pass parameters to this underlying logical device
   # the hash "currentAppliance" is set in io_hash for the moment
-  my $current_appliance_id = $io_hash->{currentAppliance}->{appliance_id};
-  my $current_type_id = $io_hash->{currentAppliance}->{type_id};
-  my $current_name = $io_hash->{currentAppliance}->{name};
-  my $current_location_id = $io_hash->{currentAppliance}->{location_id};
-  my $current_room_id = $io_hash->{currentAppliance}->{room_id};
-  my $autocreate = $io_hash->{currentAppliance}->{autocreate};
+  my $current_appliance_id  = $io_hash->{currentAppliance}->{appliance_id};
+  my $current_type_id       = $io_hash->{currentAppliance}->{type_id};
+  my $current_name          = $io_hash->{currentAppliance}->{name};
+  my $current_location_id   = $io_hash->{currentAppliance}->{location_id};
+  my $current_room_id       = $io_hash->{currentAppliance}->{room_id};
+  my $autocreate            = $io_hash->{currentAppliance}->{autocreate};
+
+  # replace "umlaute"
+  $current_name =~ s/($replacechartablekeys)/$replacechartable{$1}/g;
 
   Log3($io_name, 4, "GroheOndusSmartBridge($io_name) -> GroheOndusSmartDevice_Parse");
 
-  if ( defined( $current_appliance_id ) )
+  if(defined( $current_appliance_id ))
   {
     # SmartDevice with $deviceId found:
-    if ( my $hash = $modules{GroheOndusSmartDevice}{defptr}{$current_appliance_id} )
+    if(my $hash = $modules{GroheOndusSmartDevice}{defptr}{$current_appliance_id})
     {
       my $name = $hash->{NAME};
 
       Log3($name, 5, "GroheOndusSmartDevice_Parse($name) - found logical device");
 
       # set internals
-      $hash->{ApplianceId} = $current_appliance_id;
-      $hash->{ApplianceTypeId} = $current_type_id;
-      $hash->{ApplianceLocationId} = $current_location_id;
-      $hash->{ApplianceRoomId} = $current_room_id;
+      $hash->{ApplianceId}          = $current_appliance_id;
+      $hash->{ApplianceTypeId}      = $current_type_id;
+      $hash->{ApplianceLocationId}  = $current_location_id;
+      $hash->{ApplianceRoomId}      = $current_room_id;
 
-      # change state to "connected to cloud" -> Notify -> load timer
-      readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", "connected over bridge to cloud", 1 );
-      readingsEndUpdate( $hash, 1 );
+      if($hash->{helper}{GetInProgress} eq "0")
+      {
+        # change state to "connected to cloud" -> Notify -> load timer
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "state", "connected over bridge to cloud", 1 );
+        readingsEndUpdate( $hash, 1 );
+      }
 
       # if not timer is running then start one
-      if( not defined( $hash->{DataTimerNext} ) or
+      if(not defined( $hash->{DataTimerNext}) or
         $hash->{DataTimerNext} eq "none")
       {
-        GroheOndusSmartDevice_TimerExecute( $hash );
+        GroheOndusSmartDevice_TimerExecute($hash);
       }
 
       return $name;
     }
 
     # SmartDevice not found, create new one
-    elsif ($autocreate eq "1")
+    elsif($autocreate eq "1")
     {
-      my $deviceName = makeDeviceName( $current_name );
+      my $deviceName = makeDeviceName($current_name);
       
-      if ( $current_type_id == 101 )
+      if( $current_type_id == 101 )
       {
         my $deviceTypeName = "sense";
         Log3($io_name, 3, "GroheOndusSmartBridge($io_name) -> autocreate new device $deviceName with applianceId $current_appliance_id, model $deviceTypeName");
 
         return "UNDEFINED $deviceName GroheOndusSmartDevice $io_name $current_appliance_id $deviceTypeName";
       } 
-      elsif ( $current_type_id == 103 )
+      elsif( $current_type_id == 103 )
       {
         my $deviceTypeName = "sense_guard";
         Log3($io_name, 3, "GroheOndusSmartBridge($io_name) -> autocreate new device $deviceName with applianceId $current_appliance_id, model $deviceTypeName");
@@ -744,14 +966,14 @@ sub GroheOndusSmartDevice_Upgrade($)
   my $name = $hash->{NAME};
 
   # delete deprecated attribute "IODev"
-  if ( AttrVal( $name, "IODev", "none" ) ne "none" )
+  if( AttrVal( $name, "IODev", "none" ) ne "none" )
   {
     Log3($name, 3, "GroheOndusSmartDevice_Upgrade($name) - deleting old attribute IODEV");
     fhem("deleteattr $name IODev", 1);
   }
 
   # delete deprecated attribute "model"
-  if ( AttrVal( $name, "model", "none" ) ne "none" )
+  if( AttrVal( $name, "model", "none" ) ne "none" )
   {
     Log3($name, 3, "GroheOndusSmartDevice_Upgrade($name) - deleting old attribute model");
     fhem("deleteattr $name model", 1);
@@ -764,15 +986,16 @@ sub GroheOndusSmartDevice_Upgrade($)
 sub GroheOndusSmartDevice_UpdateInternals($)
 {
   my ( $hash ) = @_;
-  my $name = $hash->{NAME};
+  my $name  = $hash->{NAME};
+  my $model = $hash->{ApplianceModel};
 
   Log3($name, 5, "GroheOndusSmartDevice_UpdateInternals($name)");
 
   # logFile internals
   if($hash->{helper}{LogFileEnabled} eq "1")
   {
-    $hash->{LogFile_Pattern} = $hash->{helper}{LogFilePattern};
-    $hash->{LogFile_Name} = $hash->{helper}{LogFileName};
+    $hash->{LogFile_Pattern}  = $hash->{helper}{LogFilePattern};
+    $hash->{LogFile_Name}     = $hash->{helper}{LogFileName};
   }
   else
   {
@@ -785,29 +1008,60 @@ sub GroheOndusSmartDevice_UpdateInternals($)
   }
   
   # debug-internals
-  if( $hash->{helper}{DEBUG} eq "1")
+  if($hash->{helper}{DEBUG} eq "1")
   {
-    $hash->{DEBUG_IsDisabled} = $hash->{helper}{IsDisabled};
-    $hash->{DEBUG_ApplianceTDT} = $hash->{helper}{ApplianceTDT};
-    $hash->{DEBUG_OverrideCheckTDT} = $hash->{helper}{OverrideCheckTDT};
-    $hash->{DEBUG_LastProcessedMeasurementTimestamp} = $hash->{helper}{LastProcessedMeasurementTimestamp};
+    $hash->{DEBUG_IsDisabled}                             = $hash->{helper}{IsDisabled};
+    $hash->{DEBUG_ApplianceTDT_LUTC}                      = $hash->{helper}{ApplianceTDT_LUTC};
+    $hash->{DEBUG_ApplianceTDT_LUTC_GetData}              = $hash->{helper}{ApplianceTDT_LUTC_GetData};
+    $hash->{DEBUG_OverrideCheckTDT}                       = $hash->{helper}{OverrideCheckTDT};
+    $hash->{DEBUG_LastProcessedTimestamp_LUTC}            = $hash->{helper}{LastProcessedTimestamp_LUTC};
+
+    $hash->{DEBUG_LogFileEnabled}                         = $hash->{helper}{LogFileEnabled};
+    $hash->{DEBUG_LogFilePattern}                         = $hash->{helper}{LogFilePattern};
+    $hash->{DEBUG_LogFileName}                            = $hash->{helper}{LogFileName};
+    $hash->{DEBUG_LogFileFormat}                          = $hash->{helper}{LogFileFormat};
+    $hash->{DEBUG_LogFileGetDataStartDate_LTZ}            = $hash->{helper}{LogFileGetDataStartDate_LTZ};
     
-    $hash->{DEBUG_LogFileEnabled} = $hash->{helper}{LogFileEnabled};
-    $hash->{DEBUG_LogFilePattern} = $hash->{helper}{LogFilePattern};
-    $hash->{DEBUG_LogFileName} = $hash->{helper}{LogFileName};
-    $hash->{DEBUG_LogFileFormat} = $hash->{helper}{LogFileFormat};
+    $hash->{DEBUG_GetInProgress}                          = $hash->{helper}{GetInProgress};
+    $hash->{DEBUG_GetTimespan}                            = $hash->{helper}{GetTimespan};
+    $hash->{DEBUG_GetCampain}                             = $hash->{helper}{GetCampain};
+    $hash->{DEBUG_GetSuspendReadings}                     = $hash->{helper}{GetSuspendReadings};
     
-    $hash->{DEBUG_HistoricGetInProgress} = $hash->{helper}{HistoricGetInProgress};
-    $hash->{DEBUG_HistoricGetTimespan} = $hash->{helper}{HistoricGetTimespan};
-    $hash->{DEBUG_HistoricGetLastProcessedMeasurementTimestamp} = $hash->{helper}{lastProcessedHistoricMeasurementTimestamp};
-    $hash->{DEBUG_HistoricGetCampain} = $hash->{helper}{HistoricGetCampain};
-    
+    if($model eq "sense_guard")
+    {
+      $hash->{DEBUG_LastProcessedWithdrawalTimestamp_LUTC}  = $hash->{helper}{LastProcessedWithdrawalTimestamp_LUTC};
+
+      $hash->{DEBUG_OffsetEnergyCost}                       = $hash->{helper}{OffsetEnergyCost};
+      $hash->{DEBUG_OffsetWaterCost}                        = $hash->{helper}{OffsetWaterCost};
+      $hash->{DEBUG_OffsetWaterConsumption}                 = $hash->{helper}{OffsetWaterConsumption}; 
+      $hash->{DEBUG_OffsetHotWaterShare}                    = $hash->{helper}{OffsetHotWaterShare};
+  
+      $hash->{DEBUG_TotalAnalyzeStartTimestamp}             = $hash->{helper}{TotalAnalyzeStartTimestamp};
+      $hash->{DEBUG_TotalAnalyzeEndTimestamp}               = $hash->{helper}{TotalAnalyzeEndTimestamp};
+      $hash->{DEBUG_TotalWithdrawalCount}                   = $hash->{helper}{TotalWithdrawalCount};
+      $hash->{DEBUG_TotalWaterConsumption}                  = $hash->{helper}{TotalWaterConsumption};
+      $hash->{DEBUG_TotalHotWaterShare}                     = $hash->{helper}{TotalHotWaterShare};
+      $hash->{DEBUG_TotalWaterCost}                         = $hash->{helper}{TotalWaterCost};
+      $hash->{DEBUG_TotalEnergyCost}                        = $hash->{helper}{TotalEnergyCost};
+  
+      $hash->{DEBUG_TodayAnalyzeStartTimestamp}             = $hash->{helper}{TodayAnalyzeStartTimestamp};
+      $hash->{DEBUG_TodayAnalyzeEndTimestamp}               = $hash->{helper}{TodayAnalyzeEndTimestamp};
+      $hash->{DEBUG_TodayWithdrawalCount}                   = $hash->{helper}{TodayWithdrawalCount};
+      $hash->{DEBUG_TodayWaterConsumption}                  = $hash->{helper}{TodayWaterConsumption};
+      $hash->{DEBUG_TodayHotWaterShare}                     = $hash->{helper}{TodayHotWaterShare};
+      $hash->{DEBUG_TodayWaterCost}                         = $hash->{helper}{TodayWaterCost};
+      $hash->{DEBUG_TodayEnergyCost}                        = $hash->{helper}{TodayEnergyCost};
+      $hash->{DEBUG_TodayMaxFlowrate}                       = $hash->{helper}{TodayMaxFlowrate};
+    }
+    elsif($model eq "sense")
+    {
+    }
+
     my @retrystring_keys =  grep /Telegram_/, keys %{$hash->{helper}};
     foreach (@retrystring_keys)
     {
       $hash->{"DEBUG_" . $_} = $hash->{helper}{$_};
     }
-
   }
   else
   {
@@ -824,25 +1078,25 @@ sub GroheOndusSmartDevice_UpdateInternals($)
 # GroheOndusSmartDevice_TimerExecute( $hash )
 sub GroheOndusSmartDevice_TimerExecute($)
 {
-  my ( $hash ) = @_;
-  my $name     = $hash->{NAME};
-  my $interval = $hash->{DataTimerInterval};
-  my $model = $hash->{ApplianceModel};
+  my ( $hash )  = @_;
+  my $name      = $hash->{NAME};
+  my $interval  = $hash->{DataTimerInterval};
+  my $model     = $hash->{ApplianceModel};
 
   GroheOndusSmartDevice_TimerRemove($hash);
 
-  if ( $init_done and 
+  if($init_done and 
     $hash->{helper}{IsDisabled} eq "0" )
   {
     Log3($name, 4, "GroheOndusSmartDevice_TimerExecute($name)");
 
     ### sense ###
-    if ( $model eq "sense" )
+    if( $model eq "sense" )
     {
       GroheOndusSmartDevice_Sense_Update($hash);
     }
     ### sense_guard ###
-    elsif ( $model eq "sense_guard" )
+    elsif( $model eq "sense_guard" )
     {
       GroheOndusSmartDevice_SenseGuard_Update($hash);
     }
@@ -850,11 +1104,11 @@ sub GroheOndusSmartDevice_TimerExecute($)
     # reload timer
     my $nextTimer = gettimeofday() + $interval;
     $hash->{DataTimerNext} = strftime($TimeStampFormat, localtime($nextTimer));
-    InternalTimer( $nextTimer, \&GroheOndusSmartDevice_TimerExecute, $hash );
+    InternalTimer($nextTimer, "GroheOndusSmartDevice_TimerExecute", $hash);
   } 
   else
   {
-    readingsSingleUpdate( $hash, "state", "disabled", 1 );
+    readingsSingleUpdate($hash, "state", "disabled", 1);
 
     Log3($name, 4, "GroheOndusSmartDevice_TimerExecute($name) - device is disabled");
   }
@@ -870,7 +1124,7 @@ sub GroheOndusSmartDevice_TimerRemove($)
   Log3($name, 4, "GroheOndusSmartDevice_TimerRemove($name)");
 
   $hash->{DataTimerNext} = "none";
-  RemoveInternalTimer($hash, \&GroheOndusSmartDevice_TimerExecute);
+  RemoveInternalTimer($hash, "GroheOndusSmartDevice_TimerExecute");
 }
 
 ##################################
@@ -894,17 +1148,17 @@ sub GroheOndusSmartDevice_SenseGuard_Update($)
 
   Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_Update($name)");
 
-  # paralleles Abrufen!
+  # parallel call:
+  #GroheOndusSmartDevice_SenseGuard_GetData_Last($hash);
   #GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($hash);
-  #GroheOndusSmartDevice_SenseGuard_GetData($hash);
   #GroheOndusSmartDevice_SenseGuard_GetState($hash);
   #GroheOndusSmartDevice_SenseGuard_GetConfig($hash);
   
-  # serielles Abrufen
-  my $getApplianceCommand = sub { GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($hash); };
-  my $getData = sub { GroheOndusSmartDevice_SenseGuard_GetData($hash, $getApplianceCommand); };
-  my $getState = sub { GroheOndusSmartDevice_SenseGuard_GetState($hash, $getData); };
-  my $getConfig = sub { GroheOndusSmartDevice_SenseGuard_GetConfig($hash, $getState); };
+  # serial call:
+  my $getData             = sub { GroheOndusSmartDevice_SenseGuard_GetData_Last($hash); };
+  my $getApplianceCommand = sub { GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($hash, $getData); };
+  my $getState            = sub { GroheOndusSmartDevice_SenseGuard_GetState($hash, $getApplianceCommand); };
+  my $getConfig           = sub { GroheOndusSmartDevice_SenseGuard_GetConfig($hash, $getState); };
   
   $getConfig->();
 }
@@ -922,18 +1176,20 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    $hash->{helper}{Telegram_StatusCallback}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    my $stopwatch = gettimeofday();
+    $hash->{helper}{Telegram_GetStateTimeRequest} = $stopwatch - $callbackparam->{timestampStart};
+    $hash->{helper}{Telegram_GetStateCallback}    = strftime($TimeStampFormat, localtime($stopwatch));
     Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetState($name) - resultCallback");
 
-    if ( $errorMsg eq "" )
+    if( $errorMsg eq "" )
     {
       my $decode_json = eval { decode_json($data) };
 
-      if ($@)
+      if($@)
       {
         Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetState($name) - JSON error while request: $@");
 
-        if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
           readingsBeginUpdate($hash);
           readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
@@ -957,24 +1213,24 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
         #     }
         #   ]
         # }
-        if ( defined( $decode_json )
+        if( defined( $decode_json )
           and ref( $decode_json ) eq "ARRAY" )
         {
           readingsBeginUpdate($hash);
 
           foreach my $currentData ( @{ $decode_json } )
           {
-            if ( $currentData->{type} eq "update_available"
+            if( $currentData->{type} eq "update_available"
               and defined( $currentData->{value} ) )
             {
               readingsBulkUpdateIfChanged( $hash, "StateUpdateAvailable", $currentData->{value} );
             } 
-            elsif ( $currentData->{type} eq "connection"
+            elsif( $currentData->{type} eq "connection"
               and defined( $currentData->{value} ) )
             {
               readingsBulkUpdateIfChanged( $hash, "StateConnection", $currentData->{value} );
             } 
-            elsif ( $currentData->{type} eq "wifi_quality"
+            elsif( $currentData->{type} eq "wifi_quality"
               and defined( $currentData->{value} ) )
             {
               readingsBulkUpdateIfChanged( $hash, "StateWifiQuality", $currentData->{value} );
@@ -988,7 +1244,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
 
           readingsEndUpdate( $hash, 1 );
 
-          $hash->{helper}{Telegram_StatusCounter}++;
+          $hash->{helper}{Telegram_GetStateCounter}++;
         }
         else
         {
@@ -997,6 +1253,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
       }
     }
 
+    $hash->{helper}{Telegram_GetStateTimeProcess}  = gettimeofday() - $stopwatch;
     GroheOndusSmartDevice_UpdateInternals($hash);
 
     if( $errorMsg eq "" )
@@ -1038,8 +1295,9 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
     $param->{keepalive} = 1;
       
     $param->{resultCallback} = $resultCallback;
+    $param->{timestampStart} = gettimeofday();
     
-    $hash->{helper}{Telegram_StatusIOWrite} = strftime($TimeStampFormat, localtime(gettimeofday()));
+    $hash->{helper}{Telegram_GetStateIOWrite} = strftime($TimeStampFormat, localtime($param->{timestampStart}));
 
     GroheOndusSmartDevice_IOWrite( $hash, $param );
   }
@@ -1060,25 +1318,26 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name    = $hash->{NAME};
-  my $modelId = 103;
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    $hash->{helper}{Telegram_ConfigCIOALLBACK}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    my $stopwatch = gettimeofday();
+    $hash->{helper}{Telegram_GetConfigTimeRequest} = $stopwatch - $callbackparam->{timestampStart};
+    $hash->{helper}{Telegram_GetConfigCallback}    = strftime($TimeStampFormat, localtime($stopwatch));
     Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - resultCallback");
 
     if( $errorMsg eq "" )
     {
       my $decode_json = eval { decode_json($data) };
     
-      if ($@)
+      if($@)
       {
         Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetConfig($name) - JSON error while request: $@");
 
-        if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
           readingsBeginUpdate($hash);
           readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
@@ -1185,7 +1444,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
       #   }
       # ]
       
-        if ( defined( $decode_json )
+        if( defined( $decode_json )
           and ref( $decode_json ) eq "ARRAY" )
         {
           readingsBeginUpdate($hash);
@@ -1205,7 +1464,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
 
           my $currentEntry = $decode_json->[0];
 
-          if ( defined( $currentEntry )
+          if( defined( $currentEntry )
             and ref( $currentEntry ) eq "HASH" )
           {
             readingsBulkUpdateIfChanged( $hash, "ApplianceID", "$currentEntry->{appliance_id}" )
@@ -1232,6 +1491,9 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
               if( defined( $currentEntry->{calculate_average_since} ) );
             readingsBulkUpdateIfChanged( $hash, "ApplianceSnoozeStatus", "$currentEntry->{snooze_status}" )
               if( defined( $currentEntry->{snooze_status} ) );
+
+            $hash->{helper}{ApplianceTDT_LUTC} = "$currentEntry->{tdt}"
+              if( defined( $currentEntry->{tdt} ) );
 
             #       "measurement_period":900,
             #       "measurement_transmission_intervall":900,
@@ -1272,7 +1534,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
             #       "sprinkler_mode_active_sunday":false,
             my $currentConfig = $currentEntry->{config};
 
-            if ( defined( $currentConfig )
+            if( defined( $currentConfig )
               and ref( $currentConfig ) eq "HASH" )
             {
               readingsBulkUpdateIfChanged( $hash, "ConfigMeasurementPeriod", "$currentConfig->{measurement_period}" )
@@ -1403,45 +1665,45 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
               # ]
               my $currentThresholds = $currentConfig->{thresholds};
 
-              if ( defined( $currentThresholds ) and
+              if( defined( $currentThresholds ) and
                 ref( $currentThresholds ) eq "ARRAY" )
               {
                 foreach my $currentThreshold ( @{ $currentThresholds} )
                 {
-                  if ( "$currentThreshold->{quantity}" eq "flowrate" )
+                  if( "$currentThreshold->{quantity}" eq "flowrate" )
                   {
-                    if ( "$currentThreshold->{type}" eq "max" )
+                    if( "$currentThreshold->{type}" eq "max" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigFlowrateThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
-                    elsif ( "$currentThreshold->{type}" eq "min" )
+                    elsif( "$currentThreshold->{type}" eq "min" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigFlowrateThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     }
                   } 
-                  elsif ( "$currentThreshold->{quantity}" eq "pressure" )
+                  elsif( "$currentThreshold->{quantity}" eq "pressure" )
                   {
-                    if ( "$currentThreshold->{type}" eq "max" )
+                    if( "$currentThreshold->{type}" eq "max" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigPressureThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
-                    elsif ( "$currentThreshold->{type}" eq "min" )
+                    elsif( "$currentThreshold->{type}" eq "min" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigPressureThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     }
                   }
-                  elsif ( "$currentThreshold->{quantity}" eq "temperature_guard" )
+                  elsif( "$currentThreshold->{quantity}" eq "temperature_guard" )
                   {
-                    if ( "$currentThreshold->{type}" eq "max" )
+                    if( "$currentThreshold->{type}" eq "max" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
-                    elsif ( "$currentThreshold->{type}" eq "min" )
+                    elsif( "$currentThreshold->{type}" eq "min" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
@@ -1453,7 +1715,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
           }
           readingsEndUpdate( $hash, 1 );
 
-          $hash->{helper}{Telegram_ConfigCounter}++;
+          $hash->{helper}{Telegram_GetConfigCounter}++;
         }
         else
         {
@@ -1462,6 +1724,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
       }
     }
 
+    $hash->{helper}{Telegram_GetConfigTimeProcess}  = gettimeofday() - $stopwatch;
     GroheOndusSmartDevice_UpdateInternals($hash);
 
     if( $errorMsg eq "" )
@@ -1501,8 +1764,9 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
     $param->{keepalive} = 1;
       
     $param->{resultCallback} = $resultCallback;
+    $param->{timestampStart} = gettimeofday();
     
-    $hash->{helper}{Telegram_ConfigIOWrite} = strftime($TimeStampFormat, localtime(gettimeofday()));
+    $hash->{helper}{Telegram_GetConfigIOWrite} = strftime($TimeStampFormat, localtime($param->{timestampStart}));
 
     GroheOndusSmartDevice_IOWrite( $hash, $param );
   }
@@ -1518,41 +1782,61 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
 }
 
 ##################################
-# GroheOndusSmartDevice_SenseGuard_GetData( $hash, $callbackSuccess, $callbackFail )
-sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
+# GroheOndusSmartDevice_SenseGuard_GetData( $hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail )
+sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
 {
-  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my ( $hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail ) = @_;
   my $name    = $hash->{NAME};
-  my $modelId = 103;
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    $hash->{helper}{Telegram_DataCallback}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    my $stopwatch = gettimeofday();
+    $hash->{helper}{Telegram_GetDataTimeRequest}  = $stopwatch - $callbackparam->{timestampStart};
+    $hash->{helper}{Telegram_GetDataCallback}     = strftime($TimeStampFormat, localtime($stopwatch));
+
     Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - resultCallback");
 
-    if( $errorMsg eq "" )
+    my $lastProcessedWithdrawalTimestamp_LUTC = $hash->{helper}{LastProcessedWithdrawalTimestamp_LUTC};
+    my $lastProcessedTimestamp_LUTC           = $hash->{helper}{LastProcessedTimestamp_LUTC};
+
+    my $currentDataTimestamp_LUTC             = undef;
+    my $currentDataFlowrate                   = undef;
+    my $currentDataPressure                   = undef;
+    my $currentDataTemperature                = undef;
+
+    my $currentWithdrawalTimestampStart_LUTC  = undef;
+    my $currentWithdrawalTimestampStop_LUTC   = undef;
+    my $currentWithdrawalDuration             = undef;
+    my $currentWithdrawalConsumption          = undef;
+    my $currentWithdrawalCostEnergy           = undef;
+    my $currentWithdrawalCostWater            = undef;
+    my $currentWithdrawalHotWaterShare        = undef;
+    my $currentWithdrawalMaxFlowrate          = undef;
+
+    if($callbackparam->{GetCampain} != $hash->{helper}{GetCampain})
+    {
+      $errorMsg = "GetData old Campain";
+    }
+    elsif( $errorMsg eq "" )
     {
       my $decode_json = eval { decode_json($data) };
     
-      if ($@)
+      if($@)
       {
         Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) - JSON error while request: $@");
 
-        if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
           readingsBeginUpdate($hash);
           readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
           readingsBulkUpdate( $hash, "JSON_ERROR_STRING", "\"" . $data . "\"", 1 );
           readingsEndUpdate( $hash, 1 );
         }
-
-        $errorMsg = "GETData_JSON_ERROR";
+        $errorMsg = "GetHistoricData_JSON_ERROR";
       }
-      else
-      {
       # Data:
       # {
       #   "data":
@@ -1576,7 +1860,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
       #     [
       #       {
       #         "water_cost":0.01447,
-      #         "hotwater_share":0,
+      #         "hotWater_share":0,
       #         "waterconsumption":3.4,
       #         "stoptime":"2019-07-14T03:16:51.000+02:00",
       #         "starttime":"2019-07-14T03:16:24.000+02:00",
@@ -1585,7 +1869,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
       #       },
       #       {
       #         "waterconsumption":7.6,
-      #         "hotwater_share":0,
+      #         "hotWater_share":0,
       #         "energy_cost":0,
       #         "starttime":"2019-07-14T03:58:19.000+02:00",
       #         "stoptime":"2019-07-14T03:59:13.000+02:00",
@@ -1595,60 +1879,82 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
       #     ]
       #   },
       # }
-        if ( defined( $decode_json->{data} ) and
-          ref( $decode_json->{data} ) eq "HASH" )
+      elsif( defined( $decode_json->{data} ) and
+        ref( $decode_json->{data} ) eq "HASH" )
+      {
+        $hash->{helper}{ApplianceTDT_LUTC_GetData} = $callbackparam->{ApplianceTDT_LUTC_GetData};
+
+        my $totalValuesChanged = 0;
+        my $todaysValuesChanged = 0;
+        
+        # this list contains all measurements-structures - format is:
+        # $currentDataTimestamp_LTZ_s, $currentDataTimestamp_LUTC, $currentData
+        my @measurementList;
+
+        # this list contains all withdrawal-structures - format is:
+        # $currentDataTimestampStart_LTZ_s, $currentDataTimestampStart_LUTC, $currentData
+        my @withdrawalList;
+        
+        # Measurement
+        #       {
+        #         "timestamp":"2019-07-14T02:07:36.000+02:00",
+        #         "flowrate":0,
+        #         "temperature_guard":22.5,
+        #         "pressure":3
+        #       },
+        if( defined( $decode_json->{data}->{measurement} ) and
+          ref( $decode_json->{data}->{measurement} ) eq "ARRAY" )
         {
-          $hash->{helper}{ApplianceTDT} = $callbackparam->{ApplianceTDT};
+          my $loopCounter             = 0;
+          my $listIsUnsorted          = 0; # if list isn't sorted by starttime by default: $listIsUnsorted != 0
+          my $lastDataTimestamp_LTZ_s = 0;
 
-          readingsBeginUpdate($hash);
-
-          # Measurement
-          #       {
-          #         "timestamp":"2019-07-14T02:07:36.000+02:00",
-          #         "flowrate":0,
-          #         "temperature_guard":22.5,
-          #         "pressure":3
-          #       },
-          if ( defined( $decode_json->{data}->{measurement} ) and
-            ref( $decode_json->{data}->{measurement} ) eq "ARRAY" )
+          foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
           {
-            # get entry with latest timestamp
-            my $dataTimestamp;
-            my $dataFlowrate;
-            my $dataTemperature;
-            my $dataPressure;
-
-            foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
+            # is this the correct dataset?
+            if( defined( $currentData->{timestamp} ) )
             {
-              # is this the correct dataset?
-              if ( defined( $currentData->{timestamp} ) and
-                defined( $currentData->{flowrate} ) and
-                defined( $currentData->{temperature_guard} ) and
-                defined( $currentData->{pressure} ) )
+              my $currentDataTimestamp_LUTC = $currentData->{timestamp};
+
+              # extract the timestamp from UTC-string and get TimestampInSeconds
+              my $currentDataTimestamp_LTZ   = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestamp_LUTC);
+              my $currentDataTimestamp_LTZ_s = time_str2num($currentDataTimestamp_LTZ);
+
+              # put current measurement in list
+              push(@measurementList, [$currentDataTimestamp_LTZ_s, $currentDataTimestamp_LUTC, $currentData]);
+
+              # sadly the datasets aren't sorted by starttime by default
+              # so set $listIsUnsorted != 0 if list has to be sorted later
+              if($currentDataTimestamp_LTZ_s < $lastDataTimestamp_LTZ_s)
               {
-                # is timestamp newer?
-                if ( not defined($dataTimestamp) or
-                  $currentData->{timestamp} gt $dataTimestamp )
-                {
-                  $dataTimestamp   = $currentData->{timestamp};
-                  $dataFlowrate    = $currentData->{flowrate};
-                  $dataTemperature = $currentData->{temperature_guard};
-                  $dataPressure    = $currentData->{pressure};
-                }
+                $listIsUnsorted = 1;
               }
+              $lastDataTimestamp_LTZ_s = $currentDataTimestamp_LTZ_s;
             }
-
-            readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $dataTimestamp )
-              if ( defined($dataTimestamp) );
-            readingsBulkUpdateIfChanged( $hash, "LastFlowrate", $dataFlowrate )
-              if ( defined($dataFlowrate) );
-            readingsBulkUpdateIfChanged( $hash, "LastTemperature", $dataTemperature )
-              if ( defined($dataTemperature) );
-            readingsBulkUpdateIfChanged( $hash, "LastPressure", $dataPressure )
-              if ( defined($dataPressure) );
+            else
+            {
+              Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) - wrong Measurement dataset");
+            }
+            $loopCounter++;
           }
+          $hash->{helper}{Telegram_GetDataLoopMeasurement} = $loopCounter;
 
-        # withdrawals
+          # sort list if necessary
+          if($listIsUnsorted != 0)
+          {
+            Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) - measurementlist has to be sorted");
+
+            # the list isn't sorted by starttimestamp - so sort
+            @measurementList = sort { $a->[0] cmp $b->[0] } @measurementList;
+          }
+          else
+          {
+            Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) - measurementlist list is sorted");
+          }
+        }
+
+        #     "withdrawals":
+        #     [
         #       {
         #         "water_cost":0.01447,
         #         "hotwater_share":0,
@@ -1658,219 +1964,475 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
         #         "maxflowrate":10.7,
         #         "energy_cost":0
         #       },
-          if ( defined( $decode_json->{data}->{withdrawals} ) and
-            ref( $decode_json->{data}->{withdrawals} ) eq "ARRAY" )
+        #       {
+        #         "waterconsumption":7.6,
+        #         "hotwater_share":0,
+        #         "energy_cost":0,
+        #         "starttime":"2019-07-14T03:58:19.000+02:00",
+        #         "stoptime":"2019-07-14T03:59:13.000+02:00",
+        #         "maxflowrate":10.9,
+        #         "water_cost":0.032346
+        #       }
+        #     ]
+        if( defined( $decode_json->{data}->{withdrawals} ) and
+          ref( $decode_json->{data}->{withdrawals} ) eq "ARRAY" )
+        {
+          my $loopCounter             = 0;
+          my $listIsUnsorted          = 0; # if list isn't sorted by starttime by default: $listIsUnsorted != 0
+          my $lastDataTimestamp_LTZ_s = 0;
+
+          foreach my $currentData ( @{ $decode_json->{data}->{withdrawals} } )
           {
-            # analysis
-            my $dataAnalyzeStartTimestamp;
-            my $dataAnalyzeStopTimestamp;
-            my $dataAnalyzeCount = 0;
-
-            # get entry with latest timestamp
-            my $dataLastStartTimestamp;
-            my $dataLastStopTimestamp;
-            my $dataLastWaterconsumption;
-            my $dataLastMaxflowrate;
-            my $dataLastHotwaterShare;
-            my $dataLastWaterCost;
-            my $dataLastEnergyCost;
-
-            # result of today
-            my $dataTodayAnalyzeStartTimestamp;
-            my $dataTodayAnalyzeStopTimestamp;
-            my $dataTodayAnalyzeCount     = 0;
-            my $dataTodayWaterConsumption = 0;
-            my $dataTodayMaxflowrate      = 0;
-            my $dataTodayHotWaterShare    = 0;
-            my $dataTodayWaterCost        = 0;
-            my $dataTodayEnergyCost       = 0;
-
-            # get current date
-            my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) = localtime( gettimeofday() );
-            my $today_ymd    = sprintf( "%04d-%02d-%02d", $year + 1900, $month + 1, $mday );
-            my $tomorrow_ymd = sprintf( "%04d-%02d-%02d", $year + 1900, $month + 1, $mday + 1 );    # day > 31 is OK for stringcompare
-
-            # my convention: dataset contains all withdrawals of today
-            foreach my $currentData ( @{ $decode_json->{data}->{withdrawals} } )
+            # is this the correct dataset?
+            if( defined( $currentData->{starttime} ) and 
+              defined( $currentData->{stoptime} ) 
+            )
             {
-              # is it the right dataset?
-              if ( defined( $currentData->{starttime} ) and
-                defined( $currentData->{stoptime} ) and
-                defined( $currentData->{waterconsumption} ) and
-                defined( $currentData->{maxflowrate} ) and
-                defined( $currentData->{hotwater_share} ) and
-                defined( $currentData->{water_cost} ) and
-                defined( $currentData->{energy_cost} ) )
+              my $currentDataTimestampStart_LUTC = $currentData->{starttime};
+              my $currentDataTimestampStop_LUTC  = $currentData->{stoptime};
+              
+              # extract the timestamp from UTC-string and get TimestampInSeconds
+              my $currentDataTimestampStart_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestampStart_LUTC);
+              my $currentDataTimestampStart_LTZ_s = time_str2num($currentDataTimestampStart_LTZ);
+
+              my $currentDataTimestampStop_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestampStop_LUTC);
+              my $currentDataTimestampStop_LTZ_s = time_str2num($currentDataTimestampStop_LTZ);
+              
+              my $currentDataDuration_s = $currentDataTimestampStop_LTZ_s - $currentDataTimestampStart_LTZ_s;
+              $currentData->{duration}  = $currentDataDuration_s;                        # extend structure
+
+              # put current measurement in list
+              push(@withdrawalList, [$currentDataTimestampStart_LTZ_s, $currentDataTimestampStart_LUTC, $currentData]);
+              
+              # sadly the datasets aren't sorted by starttime by default
+              # so set $listIsUnsorted != 0 if list has to be sorted later
+              if($currentDataTimestampStart_LTZ_s < $lastDataTimestamp_LTZ_s)
               {
-                $dataAnalyzeCount++;
-
-                # find first timestamp of analysis?
-                if ( not defined($dataAnalyzeStartTimestamp) or
-                  $currentData->{starttime} lt $dataAnalyzeStartTimestamp )
-                {
-                  $dataAnalyzeStartTimestamp = $currentData->{starttime};
-                }
-
-                # find last timestamp of analysis?
-                if ( not defined($dataAnalyzeStopTimestamp) or
-                  $currentData->{stoptime} gt $dataAnalyzeStopTimestamp )
-                {
-                  $dataAnalyzeStopTimestamp = $currentData->{stoptime};
-                }
-
-                # is timestamp younger?
-                if ( not defined($dataLastStartTimestamp) or
-                  $currentData->{starttime} gt $dataLastStartTimestamp )
-                {
-                  $dataLastStartTimestamp   = $currentData->{starttime};
-                  $dataLastStopTimestamp    = $currentData->{stoptime};
-                  $dataLastWaterconsumption = $currentData->{waterconsumption};
-                  $dataLastMaxflowrate      = $currentData->{maxflowrate};
-                  $dataLastHotwaterShare    = $currentData->{hotwater_share};
-                  $dataLastWaterCost        = $currentData->{water_cost};
-                  $dataLastEnergyCost       = $currentData->{energy_cost};
-                }
-
-                # is dataset within today?
-                #   $today_ymd         2019-08-31
-                #   $data->{starttime} 2019-08-31T03:58:19.000+02:00
-                #   $tomorrow_ymd      2019-08-32 -> OK for stringcompare
-                if (  $currentData->{starttime} gt $today_ymd and
-                  $currentData->{starttime} lt $tomorrow_ymd )
-                {
-                  # find first timestamp of today?
-                  if ( not defined($dataTodayAnalyzeStartTimestamp) or
-                    $currentData->{starttime} lt $dataTodayAnalyzeStartTimestamp )
-                  {
-                    $dataTodayAnalyzeStartTimestamp = $currentData->{starttime};
-                  }
-
-                  # find last timestamp of today?
-                  if ( not defined($dataTodayAnalyzeStopTimestamp) or
-                    $currentData->{stoptime} gt $dataTodayAnalyzeStopTimestamp )
-                  {
-                    $dataTodayAnalyzeStopTimestamp = $currentData->{stoptime};
-                  }
-
-                  $dataTodayAnalyzeCount     += 1;
-                  $dataTodayWaterConsumption += $currentData->{waterconsumption};
-                  $dataTodayHotWaterShare    += $currentData->{hotwater_share};
-                  $dataTodayWaterCost        += $currentData->{water_cost};
-                  $dataTodayEnergyCost       += $currentData->{energy_cost};
-                  $dataTodayMaxflowrate = ( $dataTodayMaxflowrate, $currentData->{maxflowrate} )[ $dataTodayMaxflowrate < $currentData->{maxflowrate} ];    # get maximum
-                }
+                $listIsUnsorted = 1;
               }
+              $lastDataTimestamp_LTZ_s = $currentDataTimestampStart_LTZ_s;
             }
-
-            # analysis
-            readingsBulkUpdateIfChanged( $hash, "AnalyzeStartTimestamp", $dataAnalyzeStartTimestamp )
-              if ( defined($dataAnalyzeStartTimestamp) );
-            readingsBulkUpdateIfChanged( $hash, "AnalyzeStopTimestamp", $dataAnalyzeStopTimestamp )
-              if ( defined($dataAnalyzeStopTimestamp) );
-            readingsBulkUpdateIfChanged( $hash, "AnalyzeCount", $dataAnalyzeCount );
-
-            # last dataset
-            readingsBulkUpdateIfChanged( $hash, "LastRequestFromTimestampUTC", $hash->{helper}{lastrequestfromtimestamp} )
-              if ( defined( $hash->{helper}{lastrequestfromtimestamp} ) );
-            readingsBulkUpdateIfChanged( $hash, "OffsetLocalTimeUTC", $hash->{helper}{offsetLocalTimeUTC} )
-              if ( defined( $hash->{helper}{offsetLocalTimeUTC} ) );
-            readingsBulkUpdateIfChanged( $hash, "LastStartTimestamp", $dataLastStartTimestamp )
-              if ( defined($dataLastStartTimestamp) );
-            readingsBulkUpdateIfChanged( $hash, "LastStopTimestamp", $dataLastStopTimestamp )
-              if ( defined($dataLastStopTimestamp) );
-            readingsBulkUpdateIfChanged( $hash, "LastWaterConsumption", $dataLastWaterconsumption )
-              if ( defined($dataLastWaterconsumption) );
-            readingsBulkUpdateIfChanged( $hash, "LastMaxFlowRate", $dataLastMaxflowrate )
-              if ( defined($dataLastMaxflowrate) );
-            readingsBulkUpdateIfChanged( $hash, "LastHotWaterShare", $dataLastHotwaterShare )
-              if ( defined($dataLastHotwaterShare) );
-            readingsBulkUpdateIfChanged( $hash, "LastWaterCost", $dataLastWaterCost )
-              if ( defined($dataLastWaterCost) );
-            readingsBulkUpdateIfChanged( $hash, "LastEnergyCost", $dataLastEnergyCost )
-              if ( defined($dataLastEnergyCost) );
-
-            # today"s and total values
-            readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStartTimestamp", $dataTodayAnalyzeStartTimestamp )
-              if ( defined($dataTodayAnalyzeStartTimestamp) );
-            readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStopTimestamp", $dataTodayAnalyzeStopTimestamp )
-              if ( defined($dataTodayAnalyzeStopTimestamp) );
-            readingsBulkUpdateIfChanged( $hash, "TodayMaxFlowRate", $dataTodayMaxflowrate );
-
-            # AnalyzeCount
-            my $deltaTodayAnalyzeCount = $dataTodayAnalyzeCount - ReadingsVal($hash, "TodayAnalyzeCount", 0);
-            if($deltaTodayAnalyzeCount > 0) # if there is a change of the value?
+            else
             {
-              readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeCount", $dataTodayAnalyzeCount );
-
-              my $totalAnalyzeCount = ReadingsVal($hash, "TotalAnalyzeCount", 0) + $deltaTodayAnalyzeCount;
-              readingsBulkUpdateIfChanged( $hash, "TotalAnalyzeCount", $totalAnalyzeCount );
+              Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) - wrong Withdrawal dataset");
             }
+            $loopCounter++;
+          }
+          $hash->{helper}{Telegram_GetDataLoopWithdrawal} = $loopCounter;
+          
+          # sort list if necessary
+          if($listIsUnsorted != 0)
+          {
+            Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) - withdrawallist has to be sorted");
 
-            # WaterConsumption
-            readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumptionRaw", $dataTodayWaterConsumption );
-            my $deltaTodayWaterConsumption = $dataTodayWaterConsumption - ReadingsVal($hash, "TodayWaterConsumption", 0);
-            if($deltaTodayWaterConsumption > 0) # if there is a change of the value?
-            {
-              readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumption", $dataTodayWaterConsumption );
-
-              my $totalWaterConsumptionRaw = ReadingsVal($hash, "TotalWaterConsumptionRaw", 0) + $deltaTodayWaterConsumption;
-              readingsBulkUpdateIfChanged( $hash, "TotalWaterConsumptionRaw", $totalWaterConsumptionRaw );
-            }
-
-            # HotWaterShare
-            readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShareRaw", $dataTodayHotWaterShare );
-            my $deltaTodayHotWaterShare = $dataTodayHotWaterShare - ReadingsVal($hash, "TodayHotWaterShare", 0);
-            if($deltaTodayHotWaterShare > 0) # if there is a change of the value?
-            {
-              readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShare", $dataTodayHotWaterShare );
-
-              my $totalHotWaterShareRaw = ReadingsVal($hash, "TotalHotWaterShareRaw", 0) + $deltaTodayHotWaterShare;
-              readingsBulkUpdateIfChanged( $hash, "TotalHotWaterShareRaw", $totalHotWaterShareRaw );
-            }
-
-            # WaterCost
-            readingsBulkUpdateIfChanged( $hash, "TodayWaterCostRaw", $dataTodayWaterCost );
-            my $deltaTodayWaterCost = $dataTodayWaterCost - ReadingsVal($hash, "TodayWaterCost", 0);
-            if($deltaTodayWaterCost > 0) # if there is a change of the value?
-            {
-              readingsBulkUpdateIfChanged( $hash, "TodayWaterCost", $dataTodayWaterCost );
-
-              my $totalWaterCostRaw = ReadingsVal($hash, "TotalWaterCostRaw", 0) + $deltaTodayWaterCost;
-              readingsBulkUpdateIfChanged( $hash, "TotalWaterCostRaw", $totalWaterCostRaw );
-            }
-
-            # EnergyCost
-            readingsBulkUpdateIfChanged( $hash, "TodayEnergyCostRaw", $dataTodayEnergyCost);
-            my $deltaTodayEnergyCost = $dataTodayEnergyCost - ReadingsVal($hash, "TodayEnergyCost", 0);
-            if($deltaTodayEnergyCost > 0) # if there is a change of the value?
-            {
-              readingsBulkUpdateIfChanged( $hash, "TodayEnergyCost", $dataTodayEnergyCost);
-
-              my $totalEnergyCostRaw = ReadingsVal($hash, "TotalEnergyCostRaw", 0) + $deltaTodayEnergyCost;
-              readingsBulkUpdateIfChanged( $hash, "TotalEnergyCostRaw", $totalEnergyCostRaw );
-            }
+            # the list isn't sorted by starttimestamp - so sort
+            @withdrawalList = sort { $a->[0] cmp $b->[0] } @withdrawalList;
+          }
+          else
+          {
+            Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) - withdrawallist is sorted");
           }
         }
 
-        readingsEndUpdate( $hash, 1 );
+        # iterate through both lists:
+        # "iterate a list if timestamp is smaller or equal than the timestamp of the other lists current dataset"
+        # "break if no dataset is left"
 
-        $hash->{helper}{Telegram_DataCounter}++;
+        # get first datasets - undef if empty
+        my $currentMeasurement = shift(@measurementList);
+        my $currentWithdrawal = shift(@withdrawalList);
 
-        GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($hash);
+        my $todayMidnight_LTZ = GroheOndusSmartDevice_GetLTZMidnightDate();
+        Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) - midnight: $todayMidnight_LTZ");
+
+        # get first entries of both lists if defined
+        my ($currentMeasurementDataTimestamp_LTZ_s, $currentMeasurementDataTimestamp_LUTC, $currentMeasurementData) = @{$currentMeasurement}
+          if(defined($currentMeasurement));
+        my ($currentWithdrawalDataTimestamp_LTZ_s, $currentWithdrawalDataTimestamp_LUTC, $currentWithdrawalData) = @{$currentWithdrawal}
+          if(defined($currentWithdrawal));
+        
+        while(defined($currentMeasurement) or # break loop if both entries are undefined
+          defined($currentWithdrawal))
+        {
+          if(defined($currentMeasurement) and
+            ((not defined($currentWithdrawal) or
+            ($currentMeasurementDataTimestamp_LTZ_s <= $currentWithdrawalDataTimestamp_LTZ_s))))
+          {
+            # don't process measurevalues with timestamp before $lastProcessedTimestamp
+            if($lastProcessedTimestamp_LUTC gt $currentMeasurementDataTimestamp_LUTC)
+            {
+              Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) - old Measurement: $lastProcessedTimestamp_LUTC > $currentMeasurementDataTimestamp_LUTC");
+            }
+            else
+            {
+              $currentDataTimestamp_LUTC = $currentMeasurementData->{timestamp};
+              $currentDataTemperature    = $currentMeasurementData->{temperature_guard};
+              $currentDataPressure       = $currentMeasurementData->{pressure};
+              $currentDataFlowrate       = $currentMeasurementData->{flowrate};
+
+              # force the timestamp-seconds-string to have a well known length
+              # fill with leading zeros
+              my $currentDataTimestamp_LTZ_s_string = GroheOndusSmartDevice_GetLTZStringFromLUTC($currentDataTimestamp_LUTC);
+
+              if( $hash->{helper}{GetSuspendReadings} eq "0")
+              {
+                readingsBeginUpdate($hash);
+  
+                readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
+                  if( defined($currentDataTimestamp_LUTC) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementFlowrate", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataFlowrate )
+                  if( defined($currentDataFlowrate) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTemperature )
+                  if( defined($currentDataTemperature) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementPressure", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataPressure )
+                  if( defined($currentDataPressure) );
+  
+                readingsEndUpdate( $hash, 1 );
+              }
+
+              # if enabled write MeasureValues to own FileLog
+              GroheOndusSmartDevice_FileLog_MeasureValueWrite($hash, "Measurement", $currentMeasurementDataTimestamp_LTZ_s, 
+                  ["MeasurementDataTimestamp", $currentDataTimestamp_LUTC],
+                  ["MeasurementTemperature",   $currentDataTemperature],
+                  ["MeasurementPressure",      $currentDataPressure],
+                  ["MeasurementFlowrate",      $currentDataFlowrate]
+                )
+                if( $hash->{helper}{LogFileEnabled} eq "1" ); # only if LogFile in use
+              
+              $lastProcessedTimestamp_LUTC = $currentMeasurementDataTimestamp_LUTC;
+            }
+            
+            # shift next entry
+            $currentMeasurement = shift(@measurementList);
+
+            if(defined($currentMeasurement))
+            {
+              ($currentMeasurementDataTimestamp_LTZ_s, $currentMeasurementDataTimestamp_LUTC, $currentMeasurementData) = @{$currentMeasurement};
+              
+              Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) - Measurement: $currentMeasurementDataTimestamp_LUTC");
+            }
+            else
+            {
+              Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) - Measurement: finished");
+            }
+          }
+          elsif(defined($currentWithdrawal))
+          {
+            # don't process measurevalues with timestamp before $lastProcessedTimestamp
+            if($lastProcessedTimestamp_LUTC gt $currentWithdrawalDataTimestamp_LUTC)
+            {
+              Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) - old Measurement: $lastProcessedTimestamp_LUTC > $currentWithdrawalDataTimestamp_LUTC");
+            }
+            else
+            {
+              $currentWithdrawalTimestampStart_LUTC = $currentWithdrawalData->{starttime};
+              $currentWithdrawalTimestampStop_LUTC  = $currentWithdrawalData->{stoptime};
+              $currentWithdrawalDuration            = $currentWithdrawalData->{duration};
+              $currentWithdrawalConsumption         = $currentWithdrawalData->{waterconsumption};
+              $currentWithdrawalMaxFlowrate         = $currentWithdrawalData->{maxflowrate};
+              $currentWithdrawalHotWaterShare       = $currentWithdrawalData->{hotwater_share};
+              $currentWithdrawalCostWater           = $currentWithdrawalData->{water_cost};
+              $currentWithdrawalCostEnergy          = $currentWithdrawalData->{energy_cost};
+
+              # force the timestamp-seconds-string to have a well known length
+              # fill with leading zeros
+              my $currentWithdrawalTimestamp_LTZ_s_string = GroheOndusSmartDevice_GetLTZStringFromLUTC($currentWithdrawalTimestampStart_LUTC);
+
+              $hash->{helper}{TotalAnalyzeStartTimestamp} = $currentWithdrawalDataTimestamp_LUTC if($hash->{helper}{TotalWithdrawalCount} == 0);
+              $hash->{helper}{TotalAnalyzeEndTimestamp} = $currentWithdrawalDataTimestamp_LUTC;
+
+              $hash->{helper}{TotalWaterConsumption} += $currentWithdrawalConsumption
+                if(defined($currentWithdrawalConsumption));
+              $hash->{helper}{TotalHotWaterShare} += $currentWithdrawalHotWaterShare
+                if(defined($currentWithdrawalHotWaterShare));
+              $hash->{helper}{TotalWaterCost} += $currentWithdrawalCostWater
+                if(defined($currentWithdrawalCostWater));
+              $hash->{helper}{TotalEnergyCost} += $currentWithdrawalCostEnergy
+                if(defined($currentWithdrawalCostEnergy));
+              $hash->{helper}{TotalWithdrawalCount}++;
+              $totalValuesChanged = 1;
+
+              if($lastProcessedWithdrawalTimestamp_LUTC lt $todayMidnight_LTZ and   # last is yesterday
+                not ($currentWithdrawalDataTimestamp_LUTC lt $todayMidnight_LTZ))   # and current is today -> today begins
+              {
+                $hash->{helper}{TodayAnalyzeStartTimestamp} = $currentWithdrawalDataTimestamp_LUTC;
+                $hash->{helper}{TodayAnalyzeEndTimestamp} = $currentWithdrawalDataTimestamp_LUTC;
+                
+                $hash->{helper}{TodayWaterConsumption} = $currentWithdrawalConsumption
+                  if(defined($currentWithdrawalConsumption));
+                $hash->{helper}{TodayHotWaterShare} = $currentWithdrawalHotWaterShare
+                  if(defined($currentWithdrawalHotWaterShare));
+                $hash->{helper}{TodayWaterCost} = $currentWithdrawalCostWater
+                  if(defined($currentWithdrawalCostWater));
+                $hash->{helper}{TodayEnergyCost} = $currentWithdrawalCostEnergy
+                  if(defined($currentWithdrawalCostEnergy));
+                $hash->{helper}{TodayMaxFlowrate} = $currentWithdrawalMaxFlowrate;
+                $hash->{helper}{TodayWithdrawalCount} = 1;
+                $todaysValuesChanged = 1;
+              }
+              elsif(not ($currentWithdrawalDataTimestamp_LUTC lt $todayMidnight_LTZ)) # within today
+              {
+                $hash->{helper}{TodayAnalyzeEndTimestamp} = $currentWithdrawalDataTimestamp_LUTC;
+                $hash->{helper}{TodayWaterConsumption} += $currentWithdrawalConsumption
+                  if(defined($currentWithdrawalConsumption));
+                $hash->{helper}{TodayHotWaterShare} += $currentWithdrawalHotWaterShare
+                  if(defined($currentWithdrawalHotWaterShare));
+                $hash->{helper}{TodayWaterCost} += $currentWithdrawalCostWater
+                  if(defined($currentWithdrawalCostWater));
+                $hash->{helper}{TodayEnergyCost} += $currentWithdrawalCostEnergy
+                  if(defined($currentWithdrawalCostEnergy));
+                $hash->{helper}{TodayMaxFlowrate} = $currentWithdrawalMaxFlowrate if($hash->{helper}{TodayMaxFlowrate} < $currentWithdrawalMaxFlowrate);
+                $hash->{helper}{TodayWithdrawalCount}++;
+                $todaysValuesChanged = 1;
+              }
+              else
+              {
+                # not within today
+              }
+              $lastProcessedWithdrawalTimestamp_LUTC = $currentWithdrawalDataTimestamp_LUTC;
+
+              if( $hash->{helper}{GetSuspendReadings} eq "0")
+              {
+                readingsBeginUpdate($hash);
+  
+                readingsBulkUpdateIfChanged( $hash, "MeasurementWithdrawalTimestampStart", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalTimestampStart_LUTC )
+                  if( defined($currentWithdrawalTimestampStart_LUTC) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementWithdrawalTimestampStop", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalTimestampStop_LUTC )
+                  if( defined($currentWithdrawalTimestampStop_LUTC) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementWithdrawalDuration", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalDuration )
+                  if( defined($currentWithdrawalDuration) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementWaterConsumption", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalConsumption )
+                  if( defined($currentWithdrawalConsumption) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementMaxFlowrate", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalMaxFlowrate )
+                  if( defined($currentWithdrawalMaxFlowrate) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementHotWaterShare", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalHotWaterShare )
+                  if( defined($currentWithdrawalHotWaterShare) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementWaterCost", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalCostWater )
+                  if( defined($currentWithdrawalCostWater) );
+                readingsBulkUpdateIfChanged( $hash, "MeasurementEnergyCost", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalCostEnergy )
+                  if( defined($currentWithdrawalCostEnergy) );
+  
+                readingsEndUpdate( $hash, 1 );
+              }
+
+              # if enabled write MeasureValues to own FileLog
+              GroheOndusSmartDevice_FileLog_MeasureValueWrite($hash, "Withdrawal", $currentMeasurementDataTimestamp_LTZ_s, 
+                  ["TimestampStart", $currentWithdrawalTimestampStart_LUTC],
+                  ["TimestampStop",  $currentWithdrawalTimestampStop_LUTC],
+                  ["Duration",       $currentWithdrawalDuration],
+                  ["Consumption",    $currentWithdrawalConsumption],
+                  ["MaxFlowrate",    $currentWithdrawalMaxFlowrate],
+                  ["HotWaterShared", $currentWithdrawalHotWaterShare],
+                  ["CostWater",      $currentWithdrawalCostWater],
+                  ["CostEnergy",     $currentWithdrawalCostEnergy],
+                )
+                if( $hash->{helper}{LogFileEnabled} eq "1" ); # only if LogFile in use
+
+              $lastProcessedTimestamp_LUTC = $currentWithdrawalDataTimestamp_LUTC;
+            }
+
+            # shift next entry
+            $currentWithdrawal = shift(@withdrawalList);
+
+            if(defined($currentWithdrawal))
+            {
+              ($currentWithdrawalDataTimestamp_LTZ_s, $currentWithdrawalDataTimestamp_LUTC, $currentWithdrawalData) = @{$currentWithdrawal};
+
+              Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) -  Withdrawal: $currentWithdrawalDataTimestamp_LUTC");
+            }
+            else
+            {
+              Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) -  Withdrawal: finished");
+            }
+          }
+        }
+        
+        $hash->{helper}{LastProcessedTimestamp_LUTC}            = $lastProcessedTimestamp_LUTC;
+        $hash->{helper}{LastProcessedWithdrawalTimestamp_LUTC}  = $lastProcessedWithdrawalTimestamp_LUTC;
+        $hash->{helper}{Telegram_GetDataCounter}++;
+
+        # save values in store
+        GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "LastProcessedTimestamp_LUTC", $hash->{helper}{LastProcessedTimestamp_LUTC});
+        GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "LastProcessedWithdrawalTimestamp_LUTC", $hash->{helper}{LastProcessedWithdrawalTimestamp_LUTC});
+        
+        # total values
+        if($totalValuesChanged != 0)
+        {
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalAnalyzeStartTimestamp", $hash->{helper}{TotalAnalyzeStartTimestamp});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalAnalyzeEndTimestamp", $hash->{helper}{TotalAnalyzeEndTimestamp});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalWithdrawalCount", $hash->{helper}{TotalWithdrawalCount});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalWaterConsumption", $hash->{helper}{TotalWaterConsumption});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalHotWaterShare", $hash->{helper}{TotalHotWaterShare});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalWaterCost", $hash->{helper}{TotalWaterCost});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TotalEnergyCost", $hash->{helper}{TotalEnergyCost});
+        }
+
+        # today values
+        if($todaysValuesChanged != 0)
+        {
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TodayAnalyzeStartTimestamp", $hash->{helper}{TodayAnalyzeStartTimestamp});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TodayAnalyzeEndTimestamp", $hash->{helper}{TodayAnalyzeEndTimestamp});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TodayWithdrawalCount", $hash->{helper}{TodayWithdrawalCount});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TodayWaterConsumption", $hash->{helper}{TodayWaterConsumption});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TodayHotWaterShare", $hash->{helper}{TodayHotWaterShare});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TodayWaterCost", $hash->{helper}{TodayWaterCost});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TodayEnergyCost", $hash->{helper}{TodayEnergyCost});
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "TodayMaxFlowrate", $hash->{helper}{TodayMaxFlowrate});
+        }
+      }
+      # {
+      #   "code":404,
+      #   "message":"Not found"
+      # }
+      elsif( defined( $decode_json ) and
+        defined( $decode_json->{code} ) and
+        defined( $decode_json->{message} ) )
+      {
+        my $errorCode = $decode_json->{code};
+        my $errorMessage = $decode_json->{message};
+        my $message = "TimeStamp: " . strftime($TimeStampFormat, localtime(gettimeofday())) . " Code: " . $errorCode . " Message: " . $decode_json->{message}; 
+
+        # Not found -> no data in requested timespan
+        if( $errorCode == 404 )
+        {
+          Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - $message");
+          readingsSingleUpdate( $hash, "Message", $message, 1 );
+        }
+        # Too many requests 
+        elsif($errorCode == 429)
+        {
+          Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - $message");
+          readingsSingleUpdate( $hash, "Message", $message, 1 );
+        }
+        else
+        {
+          Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) - $message");
+          readingsSingleUpdate( $hash, "Message", $message, 1 );
+        }
+      }
+      else
+      {
+        $errorMsg = "UNKNOWN Data";
       }
     }
 
+    $hash->{helper}{Telegram_GetDataTimeProcess}  = gettimeofday() - $stopwatch;
+
     if($errorMsg eq "")
     {
-      # if there is a callback then call it
-      if( defined($callbackSuccess) )
+      my $applianceTDT_UTC = GroheOndusSmartDevice_GetUTCFromLUTC($hash->{helper}{ApplianceTDT_LUTC});
+
+      # requested timespan contains TDT so break historic get
+      if($callbackparam->{requestToTimestamp_UTC} gt $applianceTDT_UTC)
       {
-        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackSuccess");
-        $callbackSuccess->();
+        readingsBeginUpdate($hash);
+
+        if($hash->{helper}{GetInProgress} ne "0" and 
+          $hash->{helper}{GetSuspendReadings} ne "0")
+        {
+          readingsBulkUpdateIfChanged($hash, "state", "getting historic data finished", 1);
+        }
+
+        $hash->{helper}{GetSuspendReadings} = "0";
+        GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData", "GetSuspendReadings", $hash->{helper}{GetSuspendReadings});
+        
+        $hash->{helper}{GetInProgress} = "0";
+        GroheOndusSmartDevice_UpdateInternals($hash);
+
+        readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $currentDataTimestamp_LUTC )
+          if(defined($currentDataTimestamp_LUTC));
+        readingsBulkUpdateIfChanged( $hash, "LastFlowrate", $currentDataFlowrate )
+          if(defined($currentDataFlowrate));
+        readingsBulkUpdateIfChanged( $hash, "LastTemperature", $currentDataTemperature )
+          if(defined($currentDataTemperature));
+        readingsBulkUpdateIfChanged( $hash, "LastPressure", $currentDataPressure )
+          if(defined($currentDataPressure));
+
+        readingsBulkUpdateIfChanged( $hash, "LastWithdrawalTimestampStart", $currentWithdrawalTimestampStart_LUTC )
+          if(defined($currentWithdrawalTimestampStart_LUTC));
+        readingsBulkUpdateIfChanged( $hash, "LastWithdrawalTimestampStop", $currentWithdrawalTimestampStop_LUTC )
+          if(defined($currentWithdrawalTimestampStop_LUTC));
+        readingsBulkUpdateIfChanged( $hash, "LastWithdrawalDuration", $currentWithdrawalDuration )
+          if(defined($currentWithdrawalDuration));
+        readingsBulkUpdateIfChanged( $hash, "LastWaterConsumption", $currentWithdrawalConsumption )
+          if(defined($currentWithdrawalConsumption));
+        readingsBulkUpdateIfChanged( $hash, "LastEnergyCost", $currentWithdrawalCostEnergy )
+          if(defined($currentWithdrawalCostEnergy));
+        readingsBulkUpdateIfChanged( $hash, "LastWaterCost", $currentWithdrawalCostWater )
+          if(defined($currentWithdrawalCostWater));
+        readingsBulkUpdateIfChanged( $hash, "LastHotWaterShare", $currentWithdrawalHotWaterShare )
+          if(defined($currentWithdrawalHotWaterShare));
+        readingsBulkUpdateIfChanged( $hash, "LastMaxFlowrate", $currentWithdrawalMaxFlowrate )
+          if(defined($currentWithdrawalMaxFlowrate));
+
+        readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStartTimestamp", $hash->{helper}{TodayAnalyzeStartTimestamp} )
+          if(defined($hash->{helper}{TodayAnalyzeStartTimestamp}));
+        readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeEndTimestamp", $hash->{helper}{TodayAnalyzeEndTimestamp} )
+          if(defined($hash->{helper}{TodayAnalyzeEndTimestamp}));
+        readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumption", $hash->{helper}{TodayWaterConsumption} )
+          if(defined($hash->{helper}{TodayWaterConsumption}));
+        readingsBulkUpdateIfChanged( $hash, "TodayWithdrawalCount", $hash->{helper}{TodayWithdrawalCount} )
+          if(defined($hash->{helper}{TodayWithdrawalCount}));
+        readingsBulkUpdateIfChanged( $hash, "TodayEnergyCost", $hash->{helper}{TodayEnergyCost} )
+          if(defined($hash->{helper}{TodayEnergyCost}));
+        readingsBulkUpdateIfChanged( $hash, "TodayWaterCost", $hash->{helper}{TodayWaterCost} )
+          if(defined($hash->{helper}{TodayWaterCost}));
+        readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShare", $hash->{helper}{TodayHotWaterShare} )
+          if(defined($hash->{helper}{TodayHotWaterShare}));
+        readingsBulkUpdateIfChanged( $hash, "TodayMaxFlowrate", $hash->{helper}{TodayMaxFlowrate} )
+          if(defined($hash->{helper}{TodayMaxFlowrate}));
+
+        readingsBulkUpdateIfChanged( $hash, "TotalAnalyzeStartTimestamp", $hash->{helper}{TotalAnalyzeStartTimestamp} )
+          if(defined($hash->{helper}{TotalAnalyzeStartTimestamp}));
+        readingsBulkUpdateIfChanged( $hash, "TotalAnalyzeEndTimestamp", $hash->{helper}{TotalAnalyzeEndTimestamp} )
+          if(defined($hash->{helper}{TotalAnalyzeEndTimestamp}));
+        readingsBulkUpdateIfChanged( $hash, "TotalWaterConsumption", $hash->{helper}{TotalWaterConsumption} )
+          if(defined($hash->{helper}{TotalWaterConsumption}));
+        readingsBulkUpdateIfChanged( $hash, "TotalWithdrawalCount", $hash->{helper}{TotalWithdrawalCount} )
+          if(defined($hash->{helper}{TotalWithdrawalCount}));
+        readingsBulkUpdateIfChanged( $hash, "TotalEnergyCost", $hash->{helper}{TotalEnergyCost} )
+          if(defined($hash->{helper}{TotalEnergyCost}));
+        readingsBulkUpdateIfChanged( $hash, "TotalWaterCost", $hash->{helper}{TotalWaterCost} )
+          if(defined($hash->{helper}{TotalWaterCost}));
+        readingsBulkUpdateIfChanged( $hash, "TotalHotWaterShare", $hash->{helper}{TotalHotWaterShare} )
+          if(defined($hash->{helper}{TotalHotWaterShare}));
+
+        readingsEndUpdate( $hash, 1 );
+
+        # if there is a callback then call it
+        if( defined($callbackSuccess) )
+        {
+          Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackSuccess");
+          $callbackSuccess->();
+        }
+      }
+      else
+      {
+        # historic get still active
+        $hash->{helper}{GetInProgress} = "1";
+        GroheOndusSmartDevice_UpdateInternals($hash);
+
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "state", "getting historic data $callbackparam->{requestToTimestamp_UTC}", 1 );
+        readingsEndUpdate( $hash, 1 );
+
+        # reload timer
+        my $nextTimer = gettimeofday() + $GetLoopDataInterval;
+        InternalTimer( $nextTimer, "GroheOndusSmartDevice_SenseGuard_GetData_TimerExecute", 
+          [$hash, 
+          $callbackparam->{requestToTimestamp_UTC}, 
+          $callbackparam->{GetCampain}, 
+          $callbackSuccess, 
+          $callbackFail]
+        );
       }
     }
     else
     {
+      # error -> historic get has broken
+      #$hash->{helper}{GetInProgress} = "0";
+      #GroheOndusSmartDevice_UpdateInternals($hash);
+
       readingsSingleUpdate( $hash, "state", $errorMsg, 1 );
 
       # if there is a callback then call it
@@ -1882,19 +2444,24 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
     }
   }; 
 
-  my $deviceId = $hash->{DEVICEID};
+  # if there is a timer remove it
+  GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove($hash);
+
+  my $deviceId          = $hash->{DEVICEID};
   my $device_locationId = $hash->{ApplianceLocationId};
   my $device_roomId     = $hash->{ApplianceRoomId};
 
-  if( defined( $device_locationId ) and
-    defined( $device_roomId ))
+  if(defined($device_locationId) and
+    defined($device_roomId))
   {
-    my $lastTDT = $hash->{helper}{ApplianceTDT};
-    my $applianceTDT = ReadingsVal($name, "ApplianceTDT", "none");
+    my $lastTDT_LUTC      = $hash->{helper}{ApplianceTDT_LUTC_GetData};
+    my $applianceTDT_LUTC = $hash->{helper}{ApplianceTDT_LUTC};
     
-    if($hash->{helper}{OverrideCheckTDT} eq "0" and
-      $lastTDT eq $applianceTDT)
-    {
+    if($hash->{helper}{GetInProgress} ne "1" and              # only check if no campain is running:
+      $hash->{helper}{LastProcessedTimestamp_LUTC} ne "" and  # if there is a LastProcessedTimestamp
+      $hash->{helper}{OverrideCheckTDT} eq "0" and            # if check is disabled 
+      $lastTDT_LUTC eq $applianceTDT_LUTC)                    # if TDT is processed
+    {                                                         # -> don't get new data
       Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - no new TDT");
 
       # if there is a callback then call it
@@ -1906,23 +2473,32 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
     }
     else
     {
-      # get all Data from within today
-      # calc gmt from localtime because the grohe cloud works with gmt
-      my $requestFromTimestamp     = GroheOndusSmartDevice_GetUTCMidnightDate(0);
-
+      # add offset in seconds to get to-timestamp
+      my $requestToTimestamp_UTC_s = time_str2num($requestFromTimestamp_UTC) + $hash->{helper}{GetTimespan};
+      my @t = localtime($requestToTimestamp_UTC_s);
+      my $requestToTimestamp_UTC = sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+      
       my $param = {};
-      $param->{method} = "GET";
-      $param->{url} = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp;
-      $param->{header} = "Content-Type: application/json";
-      $param->{data} = "{}";
-      $param->{httpversion} = "1.0";
-      $param->{ignoreredirects} = 0;
-      $param->{keepalive} = 1;
+      $param->{method}                    = "GET";
+      $param->{url}                       = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
+      $param->{header}                    = "Content-Type: application/json";
+      $param->{data}                      = "{}";
+      $param->{httpversion}               = "1.0";
+      $param->{ignoreredirects}           = 0;
+      $param->{keepalive}                 = 1;
+      $param->{timeout}                   = 10;
+      $param->{incrementalTimeout}        = 1;
 
-      $param->{resultCallback} = $resultCallback;
-      $param->{ApplianceTDT} = $applianceTDT;
+      $param->{resultCallback}            = $resultCallback;
+      $param->{requestFromTimestamp_UTC}  = $requestFromTimestamp_UTC;
+      $param->{requestToTimestamp_UTC}    = $requestToTimestamp_UTC;
+      $param->{GetCampain}                = $hash->{helper}{GetCampain};
+      $param->{ApplianceTDT_LUTC_GetData} = $applianceTDT_LUTC;
+      $param->{timestampStart} = gettimeofday();
 
-      $hash->{helper}{Telegram_DataIOWrite} = strftime($TimeStampFormat, localtime(gettimeofday()));
+      $hash->{helper}{GetInProgress}            = "1";
+      $hash->{helper}{Telegram_GetDataIOWrite}  = strftime($TimeStampFormat, localtime($param->{timestampStart}));
+      GroheOndusSmartDevice_UpdateInternals($hash);
 
       GroheOndusSmartDevice_IOWrite( $hash, $param );
     }
@@ -1939,31 +2515,145 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($;$$)
 }
 
 ##################################
-# GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues( $hash )
-sub GroheOndusSmartDevice_SenseGuard_UpdateOffsetValues($)
+# GroheOndusSmartDevice_SenseGuard_GetData_Last( $hash, $callbackSuccess, $callbackFail )
+sub GroheOndusSmartDevice_SenseGuard_GetData_Last($;$$)
+{
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+
+  if($hash->{helper}{GetInProgress} eq "1")
+  {
+    Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData_Last($name) - GetInProgress");
+  }
+  else
+  {
+    my $requestFromTimestamp_UTC      = GroheOndusSmartDevice_GetUTCFromLUTC($hash->{helper}{LastProcessedTimestamp_LUTC});
+    my $applianceTDT_UTC              = GroheOndusSmartDevice_GetUTCFromLUTC($hash->{helper}{ApplianceTDT_LUTC});
+    my $getHistoricDataStartDate_UTC  = GroheOndusSmartDevice_GetUTCFromLTZ($hash->{helper}{LogFileGetDataStartDate_LTZ});
+
+    if(not defined($requestFromTimestamp_UTC))
+    {
+      $requestFromTimestamp_UTC = GroheOndusSmartDevice_GetUTCMidnightDate(0);
+    }
+    elsif(defined($getHistoricDataStartDate_UTC) and
+      $getHistoricDataStartDate_UTC gt $requestFromTimestamp_UTC)
+    {
+      $requestFromTimestamp_UTC = $getHistoricDataStartDate_UTC;
+    }
+
+    if($requestFromTimestamp_UTC lt $applianceTDT_UTC)
+    {
+      Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData_Last($name) - requestFromTimestamp_UTC: $requestFromTimestamp_UTC");
+    
+      $hash->{helper}{GetCampain}++;                                  # new campain-counter to stop current running old campains
+
+      GroheOndusSmartDevice_SenseGuard_GetData($hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail);
+    }
+    else
+    {
+      Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData_Last($name) - requestFromTimestamp_UTC: $requestFromTimestamp_UTC > applianceTDT: $applianceTDT_UTC");
+    }
+  }
+}
+
+##################################
+# GroheOndusSmartDevice_SenseGuard_GetData_Stop( $hash, $callbackSuccess, $callbackFail )
+sub GroheOndusSmartDevice_SenseGuard_GetData_Stop($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+
+  if($hash->{helper}{GetInProgress} eq "1")
+  {
+    Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData_Stop($name)");
+    
+    GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove($hash);
+
+    $hash->{helper}{GetInProgress}                = "0";
+    $hash->{helper}{LastProcessedTimestamp_LUTC}  = "";
+    $hash->{helper}{GetSuspendReadings}           = "0"; # suspend readings
+    $hash->{helper}{GetCampain}++;                       # new campain-counter to stop current running old campains
+    GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData_StartCampain", "GetSuspendReadings", $hash->{helper}{GetSuspendReadings});
+
+    GroheOndusSmartDevice_UpdateInternals($hash);
+
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged($hash, "state", "getting historic data stopped", 1);
+    readingsEndUpdate( $hash, 1 );
+  }
+}
+
+##################################
+# GroheOndusSmartDevice_SenseGuard_GetData_StartCampain( $hash, $requestFromTimestamp, $callbackSuccess, $callbackFail )
+sub GroheOndusSmartDevice_SenseGuard_GetData_StartCampain($$;$$)
+{
+  my ($hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail) = @_;
+  my $name = $hash->{NAME};
+
+  $hash->{helper}{TotalAnalyzeStartTimestamp}             = "";
+  $hash->{helper}{TotalAnalyzeEndTimestamp}               = "";
+  $hash->{helper}{TotalWithdrawalCount}                   = 0;
+  $hash->{helper}{TotalWaterConsumption}                  = 0;
+  $hash->{helper}{TotalHotWaterShare}                     = 0;
+  $hash->{helper}{TotalWaterCost}                         = 0;
+  $hash->{helper}{TotalEnergyCost}                        = 0;
+
+  $hash->{helper}{TodayAnalyzeStartTimestamp}             = "";
+  $hash->{helper}{TodayAnalyzeEndTimestamp}               = "";
+  $hash->{helper}{TodayWithdrawalCount}                   = 0;
+  $hash->{helper}{TodayWaterConsumption}                  = 0;
+  $hash->{helper}{TodayHotWaterShare}                     = 0;
+  $hash->{helper}{TodayWaterCost}                         = 0;
+  $hash->{helper}{TodayEnergyCost}                        = 0;
+  $hash->{helper}{TodayMaxFlowrate}                       = 0;
+
+  $hash->{helper}{LogFileName}                            = "";   # reset internal to delete existing file
+  $hash->{helper}{LastProcessedTimestamp_LUTC}            = "";   # reset internal to restart processing
+  $hash->{helper}{LastProcessedWithdrawalTimestamp_LUTC}  = "";   # reset internal to restart processing
+  $hash->{helper}{GetCampain}++;                                  # new campain-counter to stop current running old campains
+
+  $hash->{helper}{GetSuspendReadings}                     = "1";  # suspend readings
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_SenseGuard_GetData_StartCampain", "GetSuspendReadings", $hash->{helper}{GetSuspendReadings});
+
+  GroheOndusSmartDevice_SenseGuard_GetData($hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail);
+}
+
+##################################
+# GroheOndusSmartDevice_SenseGuard_GetData_TimerExecute( @args )
+sub GroheOndusSmartDevice_SenseGuard_GetData_TimerExecute($)
+{
+  my ( $args ) = @_;
+  my ( $hash, $requestFromTimestamp_UTC, $getCampain, $callbackSuccess, $callbackFail ) = @{$args};
+  my $name = $hash->{NAME};
+
+  if($getCampain != $hash->{helper}{GetCampain})
+  {
+    Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData_TimerExecute($name) - dropping old Campain");
+
+    # if there is a callback then call it
+    if(defined($callbackFail))
+    {
+      Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackFail");
+      $callbackFail->();
+    }
+  }
+  else
+  {
+    GroheOndusSmartDevice_SenseGuard_GetData($hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail);  
+  }
+}
+
+##################################
+# GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove( @args )
+sub GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove($)
 {
   my ( $hash ) = @_;
   my $name = $hash->{NAME};
   
-  readingsBeginUpdate($hash);
-
-  my $totalWaterConsumptionRaw = ReadingsVal($name, "TotalWaterConsumptionRaw", 0);
-  my $totalWaterConsumption = $totalWaterConsumptionRaw + AttrVal($name, "offsetWaterConsumption", 0);
-  readingsBulkUpdateIfChanged( $hash, "TotalWaterConsumption", $totalWaterConsumption );
-
-  my $totalHotWaterShareRaw = ReadingsVal($name, "TotalHotWaterShareRaw", 0);
-  my $totalHotWaterShare = $totalHotWaterShareRaw + AttrVal($name, "offsetHotWaterShare", 0);
-  readingsBulkUpdateIfChanged( $hash, "TotalHotWaterShare", $totalHotWaterShare );
+  my $functionName = "GroheOndusSmartDevice_SenseGuard_GetData_TimerExecute"; 
+  Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove($name) - $functionName");
   
-  my $totalWaterCostRaw = ReadingsVal($name, "TotalWaterCostRaw", 0);
-  my $totalWaterCost = $totalWaterCostRaw + AttrVal($name, "offsetWaterCost", 0);
-  readingsBulkUpdateIfChanged( $hash, "TotalWaterCost", $totalWaterCost );
-  
-  my $totalEnergyCostRaw = ReadingsVal($name, "TotalEnergyCostRaw", 0);
-  my $totalEnergyCost = $totalEnergyCostRaw + AttrVal($name, "offsetEnergyCost", 0);
-  readingsBulkUpdateIfChanged( $hash, "TotalEnergyCost", $totalEnergyCost );
-  
-  readingsEndUpdate( $hash, 1 );
+  RemoveInternalTimer($hash, $functionName);
 }
 
 #################################
@@ -1972,32 +2662,33 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name    = $hash->{NAME};
-  my $modelId = 103;
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    $hash->{helper}{Telegram_COMMANDCallback}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    my $stopwatch = gettimeofday();
+    $hash->{helper}{Telegram_GetCommandTimeRequest}  = $stopwatch - $callbackparam->{timestampStart};
+    $hash->{helper}{Telegram_GetCommandCallback}     = strftime($TimeStampFormat, localtime($stopwatch));
     Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - resultCallback");
 
-    if ( $errorMsg eq "" )
+    if( $errorMsg eq "" )
     {
       my $decode_json = eval { decode_json($data) };
     
-      if ($@)
+      if($@)
       {
         Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($name) - JSON error while request: $@");
 
-        if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
           readingsBeginUpdate($hash);
           readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
           readingsBulkUpdate( $hash, "JSON_ERROR_STRING", "\"" . $data . "\"", 1 );
           readingsEndUpdate( $hash, 1 );
         }
-        $errorMsg = "GETAPPLIANCECOMMAND_JSON_ERROR";
+        $errorMsg = "GETAPPLIANCECommand_JSON_ERROR";
       }
       else
       {
@@ -2016,7 +2707,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
       #   "appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       #   "type":103
       # }
-        if (defined( $decode_json->{command} ) and 
+        if(defined( $decode_json->{command} ) and 
           ref( $decode_json->{command} ) eq "HASH" )
         {
           readingsBeginUpdate($hash);
@@ -2036,7 +2727,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
           readingsBulkUpdateIfChanged( $hash, "CmdBuzzerSoundProfile", "$buzzer_sound_profile" );
 
           readingsEndUpdate( $hash, 1 );
-          $hash->{helper}{Telegram_COMMANDCounter}++;
+          $hash->{helper}{Telegram_GetCommandCounter}++;
         }
         else
         {
@@ -2044,6 +2735,8 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
         }
       }
     }
+
+    $hash->{helper}{Telegram_GetCommandTimeProcess}  = gettimeofday() - $stopwatch;
 
     if( $errorMsg eq "" )
     {
@@ -2084,8 +2777,9 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
     $param->{keepalive} = 1;
       
     $param->{resultCallback} = $resultCallback;
+    $param->{timestampStart} = gettimeofday();
     
-    $hash->{helper}{Telegram_COMMANDIOWrite}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    $hash->{helper}{Telegram_GetCommandIOWrite}  = strftime($TimeStampFormat, localtime($param->{timestampStart}));
 
     GroheOndusSmartDevice_IOWrite( $hash, $param );
   }
@@ -2109,25 +2803,25 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
   Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_Set($name) - cmd= $cmd");
 
   ### Command "update"
-  if ( lc $cmd eq lc "update" )
+  if( lc $cmd eq lc "update" )
   {
     GroheOndusSmartDevice_SenseGuard_Update($hash);
     return;
   }
   ### Command "on"
-  elsif ( lc $cmd eq lc "on" )
+  elsif( lc $cmd eq lc "on" )
   {
     GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", "on");
     return;
   }
   ### Command "off"
-  elsif ( lc $cmd eq lc "off" )
+  elsif( lc $cmd eq lc "off" )
   {
     GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", "off");
     return;
   }
   ### Command "buzzer"
-  elsif ( lc $cmd eq lc "buzzer" )
+  elsif( lc $cmd eq lc "buzzer" )
   {
     # parameter is "on" or "off" so convert to "true" : "false"
     my $onoff = lc join( " ", @args ) eq lc "on" ? "true" : "false";
@@ -2136,7 +2830,7 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
     return;
   }
   ### Command "valve"
-  elsif ( lc $cmd eq lc "valve" )
+  elsif( lc $cmd eq lc "valve" )
   {
     # parameter is "on" or "off" so convert to "true" : "false"
     my $onoff = lc join( " ", @args ) eq lc "on" ? "true" : "false";
@@ -2144,38 +2838,197 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
     GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($hash, "valve_open", $onoff);
     return;
   }
+  ### Command "TotalWaterConsumption"
+  elsif( lc $cmd eq lc "TotalWaterConsumption" )
+  {
+    my $totalWaterConsumption = undef;
+    
+    $totalWaterConsumption = GroheOndusSmartDevice_Getnum($args[0])
+      if( @args == 1 );
+    
+    return "usage: $cmd [<devicename>] 123.4"
+      if(not defined($totalWaterConsumption));
+    
+    my $currentTotalWaterConsumption = ReadingsVal($name, "TotalWaterConsumption", 0);
+    my $offsetTotalWaterConsumption = AttrVal($name, "offsetTotalWaterConsumption", 0);
+    my $delta = $totalWaterConsumption - $currentTotalWaterConsumption - $offsetTotalWaterConsumption;
+
+    CommandAttr( undef, "$name offsetTotalWaterConsumption $delta" );
+    readingsSingleUpdate( $hash, "TotalWaterConsumption", $totalWaterConsumption, 1 );
+    
+    return;
+  }
+  ### Command "TotalWaterCost"
+  elsif( lc $cmd eq lc "TotalWaterCost" )
+  {
+    my $totalWaterCost = undef;
+    
+    $totalWaterCost = GroheOndusSmartDevice_Getnum($args[0])
+      if( @args == 1 );
+    
+    return "usage: $cmd [<devicename>] 123.4"
+      if(not defined($totalWaterCost));
+
+    my $currentTotalWaterCost = ReadingsVal($name, "TotalWaterCost", 0);
+    my $offsetTotalWaterCost = AttrVal($name, "offsetTotalWaterCost", 0);
+    my $delta = $totalWaterCost - $currentTotalWaterCost - $offsetTotalWaterCost;
+
+    CommandAttr( undef, "$name offsetTotalWaterCost $delta" );
+    readingsSingleUpdate( $hash, "TotalWaterCost", $totalWaterCost, 1 );
+
+    return;
+  }
+  ### Command "TotalEnergyCost"
+  elsif( lc $cmd eq lc "TotalEnergyCost" )
+  {
+    my $totalEnergyCost = undef;
+    
+    $totalEnergyCost = GroheOndusSmartDevice_Getnum($args[0])
+      if( @args == 1 );
+    
+    return "usage: $cmd [<devicename>] 123.4"
+      if(not defined($totalEnergyCost));
+
+    my $currentTotalEnergyCost = ReadingsVal($name, "TotalEnergyCost", 0);
+    my $offsetTotalEnergyCost = AttrVal($name, "offsetTotalEnergyCost", 0);
+    my $delta = $totalEnergyCost - $currentTotalEnergyCost - $offsetTotalEnergyCost;
+
+    CommandAttr( undef, "$name offsetTotalEnergyCost $delta" );
+    readingsSingleUpdate( $hash, "TotalEnergyCost", $totalEnergyCost, 1 );
+
+    return;
+  }
+  ### Command "TotalHotWaterShare"
+  elsif( lc $cmd eq lc "TotalHotWaterShare" )
+  {
+    my $totalHotWaterShare = undef;
+    
+    $totalHotWaterShare = GroheOndusSmartDevice_Getnum($args[0])
+      if( @args == 1 );
+    
+    return "usage: $cmd [<devicename>] 123.4"
+      if(not defined($totalHotWaterShare));
+
+    my $currentTotalHotWaterShare = ReadingsVal($name, "TotalHotWaterShare", 0);
+    my $offsetTotalHotWaterShare = AttrVal($name, "offsetTotalHotWaterShare", 0);
+    my $delta = $totalHotWaterShare - $currentTotalHotWaterShare - $offsetTotalHotWaterShare;
+
+    CommandAttr( undef, "$name offsetTotalEnergyCost $delta" );
+    readingsSingleUpdate( $hash, "TotalHotWaterShare", $totalHotWaterShare, 1 );
+
+    return;
+  }
   ### Command "clearreadings"
-  elsif ( lc $cmd eq lc "clearreadings" )
+  elsif( lc $cmd eq lc "clearreadings" )
   {
     fhem("deletereading $name .*", 1);
     return;
   }
-  ### Command "debugRefreshValues"
-  elsif ( lc $cmd eq lc "debugRefreshValues" )
+  ### Command "logFileDelete"
+  elsif( lc $cmd eq lc "logFileDelete" )
   {
-    GroheOndusSmartDevice_SenseGuard_GetData($hash);
+    my $logFileName = $hash->{helper}{LogFileName};
+    GroheOndusSmartDevice_FileLog_Delete($hash, $logFileName);
+    return;
+  }
+  ### Command "logFileGetHistoricData"
+  elsif( lc $cmd eq lc "logFileGetHistoricData" )
+  {
+    my $value = "";
+    my $requestFromTimestamp_UTC = "";
+
+    $value = $args[0]
+      if(@args == 1);
+
+    if(lc $value eq lc "stop")
+    {
+      GroheOndusSmartDevice_SenseGuard_GetData_Stop($hash);
+    }
+    else
+    {
+      my $getHistoricDataStartDate_UTC = GroheOndusSmartDevice_GetUTCFromLTZ($hash->{helper}{LogFileGetDataStartDate_LTZ});
+      my $applianceInstallationDate_UTC = GroheOndusSmartDevice_GetUTCFromLUTC(ReadingsVal($name, "ApplianceInstallationDate", undef));
+      
+      if($value eq "")
+      {
+        if(defined($getHistoricDataStartDate_UTC))
+        {
+          $requestFromTimestamp_UTC = $getHistoricDataStartDate_UTC;
+        }
+        elsif(defined($applianceInstallationDate_UTC))
+        {
+          $requestFromTimestamp_UTC = $applianceInstallationDate_UTC;
+        }
+      }
+      else
+      {
+        # try to parse $value to timestamp
+        my $timestampLocal_s = str2time($value);
+        
+        if(not defined($timestampLocal_s))
+        {
+          return "illegal format";
+        }
+        
+        my @t = localtime($timestampLocal_s);
+        $requestFromTimestamp_UTC = sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+
+        # limit to applianceInstallationDate
+        if(defined($applianceInstallationDate_UTC) and
+          $requestFromTimestamp_UTC lt $applianceInstallationDate_UTC)
+        {
+          $requestFromTimestamp_UTC = $applianceInstallationDate_UTC;
+        }
+      }
+
+      if(defined($requestFromTimestamp_UTC) and
+        $requestFromTimestamp_UTC ne "")
+      {
+        GroheOndusSmartDevice_SenseGuard_GetData_StartCampain($hash, $requestFromTimestamp_UTC);
+      }
+    }
+
+    return;
+  }
+  ### Command "logFileCreateFileLogDevice"
+  elsif( lc $cmd eq lc "logFileCreateFileLogDevice" )
+  {
+    return "usage: $cmd [<devicename>]"
+      if( @args > 1 );
+    
+    my $logFileName = ($args[0] =~ tr/ //ds)         # trim whitespaces
+      if( @args == 1 );
+    
+    GroheOndusSmartDevice_FileLog_Create_FileLogDevice($hash, $logFileName);
+    
+    return;
+  }
+  ### Command "debugRefreshValues"
+  elsif( lc $cmd eq lc "debugRefreshValues" )
+  {
+    GroheOndusSmartDevice_SenseGuard_GetData_Last($hash);
     return;
   }
   ### Command "debugRefreshState"
-  elsif ( lc $cmd eq lc "debugRefreshState" )
+  elsif( lc $cmd eq lc "debugRefreshState" )
   {
     GroheOndusSmartDevice_SenseGuard_GetState($hash);
     return;
   }
   ### Command "debugRefreshConfig"
-  elsif ( lc $cmd eq lc "debugRefreshConfig" )
+  elsif( lc $cmd eq lc "debugRefreshConfig" )
   {
     GroheOndusSmartDevice_SenseGuard_GetConfig($hash);
     return;
   }
   ### Command "debugGetApplianceCommand"
-  elsif ( lc $cmd eq lc "debugGetApplianceCommand" )
+  elsif( lc $cmd eq lc "debugGetApplianceCommand" )
   {
     GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($hash);
     return;
   }
   ### Command "debugOverrideCheckTDT"
-  elsif ( lc $cmd eq lc "debugOverrideCheckTDT" )
+  elsif( lc $cmd eq lc "debugOverrideCheckTDT" )
   {
     $hash->{helper}{OverrideCheckTDT} = join( " ", @args );
     GroheOndusSmartDevice_UpdateInternals($hash);
@@ -2190,8 +3043,30 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
 #    $list .= "off:noArg ";
     $list .= "buzzer:on,off ";
     $list .= "valve:on,off ";
+
+    $list .= "TotalWaterConsumption ";
+    $list .= "TotalWaterCost ";
+    $list .= "TotalEnergyCost ";
+    $list .= "TotalHotWaterShare ";
+
     $list .= "clearreadings:noArg ";
     
+    $list .= "logFileDelete:noArg "
+      if($hash->{helper}{LogFileEnabled} ne "0" and  # check if in logfile mode
+      defined($hash->{helper}{LogFileName}) and      # check if filename is defined
+      -e $hash->{helper}{LogFileName});              # check if file exists
+
+    my $logFileGetHistoricDataArgs = "";
+    if($hash->{helper}{GetSuspendReadings} ne "0")
+    {
+      $logFileGetHistoricDataArgs = "stop";
+    }
+    $list .= "logFileGetHistoricData:$logFileGetHistoricDataArgs "
+      if($hash->{helper}{LogFileEnabled} ne "0");     # check if in logfile mode
+
+    $list .= "logFileCreateFileLogDevice "
+      if($hash->{helper}{LogFileEnabled} ne "0");     # check if in logfile mode
+
     $list .= "debugRefreshConfig:noArg "
       if($hash->{helper}{DEBUG} ne "0");
 
@@ -2217,32 +3092,33 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
 {
   my ( $hash, $command, $setValue, $callbackSuccess, $callbackFail ) = @_;
   my $name    = $hash->{NAME};
-  my $modelId = 103;
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    $hash->{SetApplianceCommandCallback}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    my $stopwatch = gettimeofday();
+    $hash->{helper}{Telegram_SetCommandTimeRequest}  = $stopwatch - $callbackparam->{timestampStart};
+    $hash->{helper}{Telegram_SetCommandCallback}     = strftime($TimeStampFormat, localtime($stopwatch));
     Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - resultCallback");
 
     if( $errorMsg eq "" )
     {
       my $decode_json = eval { decode_json($data) };
     
-      if ($@)
+      if($@)
       {
         Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($name) - JSON error while request: $@");
 
-        if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
           readingsBeginUpdate($hash);
           readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
           readingsBulkUpdate( $hash, "JSON_ERROR_STRING", "\"" . $data . "\"", 1 );
           readingsEndUpdate( $hash, 1 );
         }
-        $errorMsg = "SETAPPLIANCECOMMAND_JSON_ERROR";
+        $errorMsg = "SETAPPLIANCECommand_JSON_ERROR";
       }
       else
       {
@@ -2261,7 +3137,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
         #     "valve_open":true,
         #   },
         # }
-        if (defined( $decode_json->{command} ) and 
+        if(defined( $decode_json->{command} ) and 
           ref( $decode_json->{command} ) eq "HASH" )
         {
           readingsBeginUpdate($hash);
@@ -2285,7 +3161,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
           readingsBulkUpdateIfChanged( $hash, "CmdValveState",                  $valve_open == 1 ? "Open" : "Closed" );
 
           readingsEndUpdate( $hash, 1 );
-          $hash->{helper}{Telegram_COMMANDVALVECounter}++;
+          $hash->{helper}{Telegram_SetCommandCounter}++;
         }
         else
         {
@@ -2294,6 +3170,7 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
       }
     }
 
+    $hash->{helper}{Telegram_SetCommandTimeProcess}  = gettimeofday() - $stopwatch;
     GroheOndusSmartDevice_UpdateInternals($hash);
 
     if( $errorMsg eq "" )
@@ -2318,9 +3195,10 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
     }
   }; 
 
-  my $deviceId = $hash->{DEVICEID};
+  my $deviceId          = $hash->{DEVICEID};
   my $device_locationId = $hash->{ApplianceLocationId};
   my $device_roomId     = $hash->{ApplianceRoomId};
+  my $modelId           = 103;
 
   if( defined( $device_locationId ) and
     defined( $device_roomId ))
@@ -2361,8 +3239,9 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
     $param->{keepalive} = 1;
       
     $param->{resultCallback} = $resultCallback;
+    $param->{timestampStart} = gettimeofday();
     
-    $hash->{SetApplianceCommandIOWrite}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    $hash->{helper}{Telegram_SetCommandIOWrite} = strftime($TimeStampFormat, localtime($param->{timestampStart}));
 
     GroheOndusSmartDevice_IOWrite( $hash, $param );
   }
@@ -2386,14 +3265,14 @@ sub GroheOndusSmartDevice_Sense_Update($)
 
   Log3($name, 4, "GroheOndusSmartDevice_Sense_Update($name)");
 
-  # paralleles Abrufen!
+  # parallel call:
   #GroheOndusSmartDevice_Sense_GetData($hash);
   #GroheOndusSmartDevice_Sense_GetState($hash);
   #GroheOndusSmartDevice_Sense_GetConfig($hash);
   
-  # serielles Abrufen
-  my $getData = sub { GroheOndusSmartDevice_Sense_GetData($hash); };
-  my $getState = sub { GroheOndusSmartDevice_Sense_GetState($hash, $getData); };
+  # serial call:
+  my $getData   = sub { GroheOndusSmartDevice_Sense_GetData_Last($hash); };
+  my $getState  = sub { GroheOndusSmartDevice_Sense_GetState($hash, $getData); };
   my $getConfig = sub { GroheOndusSmartDevice_Sense_GetConfig($hash, $getState); };
   
   $getConfig->();
@@ -2405,25 +3284,26 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name     = $hash->{NAME};
-  my $modelId = 100;
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    $hash->{helper}{Telegram_StatusCallback}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    my $stopwatch = gettimeofday();
+    $hash->{helper}{Telegram_GetStateTimeRequest} = $stopwatch - $callbackparam->{timestampStart};
+    $hash->{helper}{Telegram_GetStateCallback}    = strftime($TimeStampFormat, localtime($stopwatch));
     Log3($name, 4, "GroheOndusSmartDevice_Sense_GetState($name) - resultCallback");
 
     if( $errorMsg eq "")
     {
       my $decode_json = eval { decode_json($data) };
     
-      if ($@)
+      if($@)
       {
         Log3($name, 3, "GroheOndusSmartDevice_Sense_GetState($name) - JSON error while request: $@");
 
-        if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
           readingsBeginUpdate($hash);
           readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
@@ -2455,29 +3335,29 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
         #     }
         #   ]
         # }
-        if ( defined( $decode_json )
+        if( defined( $decode_json )
           and ref( $decode_json ) eq "ARRAY" )
         {
           readingsBeginUpdate($hash);
     
           foreach my $currentData ( @{ $decode_json } )
           {
-            if ( $currentData->{type} eq "update_available"
+            if( $currentData->{type} eq "update_available"
               and defined( $currentData->{value} ) )
             {
               readingsBulkUpdateIfChanged( $hash, "StateUpdateAvailable", $currentData->{value} );
             } 
-            elsif ( $currentData->{type} eq "battery"
+            elsif( $currentData->{type} eq "battery"
               and defined( $currentData->{value} ) )
             {
               readingsBulkUpdateIfChanged( $hash, "StateBattery", $currentData->{value} );
             } 
-            elsif ( $currentData->{type} eq "connection"
+            elsif( $currentData->{type} eq "connection"
               and defined( $currentData->{value} ) )
             {
               readingsBulkUpdateIfChanged( $hash, "StateConnection", $currentData->{value} );
             } 
-            elsif ( $currentData->{type} eq "wifi_quality"
+            elsif( $currentData->{type} eq "wifi_quality"
               and defined( $currentData->{value} ) )
             {
               readingsBulkUpdateIfChanged( $hash, "StateWifiQuality", $currentData->{value} );
@@ -2490,7 +3370,7 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
           }
 
           readingsEndUpdate( $hash, 1 );
-          $hash->{helper}{Telegram_StatusCounter}++;
+          $hash->{helper}{Telegram_GetStateCounter}++;
         }
         else
         {
@@ -2499,6 +3379,7 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
       }
     }
 
+    $hash->{helper}{Telegram_GetStateTimeProcess}  = gettimeofday() - $stopwatch;
     GroheOndusSmartDevice_UpdateInternals($hash);
 
     if($errorMsg eq "")
@@ -2540,8 +3421,9 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
     $param->{keepalive} = 1;
 
     $param->{resultCallback} = $resultCallback;
+    $param->{timestampStart} = gettimeofday();
 
-    $hash->{helper}{Telegram_StatusIOWrite} = strftime($TimeStampFormat, localtime(gettimeofday()));
+    $hash->{helper}{Telegram_GetStateIOWrite} = strftime($TimeStampFormat, localtime($param->{timestampStart}));
 
     GroheOndusSmartDevice_IOWrite( $hash, $param );
   }
@@ -2562,25 +3444,26 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
 {
   my ( $hash, $callbackSuccess, $callbackFail ) = @_;
   my $name    = $hash->{NAME};
-  my $modelId = 103;
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    $hash->{helper}{Telegram_ConfigCallback}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    my $stopwatch = gettimeofday();
+    $hash->{helper}{Telegram_GetConfigTimeRequest} = $stopwatch - $callbackparam->{timestampStart};
+    $hash->{helper}{Telegram_GetConfigCallback}    = strftime($TimeStampFormat, localtime($stopwatch));
     Log3($name, 4, "GroheOndusSmartDevice_Sense_GetConfig($name) - resultCallback");
 
     if( $errorMsg eq "" )
     {
       my $decode_json = eval { decode_json($data) };
     
-      if ($@)
+      if($@)
       {
         Log3($name, 3, "GroheOndusSmartDevice_Sense_GetConfig($name) - JSON error while request: $@");
 
-        if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
           readingsBeginUpdate($hash);
           readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
@@ -2636,7 +3519,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
       #}
       #]
       
-        if ( defined( $decode_json )
+        if( defined( $decode_json )
           and ref( $decode_json ) eq "ARRAY" )
         {
           readingsBeginUpdate($hash);
@@ -2654,7 +3537,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
 
           my $currentEntry = $decode_json->[0];
 
-          if ( defined( $currentEntry )
+          if( defined( $currentEntry )
             and ref( $currentEntry ) eq "HASH" )
           {
             readingsBulkUpdateIfChanged( $hash, "ApplianceID", "$currentEntry->{appliance_id}" )
@@ -2678,9 +3561,12 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
             readingsBulkUpdateIfChanged( $hash, "ApplianceRegistrationComplete", "$currentEntry->{registration_complete}" )
               if( defined( $currentEntry->{registration_complete} ) );
 
+            $hash->{helper}{ApplianceTDT_LUTC} = "$currentEntry->{tdt}"
+              if( defined( $currentEntry->{tdt} ) );
+
             my $currentConfig = $currentEntry->{config};
 
-            if ( defined( $currentConfig )
+            if( defined( $currentConfig )
               and ref( $currentConfig ) eq "HASH" )
             {
       #   "config":
@@ -2716,32 +3602,32 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
 
               my $currentThresholds = $currentConfig->{thresholds};
 
-              if ( defined( $currentThresholds ) and
+              if( defined( $currentThresholds ) and
                 ref( $currentThresholds ) eq "ARRAY" )
               {
                 foreach my $currentThreshold ( @{ $currentThresholds} )
                 {
-                  if ( "$currentThreshold->{quantity}" eq "temperature" )
+                  if( "$currentThreshold->{quantity}" eq "temperature" )
                   {
-                    if ( "$currentThreshold->{type}" eq "max" )
+                    if( "$currentThreshold->{type}" eq "max" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
-                    elsif ( "$currentThreshold->{type}" eq "min" )
+                    elsif( "$currentThreshold->{type}" eq "min" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     }
                   } 
-                  elsif ( "$currentThreshold->{quantity}" eq "humidity" )
+                  elsif( "$currentThreshold->{quantity}" eq "humidity" )
                   {
-                    if ( "$currentThreshold->{type}" eq "max" )
+                    if( "$currentThreshold->{type}" eq "max" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigHumidityThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
-                    elsif ( "$currentThreshold->{type}" eq "min" )
+                    elsif( "$currentThreshold->{type}" eq "min" )
                     {
                       readingsBulkUpdateIfChanged( $hash, "ConfigHumidityThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
@@ -2753,7 +3639,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
           }
           readingsEndUpdate( $hash, 1 );
 
-          $hash->{helper}{Telegram_ConfigCounter}++;
+          $hash->{helper}{Telegram_GetConfigCounter}++;
         }
         else
         {
@@ -2762,6 +3648,7 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
       }
     }
 
+    $hash->{helper}{Telegram_GetConfigTimeProcess}  = gettimeofday() - $stopwatch;
     GroheOndusSmartDevice_UpdateInternals($hash);
 
     if( $errorMsg eq "" )
@@ -2803,8 +3690,9 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
     $param->{keepalive} = 1;
       
     $param->{resultCallback} = $resultCallback;
+    $param->{timestampStart} = gettimeofday();
     
-    $hash->{helper}{Telegram_ConfigIOWrite} = strftime($TimeStampFormat, localtime(gettimeofday()));
+    $hash->{helper}{Telegram_GetConfigIOWrite} = strftime($TimeStampFormat, localtime($param->{timestampStart}));
 
     GroheOndusSmartDevice_IOWrite( $hash, $param );
   }
@@ -2821,39 +3709,53 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
 
 ##################################
 # GroheOndusSmartDevice_Sense_GetData( $hash, $callbackSuccess, $callbackFail )
-sub GroheOndusSmartDevice_Sense_GetData($;$$)
+sub GroheOndusSmartDevice_Sense_GetData($$;$$)
 {
-  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my ( $hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail ) = @_;
   my $name     = $hash->{NAME};
-  my $modelId = 100;
 
   # definition of the lambda function wich is called to process received data
   my $resultCallback = sub 
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    $hash->{helper}{Telegram_DataCallback}  = strftime($TimeStampFormat, localtime(gettimeofday()));
+    my $stopwatch = gettimeofday();
+    $hash->{helper}{Telegram_GetDataTimeRequest}  = $stopwatch - $callbackparam->{timestampStart};
+    $hash->{helper}{Telegram_GetDataCallback}     = strftime($TimeStampFormat, localtime($stopwatch));
+    $hash->{helper}{Telegram_GetDataCampain}      = $callbackparam->{GetCampain};
     Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - resultCallback");
 
-    if( $errorMsg eq "" )
+    my $lastProcessedTimestamp_LUTC = $hash->{helper}{LastProcessedTimestamp_LUTC};
+    
+    my $currentDataTimestamp_LUTC   = undef;
+    my $currentDataHumidity         = undef;
+    my $currentDataTemperature      = undef;
+
+    if($callbackparam->{GetCampain} != $hash->{helper}{GetCampain})
+    {
+      $errorMsg = "GetData old Campain";
+    }
+    elsif( $errorMsg eq "" )
     {
       my $decode_json = eval { decode_json($data) };
     
-      if ($@)
+      if($@)
       {
         Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - JSON error while request: $@");
 
-        if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
           readingsBeginUpdate($hash);
           readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
           readingsBulkUpdate( $hash, "JSON_ERROR_STRING", "\"" . $data . "\"", 1 );
           readingsEndUpdate( $hash, 1 );
         }
-        $errorMsg = "GETData_JSON_ERROR";
+        $errorMsg = "GetHistoricData_JSON_ERROR";
       }
       else
       {
+        $hash->{helper}{ApplianceTDT_LUTC_GetData} = $callbackparam->{ApplianceTDT_LUTC_GetData};
+
         # Data:
         # {
         #   "data":
@@ -2876,112 +3778,73 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
         #      ]
         #    },
         # }
-        if ( defined( $decode_json ) and
+        if( defined( $decode_json ) and
           defined( $decode_json->{data}->{measurement} ) and
           ref( $decode_json->{data}->{measurement} ) eq "ARRAY" )
         {
-          $hash->{helper}{ApplianceTDT} = $callbackparam->{ApplianceTDT};
-
-          my $lastProcessedMeasurementTimestamp = $hash->{helper}{LastProcessedMeasurementTimestamp};
-
           # get entry with latest timestamp
           my $dataTimestamp = undef;
-          my $dataHumidity;
-          my $dataTemperature;
           my $loopCounter = 0;
 
           foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
           {
             # is this the correct dataset?
-            if ( defined( $currentData->{timestamp} ) and 
+            if( defined( $currentData->{timestamp} ) and 
               defined( $currentData->{humidity} ) and 
               defined( $currentData->{temperature} ) )
             {
-              my $currentDataTimestamp   = $currentData->{timestamp};
-              my $currentDataHumidity    = $currentData->{humidity};
-              my $currentDataTemperature = $currentData->{temperature};
+              $currentDataTimestamp_LUTC = $currentData->{timestamp};
+              $currentDataHumidity       = $currentData->{humidity};
+              $currentDataTemperature    = $currentData->{temperature};
               
-              # don't process measurevalues with timestamp before $lastProcessedMeasurementTimestamp
-              if($currentDataTimestamp gt $lastProcessedMeasurementTimestamp)
+              # don't process measurevalues with timestamp before $lastProcessedTimestamp
+              if($currentDataTimestamp_LUTC gt $lastProcessedTimestamp_LUTC)
               {
                 # force the timestamp-seconds-string to have a well known length
                 # fill with leading zeros
-                my $dataTimestamp_SubStr = substr($currentDataTimestamp, 0, 19);
-                my $dataTimestamp_s = time_str2num($dataTimestamp_SubStr);
-                my $dataTimestamp_s_string = sprintf ("%0${ForcedTimeStampLength}d", $dataTimestamp_s);
-                
-                readingsBeginUpdate($hash);
-          
-                readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $dataTimestamp_s_string . " " . $currentDataTimestamp )
-                  if ( defined($currentDataTimestamp) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $CurrentMeasurementFormatVersion . $dataTimestamp_s_string . $currentDataHumidity )
-                  if ( defined($currentDataHumidity) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $CurrentMeasurementFormatVersion . $dataTimestamp_s_string . $currentDataTemperature )
-                  if ( defined($currentDataTemperature) );
+                my $currentDataTimestamp_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestamp_LUTC);
+                my $currentDataTimestamp_LTZ_s = time_str2num($currentDataTimestamp_LTZ);
+                my $currentDataTimestamp_LTZ_s_string = GroheOndusSmartDevice_GetLTZStringFromLUTC($currentDataTimestamp_LUTC);
 
-                readingsEndUpdate( $hash, 1 );
+                if( $hash->{helper}{GetSuspendReadings} eq "0")
+                {
+                  readingsBeginUpdate($hash);
+    
+                  readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
+                    if( defined($currentDataTimestamp_LUTC) );
+                  readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataHumidity )
+                    if( defined($currentDataHumidity) );
+                  readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTemperature )
+                    if( defined($currentDataTemperature) );
+    
+                  readingsEndUpdate( $hash, 1 );
+                }
 
                 # if enabled write MeasureValues to own FileLog
-                GroheOndusSmartDevice_FileLog_MeasureValueWrite($hash, $dataTimestamp_s, 
-                  ["MeasurementDataTimestamp", $currentDataTimestamp],
-                  ["MeasurementHumidity", $currentDataHumidity],
-                  ["MeasurementTemperature", $currentDataTemperature])
-                  if($hash->{helper}{HistoricGetInProgress} eq "0" and   # historic get not running
-                    $hash->{helper}{LogFileEnabled} eq "1" );           # only if LogFile in use
-              }
-              
-              # is timestamp newer?
-              if ( not defined($dataTimestamp) or 
-                $currentDataTimestamp gt $dataTimestamp )
-              {
-                $dataTimestamp   = $currentDataTimestamp;
-                $dataHumidity    = $currentDataHumidity;
-                $dataTemperature = $currentDataTemperature;
+                GroheOndusSmartDevice_FileLog_MeasureValueWrite($hash, "Measurement", $currentDataTimestamp_LTZ_s, 
+                  ["MeasurementDataTimestamp",  $currentDataTimestamp_LUTC],
+                  ["MeasurementHumidity",       $currentDataHumidity],
+                  ["MeasurementTemperature",    $currentDataTemperature])
+                  if( $hash->{helper}{LogFileEnabled} eq "1" ); # only if LogFile in use
+                
+                $lastProcessedTimestamp_LUTC = $currentDataTimestamp_LUTC;
               }
             }
             $loopCounter++;
           }
 
-          if ( defined($dataTimestamp) )
-          {
-            # save last TimeStamp in store
-            $hash->{helper}{LastProcessedMeasurementTimestamp} = $dataTimestamp;
-            my $setKeyError = setKeyValue("MeasurementDataTimestamp", $dataTimestamp);
-            if(defined($setKeyError))
-            {
-              Log3($name, 3, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue error: " . $setKeyError);
-            }
-            else
-            {
-              Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData($name) - setKeyValue: $dataTimestamp");
-            }
+          $hash->{helper}{LastProcessedTimestamp_LUTC}      = $lastProcessedTimestamp_LUTC;
+          $hash->{helper}{Telegram_GetDataLoopMeasurement}  = $loopCounter;
+          $hash->{helper}{Telegram_GetDataCounter}++;
 
-            $hash->{STATISTICDataLoopCounter} = $loopCounter;
-
-            readingsBeginUpdate($hash);
-
-            readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $dataTimestamp );
-          
-            if ( defined($dataHumidity) )
-            {
-              readingsBulkUpdateIfChanged( $hash, "LastHumidity", $dataHumidity );
-            }
-          
-            if ( defined($dataTemperature) )
-            {
-              readingsBulkUpdateIfChanged( $hash, "LastTemperature", $dataTemperature );
-            }
-
-            readingsEndUpdate( $hash, 1 );
-          }
-
-          $hash->{helper}{Telegram_DataCounter}++;
+          # save values in store
+          GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Sense_GetData", "LastProcessedTimestamp_LUTC", $hash->{helper}{LastProcessedTimestamp_LUTC});
         }
         # {
         #   "code":404,
         #   "message":"Not found"
         # }
-        elsif ( defined( $decode_json ) and
+        elsif( defined( $decode_json ) and
           defined( $decode_json->{code} ) and
           defined( $decode_json->{message} ) )
         {
@@ -2996,7 +3859,7 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
             readingsSingleUpdate( $hash, "Message", $message, 1 );
           }
           # Too many requests 
-          elsif ($errorCode == 429)
+          elsif($errorCode == 429)
           {
             Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - $message");
             readingsSingleUpdate( $hash, "Message", $message, 1 );
@@ -3014,19 +3877,72 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
       }
     }
 
-    GroheOndusSmartDevice_UpdateInternals($hash);
+    $hash->{helper}{Telegram_GetDataTimeProcess}  = gettimeofday() - $stopwatch;
 
     if($errorMsg eq "")
     {
-      # if there is a callback then call it
-      if( defined($callbackSuccess) )
+      my $applianceTDT_UTC = GroheOndusSmartDevice_GetUTCFromLUTC($hash->{helper}->{ApplianceTDT_LUTC});
+
+      # requested timespan contains TDT so break historic get
+      if($callbackparam->{requestToTimestamp_UTC} gt $applianceTDT_UTC)
       {
-        Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - callbackSuccess");
-        $callbackSuccess->();
+        readingsBeginUpdate($hash);
+
+        if($hash->{helper}{GetInProgress} ne "0" and 
+          $hash->{helper}{GetSuspendReadings} ne "0")
+        {
+          readingsBulkUpdateIfChanged( $hash, "state", "getting historic data finished", 1 );
+        }
+
+        $hash->{helper}{GetSuspendReadings} = "0";
+        GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Sense_GetData", "GetSuspendReadings", $hash->{helper}{GetSuspendReadings});
+
+        $hash->{helper}{GetInProgress} = "0";
+        GroheOndusSmartDevice_UpdateInternals($hash);
+
+        readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $currentDataTimestamp_LUTC, 1 )
+          if(defined($currentDataTimestamp_LUTC));
+        readingsBulkUpdateIfChanged( $hash, "LastHumidity", $currentDataHumidity, 1 )
+          if(defined($currentDataHumidity));
+        readingsBulkUpdateIfChanged( $hash, "LastTemperature", $currentDataTemperature, 1 )
+          if(defined($currentDataTemperature));
+          
+        readingsEndUpdate( $hash, 1 );
+
+        # if there is a callback then call it
+        if( defined($callbackSuccess) )
+        {
+          Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - callbackSuccess");
+          $callbackSuccess->();
+        }
+      }
+      else
+      {
+        # historic get still active
+        $hash->{helper}{GetInProgress} = "1";
+        GroheOndusSmartDevice_UpdateInternals($hash);
+
+        readingsBeginUpdate($hash);
+        readingsBulkUpdateIfChanged( $hash, "state", "getting historic data $callbackparam->{requestToTimestamp_UTC}", 1 );
+        readingsEndUpdate( $hash, 1 );
+
+        # reload timer
+        my $nextTimer = gettimeofday() + $GetLoopDataInterval;
+        InternalTimer( $nextTimer, "GroheOndusSmartDevice_Sense_GetData_TimerExecute", 
+          [$hash, 
+          $callbackparam->{requestToTimestamp_UTC}, 
+          $callbackparam->{GetCampain}, 
+          $callbackSuccess, 
+          $callbackFail]
+        );
       }
     }
     else
     {
+      # error -> historic get has broken
+      #$hash->{helper}{GetInProgress} = "0";
+      #GroheOndusSmartDevice_UpdateInternals($hash);
+
       readingsSingleUpdate( $hash, "state", $errorMsg, 1 );
 
       # if there is a callback then call it
@@ -3038,6 +3954,9 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
     }
   }; 
 
+  # if there is a timer remove it
+  GroheOndusSmartDevice_Sense_GetData_TimerRemove($hash);
+
   my $deviceId          = $hash->{DEVICEID};
   my $device_locationId = $hash->{ApplianceLocationId};
   my $device_roomId     = $hash->{ApplianceRoomId};
@@ -3045,41 +3964,52 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
   if(defined( $device_locationId ) and
     defined( $device_roomId ))
   {
-    my $lastTDT = $hash->{helper}{ApplianceTDT};
-    my $applianceTDT = ReadingsVal($name, "ApplianceTDT", "none");
+    my $lastTDT_LUTC      = $hash->{helper}{ApplianceTDT_LUTC_GetData};
+    my $applianceTDT_LUTC = $hash->{helper}{ApplianceTDT_LUTC};
     
-    if($hash->{helper}{LastProcessedMeasurementTimestamp} ne "" and # if not empty
-      $hash->{helper}{OverrideCheckTDT} eq "0" and                  # if check is disabled 
-      $lastTDT eq $applianceTDT)                                    # if TDT is processed 
-    {                                                               # -> don't get new data
-      Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - no new TDT");
+    if($hash->{helper}{GetInProgress} ne "1" and              # only check if no campain is running
+      $hash->{helper}{LastProcessedTimestamp_LUTC} ne "" and  # there is a LastProcessedTimestamp
+      $hash->{helper}{OverrideCheckTDT} eq "0" and            # if check is disabled 
+      $lastTDT_LUTC eq $applianceTDT_LUTC)                    # if TDT is processed
+    {                                                         # -> don't get new data
+      Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - no new TDT");
 
       # if there is a callback then call it
       if( defined($callbackSuccess) )
       {
-        Log3($name, 4, "GroheOndusSmartDevice_SenseGuard_GetData($name) - callbackSuccess");
+        Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData($name) - callbackSuccess");
         $callbackSuccess->();
       }
     }
     else
     {
-      # get all Data from within today
-      # calc gmt from localtime because the grohe cloud works with gmt
-      my $requestFromTimestamp = GroheOndusSmartDevice_GetUTCMidnightDate(-24); # offset to prevent empty responses
+      # add offset in seconds to get to-timestamp
+      my $requestToTimestamp_UTC_s = time_str2num($requestFromTimestamp_UTC) + $hash->{helper}{GetTimespan};
+      my @t = localtime($requestToTimestamp_UTC_s);
+      my $requestToTimestamp_UTC = sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
 
       my $param = {};
-      $param->{method} = "GET";
-      $param->{url} = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp;
-      $param->{header} = "Content-Type: application/json";
-      $param->{data} = "{}";
-      $param->{httpversion} = "1.0";
-      $param->{ignoreredirects} = 0;
-      $param->{keepalive} = 1;
+      $param->{method}                    = "GET";
+      $param->{url}                       = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
+      $param->{header}                    = "Content-Type: application/json";
+      $param->{data}                      = "{}";
+      $param->{httpversion}               = "1.0";
+      $param->{ignoreredirects}           = 0;
+      $param->{keepalive}                 = 1;
+      $param->{timeout}                   = 10;
+      $param->{incrementalTimeout}        = 1;
 
-      $param->{resultCallback} = $resultCallback;
-      $param->{ApplianceTDT} = $applianceTDT;
+      $param->{resultCallback}            = $resultCallback;
+      $param->{requestFromTimestamp_UTC}  = $requestFromTimestamp_UTC;
+      $param->{requestToTimestamp_UTC}    = $requestToTimestamp_UTC;
+      $param->{GetCampain}                = $hash->{helper}{GetCampain};
+      $param->{ApplianceTDT_LUTC_GetData} = $applianceTDT_LUTC;
+      $param->{timestampStart}            = gettimeofday();
 
-      $hash->{helper}{Telegram_DataIOWrite} = strftime($TimeStampFormat, localtime(gettimeofday()));
+      # set historic get to active
+      $hash->{helper}{GetInProgress}            = "1";
+      $hash->{helper}{Telegram_GetDataIOWrite}  = strftime($TimeStampFormat, localtime($param->{timestampStart}));
+      GroheOndusSmartDevice_UpdateInternals($hash);
 
       GroheOndusSmartDevice_IOWrite( $hash, $param );
     }
@@ -3095,283 +4025,129 @@ sub GroheOndusSmartDevice_Sense_GetData($;$$)
   }
 }
 
+
 ##################################
-# GroheOndusSmartDevice_Sense_GetHistoricData( $hash, $callbackSuccess, $callbackFail )
-sub GroheOndusSmartDevice_Sense_GetHistoricData($$;$$)
+# GroheOndusSmartDevice_Sense_GetData_Last( $hash, $callbackSuccess, $callbackFail )
+sub GroheOndusSmartDevice_Sense_GetData_Last($;$$)
 {
-  my ( $hash, $timeStampFrom, $callbackSuccess, $callbackFail ) = @_;
-  my $name     = $hash->{NAME};
-  my $modelId = 100;
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
 
-  # definition of the lambda function wich is called to process received data
-  my $resultCallback = sub 
+  if($hash->{helper}{GetInProgress} eq "1")
   {
-    my ( $callbackparam, $data, $errorMsg ) = @_;
+    Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData_Last($name) - GetInProgress");
+  }
+  else
+  {
+    my $requestFromTimestamp_UTC      = GroheOndusSmartDevice_GetUTCFromLUTC($hash->{helper}{LastProcessedTimestamp_LUTC});
+    my $applianceTDT_UTC              = GroheOndusSmartDevice_GetUTCFromLUTC($hash->{helper}{ApplianceTDT_LUTC});
+    my $getHistoricDataStartDate_UTC  = GroheOndusSmartDevice_GetUTCFromLTZ($hash->{helper}{LogFileGetDataStartDate_LTZ});
 
-    $hash->{helper}{Telegram_HistoricDataCallback} = strftime($TimeStampFormat, localtime(gettimeofday()));
-    Log3($name, 4, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - resultCallback");
-
-    my $lastProcessedHistoricMeasurementTimestamp = $hash->{helper}{lastProcessedHistoricMeasurementTimestamp};
-
-    if( $errorMsg eq "" )
+    if(not defined($requestFromTimestamp_UTC))
     {
-      my $decode_json = eval { decode_json($data) };
-    
-      if ($@)
-      {
-        Log3($name, 3, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - JSON error while request: $@");
-
-        if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
-        {
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
-          readingsBulkUpdate( $hash, "JSON_ERROR_STRING", "\"" . $data . "\"", 1 );
-          readingsEndUpdate( $hash, 1 );
-        }
-        $errorMsg = "GetHistoricData_JSON_ERROR";
-      }
-      elsif($callbackparam->{HistoricGetCampain} != $hash->{helper}{HistoricGetCampain})
-      {
-        $errorMsg = "GetHistoricData Old Campain";
-      }
-      else
-      {
-        # Data:
-        # {
-        #   "data":
-        #   {
-        #     "measurement":
-        #     [
-        #       {
-        #         "timestamp":"2019-01-30T08:04:27.000+01:00",
-        #         "humidity":54,
-        #         "temperature":19.4
-        #       },
-        #       {
-        #         "timestamp":"2019-01-30T08:04:28.000+01:00",
-        #         "humidity":53,
-        #         "temperature":19.4
-        #       }
-        #     ],
-        #     "withdrawals":
-        #      [
-        #      ]
-        #    },
-        # }
-        if ( defined( $decode_json ) and
-          defined( $decode_json->{data}->{measurement} ) and
-          ref( $decode_json->{data}->{measurement} ) eq "ARRAY" )
-        {
-          # get entry with latest timestamp
-          my $dataTimestamp = undef;
-          my $loopCounter = 0;
-
-          foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
-          {
-            # is this the correct dataset?
-            if ( defined( $currentData->{timestamp} ) and 
-              defined( $currentData->{humidity} ) and 
-              defined( $currentData->{temperature} ) )
-            {
-              my $currentDataTimestamp   = $currentData->{timestamp};
-              my $currentDataHumidity    = $currentData->{humidity};
-              my $currentDataTemperature = $currentData->{temperature};
-              
-              # don't process measurevalues with timestamp before $lastProcessedHistoricMeasurementTimestamp
-              if($currentDataTimestamp gt $lastProcessedHistoricMeasurementTimestamp)
-              {
-                # force the timestamp-seconds-string to have a well known length
-                # fill with leading zeros
-                my $dataTimestamp_SubStr = substr($currentDataTimestamp, 0, 19);
-                my $dataTimestamp_s = time_str2num($dataTimestamp_SubStr);
-                my $dataTimestamp_s_string = sprintf ("%0${ForcedTimeStampLength}d", $dataTimestamp_s);
-
-                # if enabled write MeasureValues to own FileLog
-                GroheOndusSmartDevice_FileLog_MeasureValueWrite($hash, $dataTimestamp_s, 
-                  ["MeasurementDataTimestamp", $currentDataTimestamp],
-                  ["MeasurementHumidity", $currentDataHumidity],
-                  ["MeasurementTemperature", $currentDataTemperature])
-                  if( $hash->{helper}{LogFileEnabled} eq "1" ); # only if LogFile in use
-                
-                $lastProcessedHistoricMeasurementTimestamp = $currentDataTimestamp;
-              }
-            }
-            $loopCounter++;
-          }
-
-          # save last TimeStamp in store
-          $hash->{helper}{lastProcessedHistoricMeasurementTimestamp} = $lastProcessedHistoricMeasurementTimestamp;
-          my $setKeyError = setKeyValue("MeasurementDataTimestamp", $lastProcessedHistoricMeasurementTimestamp);
-          if(defined($setKeyError))
-          {
-            Log3($name, 3, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - setKeyValue error: " . $setKeyError);
-          }
-          else
-          {
-            Log3($name, 5, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - setKeyValue: $lastProcessedHistoricMeasurementTimestamp");
-          }
-
-          $hash->{helper}{Telegram_HistoricDataLoop} = $loopCounter;
-          $hash->{helper}{Telegram_HistoricDataCounter}++;
-        }
-        # {
-        #   "code":404,
-        #   "message":"Not found"
-        # }
-        elsif ( defined( $decode_json ) and
-          defined( $decode_json->{code} ) and
-          defined( $decode_json->{message} ) )
-        {
-          my $errorCode = $decode_json->{code};
-          my $errorMessage = $decode_json->{message};
-          my $message = "TimeStamp: " . strftime($TimeStampFormat, localtime(gettimeofday())) . " Code: " . $errorCode . " Message: " . $decode_json->{message}; 
-
-          # Not found -> no data in requested timespan
-          if( $errorCode == 404 )
-          {
-            Log3($name, 4, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - $message");
-            readingsSingleUpdate( $hash, "Message", $message, 1 );
-          }
-          # Too many requests 
-          elsif ($errorCode == 429)
-          {
-            Log3($name, 4, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - $message");
-            readingsSingleUpdate( $hash, "Message", $message, 1 );
-          }
-          else
-          {
-            Log3($name, 3, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - $message");
-            readingsSingleUpdate( $hash, "Message", $message, 1 );
-          }
-        }
-        else
-        {
-          $errorMsg = "UNKNOWN Data";
-        }
-      }
+      $requestFromTimestamp_UTC = GroheOndusSmartDevice_GetUTCMidnightDate(0);
+    }
+    elsif(defined($getHistoricDataStartDate_UTC) and
+      $getHistoricDataStartDate_UTC gt $requestFromTimestamp_UTC)
+    {
+      $requestFromTimestamp_UTC = $getHistoricDataStartDate_UTC;
     }
 
-    if($errorMsg eq "")
+    if($requestFromTimestamp_UTC lt $applianceTDT_UTC)
     {
-      my $now = strftime($TimeStampFormat, localtime(gettimeofday()));
-      my $applianceTDT = ReadingsVal($name, "ApplianceTDT", $now);
+      Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData_Last($name) - requestFromTimestamp_UTC: $requestFromTimestamp_UTC");
 
-      # requested timespan contains TDT so break historic get
-      if($callbackparam->{requestToTimestamp} gt $applianceTDT)
-      {
-        $hash->{helper}{HistoricGetInProgress} = "0";
-        GroheOndusSmartDevice_UpdateInternals($hash);
-        
-        # if there is a callback then call it
-        if( defined($callbackSuccess) )
-        {
-          Log3($name, 4, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - callbackSuccess");
-          $callbackSuccess->();
-        }
-      }
-      else
-      {
-        # historic get still active
-        $hash->{helper}{HistoricGetInProgress} = "1";
-        GroheOndusSmartDevice_UpdateInternals($hash);
+      $hash->{helper}{GetCampain}++;                                  # new campain-counter to stop current running old campains
 
-        # reload timer
-        my $nextTimer = gettimeofday() + $GetHistoricDataInterval;
-        # $hash->{DataTimerNext} = strftime($TimeStampFormat, localtime($nextTimer));
-        InternalTimer( $nextTimer, \&GroheOndusSmartDevice_Sense_GetHistoricData_TimerExecute, [$hash, $callbackparam->{requestToTimestamp}, $callbackSuccess, $callbackFail] );
-      }
+      GroheOndusSmartDevice_Sense_GetData($hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail);
     }
     else
     {
-      # error -> historic get has broken
-      $hash->{helper}{HistoricGetInProgress} = "0";
-      GroheOndusSmartDevice_UpdateInternals($hash);
-
-      readingsSingleUpdate( $hash, "state", $errorMsg, 1 );
-
-      # if there is a callback then call it
-      if( defined($callbackFail) )
-      {
-        Log3($name, 4, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - callbackFail");
-        $callbackFail->();
-      }
+      Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData_Last($name) - requestFromTimestamp_UTC: $requestFromTimestamp_UTC > applianceTDT: $applianceTDT_UTC");
     }
-  }; 
+  }
+}
 
-  # if there is a timer remove it
-  GroheOndusSmartDevice_Sense_GetHistoricData_TimerRemove($hash);
+##################################
+# GroheOndusSmartDevice_Sense_GetData_Stop($)
+sub GroheOndusSmartDevice_Sense_GetData_Stop($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
 
-  my $deviceId          = $hash->{DEVICEID};
-  my $device_locationId = $hash->{ApplianceLocationId};
-  my $device_roomId     = $hash->{ApplianceRoomId};
-
-  if(defined( $device_locationId ) and
-    defined( $device_roomId ))
+  if($hash->{helper}{GetInProgress} eq "1")
   {
+    Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData_Stop($name)");
+    
+    GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove($hash);
+
+    $hash->{helper}{GetInProgress}                = "0";
+    $hash->{helper}{LastProcessedTimestamp_LUTC}  = "";
+    $hash->{helper}{GetSuspendReadings}           = "0";  # suspend readings
+    $hash->{helper}{GetCampain}++;                        # new campain-counter to stop current running old campains
+    GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Sense_GetData_StartCampain", "GetSuspendReadings", $hash->{helper}{GetSuspendReadings});
+
+    GroheOndusSmartDevice_UpdateInternals($hash);
+
+    readingsBeginUpdate($hash);
+    readingsBulkUpdateIfChanged($hash, "state", "getting historic data stopped", 1);
+    readingsEndUpdate($hash, 1);
+  }
+}
+
+##################################
+# GroheOndusSmartDevice_Sense_GetData_StartCampain( $hash, $callbackSuccess, $callbackFail )
+sub GroheOndusSmartDevice_Sense_GetData_StartCampain($$;$$)
+{
+  my ( $hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail ) = @_;
+  my $name = $hash->{NAME};
+  
+  $hash->{helper}{LogFileName}                  = "";   # reset internal to delete existing file
+  $hash->{helper}{LastProcessedTimestamp_LUTC}  = "";   # reset internal to restart processing
+  $hash->{helper}{GetCampain}++;                        # new campain-counter to stop current running old campains
+
+  $hash->{helper}{GetSuspendReadings}           = "1";  # suspend readings
+  GroheOndusSmartDevice_Store($hash, "GroheOndusSmartDevice_Sense_GetData_StartCampain", "GetSuspendReadings", $hash->{helper}{GetSuspendReadings});
+
+  GroheOndusSmartDevice_Sense_GetData($hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail);
+}
+
+##################################
+# GroheOndusSmartDevice_Sense_GetData_TimerExecute( @args )
+sub GroheOndusSmartDevice_Sense_GetData_TimerExecute($)
+{
+  my ( $args ) = @_;
+  my ( $hash, $requestFromTimestamp_UTC, $getCampain, $callbackSuccess, $callbackFail ) = @{$args};
+  my $name = $hash->{NAME};
+
+  if($getCampain != $hash->{helper}{GetCampain})
+  {
+    Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData_TimerExecute($name) - dropping old Campain");
+
+    # if there is a callback then call it
+    if( defined($callbackFail) )
     {
-      # no $timeStampFrom is given -> take ApplianceInstallationDate for first request 
-      $timeStampFrom = substr(ReadingsVal($name, "ApplianceInstallationDate", "none"), 0, 19)
-        if(not defined($timeStampFrom));
-
-      my $requestFromTimestamp = $timeStampFrom;
-
-      # add offset in seconds to get to-timestamp
-      my $requestToTimestamp_s = time_str2num($requestFromTimestamp) + $hash->{helper}{HistoricGetTimespan};
-      my @t = localtime($requestToTimestamp_s);
-      my $requestToTimestamp = sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
-      
-      my $param = {};
-      $param->{method} = "GET";
-      $param->{url} = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp . "&to=" . $requestToTimestamp;
-      $param->{header} = "Content-Type: application/json";
-      $param->{data} = "{}";
-      $param->{httpversion} = "1.0";
-      $param->{ignoreredirects} = 0;
-      $param->{keepalive} = 1;
-      $param->{timeout} = 10;
-      $param->{incrementalTimeout} = 1;
-
-      $param->{resultCallback} = $resultCallback;
-      $param->{requestFromTimestamp} = $requestFromTimestamp;
-      $param->{requestToTimestamp} = $requestToTimestamp;
-      $param->{HistoricGetCampain} = $hash->{helper}{HistoricGetCampain};
-
-      # set historic get to active
-      $hash->{helper}{HistoricGetInProgress} = "1";
-      $hash->{helper}{Telegram_HistoricDataIOWrite} = strftime($TimeStampFormat, localtime(gettimeofday()));
-      GroheOndusSmartDevice_UpdateInternals($hash);
-
-      GroheOndusSmartDevice_IOWrite( $hash, $param );
+      Log3($name, 4, "GroheOndusSmartDevice_Sense_GetData_TimerExecute($name) - callbackFail");
+      $callbackFail->();
     }
   }
   else
   {
-    # if there is a callback then call it
-    if( defined($callbackFail) )
-    {
-      Log3($name, 4, "GroheOndusSmartDevice_Sense_GetHistoricData($name) - callbackFail");
-      $callbackFail->();
-    }
+    GroheOndusSmartDevice_Sense_GetData($hash, $requestFromTimestamp_UTC, $callbackSuccess, $callbackFail);  
   }
 }
 
 ##################################
-# GroheOndusSmartDevice_Sense_GetHistoricData_TimerExecute( @args )
-sub GroheOndusSmartDevice_Sense_GetHistoricData_TimerExecute($)
-{
-  my ( $args ) = @_;
-  my ( $hash, $timeStampFrom, $callbackSuccess, $callbackFail ) = @{$args};
-
-  GroheOndusSmartDevice_Sense_GetHistoricData($hash, $timeStampFrom, $callbackSuccess, $callbackFail);  
-}
-
-##################################
-# GroheOndusSmartDevice_Sense_GetHistoricData_TimerRemove( @args )
-sub GroheOndusSmartDevice_Sense_GetHistoricData_TimerRemove($)
+# GroheOndusSmartDevice_Sense_GetData_TimerRemove( @args )
+sub GroheOndusSmartDevice_Sense_GetData_TimerRemove($)
 {
   my ( $hash ) = @_;
+  my $name = $hash->{NAME};
   
-  RemoveInternalTimer($hash, \&GroheOndusSmartDevice_Sense_GetHistoricData_TimerExecute);
+  my $functionName = "GroheOndusSmartDevice_Sense_GetData_TimerExecute"; 
+  Log3($name, 5, "GroheOndusSmartDevice_Sense_GetData_TimerRemove($name) - $functionName");
+  
+  RemoveInternalTimer($hash, $functionName);
 }
 
 #####################################
@@ -3381,90 +4157,134 @@ sub GroheOndusSmartDevice_Sense_Set($@)
   my ( $hash, $name, $cmd, @args ) = @_;
 
   ### Command "update"
-  if ( lc $cmd eq lc "update" )
+  if( lc $cmd eq lc "update" )
   {
     GroheOndusSmartDevice_Sense_Update($hash);
     return;
   }
   ### Command "clearreadings"
-  elsif ( lc $cmd eq lc "clearreadings" )
+  elsif( lc $cmd eq lc "clearreadings" )
   {
     fhem("deletereading $name .*", 1);
     return;
   }
   ### Command "logFileDelete"
-  elsif ( lc $cmd eq lc "logFileDelete" )
+  elsif( lc $cmd eq lc "logFileDelete" )
   {
     my $logFileName = $hash->{helper}{LogFileName};
     GroheOndusSmartDevice_FileLog_Delete($hash, $logFileName);
     return;
   }
   ### Command "logFileGetHistoricData"
-  elsif ( lc $cmd eq lc "logFileGetHistoricData" )
+  elsif( lc $cmd eq lc "logFileGetHistoricData" )
   {
-    my $applianceInstallationDate = ReadingsVal($name, "ApplianceInstallationDate", "none");
-    if($applianceInstallationDate ne "none")
+    my $value = "";
+    my $requestFromTimestamp_UTC = "";
+
+    $value = $args[0]
+      if(@args == 1);
+
+    if(lc $value eq lc "stop")
     {
-      $hash->{helper}{LogFileName} = "";                                # reset internal to delete existing file
-      $hash->{helper}{lastProcessedHistoricMeasurementTimestamp} = "";  # reset internal to restart processing
-      $hash->{helper}{HistoricGetCampain}++;                            # new campain-counter to stop current running old campains
-  
-      my $timeStampFrom = substr($applianceInstallationDate, 0, 19);
-      GroheOndusSmartDevice_Sense_GetHistoricData($hash, $timeStampFrom);
+      GroheOndusSmartDevice_Sense_GetData_Stop($hash);
     }
+    else
+    {
+      my $getHistoricDataStartDate_UTC = GroheOndusSmartDevice_GetUTCFromLTZ($hash->{helper}{LogFileGetDataStartDate_LTZ});
+      my $applianceInstallationDate_UTC = GroheOndusSmartDevice_GetUTCFromLUTC(ReadingsVal($name, "ApplianceInstallationDate", undef));
+      
+      if($value eq "")
+      {
+        if(defined($getHistoricDataStartDate_UTC))
+        {
+          $requestFromTimestamp_UTC = $getHistoricDataStartDate_UTC;
+        }
+        elsif(defined($applianceInstallationDate_UTC))
+        {
+          $requestFromTimestamp_UTC = $applianceInstallationDate_UTC;
+        }
+      }
+      else
+      {
+        # try to parse $value to timestamp
+        my $timestampLocal_s = str2time($value);
+
+        if(not defined($timestampLocal_s))
+        {
+          return "illegal format";
+        }
+
+        my @t = localtime($timestampLocal_s);
+        $requestFromTimestamp_UTC = sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+        
+        # limit to applianceInstallationDate
+        if(defined($applianceInstallationDate_UTC) and
+          $requestFromTimestamp_UTC lt $applianceInstallationDate_UTC)
+        {
+          $requestFromTimestamp_UTC = $applianceInstallationDate_UTC;
+        }
+      }
+
+      if(defined($requestFromTimestamp_UTC) and
+        $requestFromTimestamp_UTC ne "")
+      {
+        GroheOndusSmartDevice_Sense_GetData_StartCampain($hash, $requestFromTimestamp_UTC);
+      }
+    }
+
     return;
   }
   ### Command "logFileCreateFileLogDevice"
-  elsif ( lc $cmd eq lc "logFileCreateFileLogDevice" )
+  elsif( lc $cmd eq lc "logFileCreateFileLogDevice" )
   {
     my $logFileName = "";
     
     return "usage: $cmd [<devicename>]"
-      if ( @args > 1 );
+      if( @args > 1 );
     
     $logFileName = ($args[0] =~ tr/ //ds)         # trim whitespaces
-      if ( @args == 1 );
+      if( @args == 1 );
     
     GroheOndusSmartDevice_FileLog_Create_FileLogDevice($hash, $logFileName);
     
     return;
   }
   ### Command "debugRefreshValues"
-  elsif ( lc $cmd eq lc "debugRefreshValues" )
+  elsif( lc $cmd eq lc "debugRefreshValues" )
   {
-    GroheOndusSmartDevice_Sense_GetData($hash);
+    GroheOndusSmartDevice_Sense_GetData_Last($hash);
     return;
   }
   ### Command "debugRefreshState"
-  elsif ( lc $cmd eq lc "debugRefreshState" )
+  elsif( lc $cmd eq lc "debugRefreshState" )
   {
     GroheOndusSmartDevice_Sense_GetState($hash);
     return;
   }
   ### Command "debugRefreshConfig"
-  elsif ( lc $cmd eq lc "debugRefreshConfig" )
+  elsif( lc $cmd eq lc "debugRefreshConfig" )
   {
     GroheOndusSmartDevice_Sense_GetConfig($hash);
     return;
   }
   ### Command "debugOverrideCheckTDT"
-  elsif ( lc $cmd eq lc "debugOverrideCheckTDT" )
+  elsif( lc $cmd eq lc "debugOverrideCheckTDT" )
   {
     $hash->{helper}{OverrideCheckTDT} = join( " ", @args );
     GroheOndusSmartDevice_UpdateInternals($hash);
     return;
   }
   ### Command "debugResetProcessedMeasurementTimestamp"
-  elsif ( lc $cmd eq lc "debugResetProcessedMeasurementTimestamp" )
+  elsif( lc $cmd eq lc "debugResetProcessedMeasurementTimestamp" )
   {
-    $hash->{helper}{LastProcessedMeasurementTimestamp} = "";
+    $hash->{helper}{LastProcessedTimestamp_LUTC}  = "";
     GroheOndusSmartDevice_UpdateInternals($hash);
     return;
   }
   ### Command "debugForceUpdate"
-  elsif ( lc $cmd eq lc "debugForceUpdate" )
+  elsif( lc $cmd eq lc "debugForceUpdate" )
   {
-    $hash->{helper}{LastProcessedMeasurementTimestamp} = "";
+    $hash->{helper}{LastProcessedTimestamp_LUTC}  = "";
     GroheOndusSmartDevice_UpdateInternals($hash);
     
     GroheOndusSmartDevice_TimerExecute($hash);
@@ -3483,7 +4303,12 @@ sub GroheOndusSmartDevice_Sense_Set($@)
       defined($hash->{helper}{LogFileName}) and      # check if filename is defined
       -e $hash->{helper}{LogFileName});              # check if file exists
 
-    $list .= "logFileGetHistoricData:noArg "
+    my $logFileGetHistoricDataArgs = "";
+    if($hash->{helper}{GetSuspendReadings} ne "0")
+    {
+      $logFileGetHistoricDataArgs = "stop";
+    }
+    $list .= "logFileGetHistoricData:$logFileGetHistoricDataArgs "
       if($hash->{helper}{LogFileEnabled} ne "0");     # check if in logfile mode
 
     $list .= "logFileCreateFileLogDevice "
@@ -3512,27 +4337,168 @@ sub GroheOndusSmartDevice_Sense_Set($@)
 }
 
 ##################################
-# GroheOndusSmartDevice_GetUTCOffset()
-# This methode calculates the offset in hours from UTC and localtime
-# returns ($offsetLocalTimeUTC_hours)
-sub GroheOndusSmartDevice_GetUTCOffset()
+# GroheOndusSmartDevice_Store
+sub GroheOndusSmartDevice_Store($$$$)
 {
-  # it seems that the timestamp for this command has to be in UTC
-  # we want to request all data from within the current day beginning from 00:00:00
-  # so we need to transform the current date 00:00:00 to UTC
-  # localtime           -> request UTC
-  # 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
-  # 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
-  # 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
-  # 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
-  # 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
-  my $currentTimestamp = gettimeofday();
+  my ($hash, $sender, $key, $value) = @_;
+  my $type = $hash->{TYPE};
+  my $name = $hash->{NAME};
 
-  # calculate the offset between localtime and UTC in hours
-  #my $offsetLocalTimeUTCime = localtime($currentTimestamp) - gmtime($currentTimestamp);
-  my $offsetLocalTimeUTC_hours = ( localtime $currentTimestamp + 3600 * ( 12 - (gmtime)[2] ) )[2] - 12;
+  my $deviceKey = $type . "_" . $name . "_" . $key;
 
-  return ($offsetLocalTimeUTC_hours);
+  my $setKeyError = setKeyValue($deviceKey, $value);
+  if(defined($setKeyError))
+  {
+    Log3($name, 3, "$sender($name) - setKeyValue $deviceKey error: $setKeyError");
+  }
+  else
+  {
+    Log3($name, 5, "$sender($name) - setKeyValue: $deviceKey -> $value");
+  }
+}
+
+##################################
+# GroheOndusSmartDevice_Restore
+sub GroheOndusSmartDevice_Restore($$$$)
+{
+  my ($hash, $sender, $key, $defaultvalue) = @_;
+  my $type = $hash->{TYPE};
+  my $name = $hash->{NAME};
+
+  my $deviceKey = $type . "_" . $name . "_" . $key;
+
+  my ($getKeyError, $value) = getKeyValue($deviceKey);
+  $value = $defaultvalue
+    if(defined($getKeyError) or
+      not defined ($value));
+
+  if(defined($getKeyError))
+  {
+    Log3($name, 3, "$sender($name) - getKeyValue $deviceKey error: $getKeyError");
+  }
+  else
+  {
+    Log3($name, 5, "$sender($name) - getKeyValue: $deviceKey -> $value");
+  }
+
+  return $value;
+}
+
+##################################
+# GroheOndusSmartDevice_StoreRename($hash, $sender, $old_name, $key)
+sub GroheOndusSmartDevice_StoreRename($$$$)
+{
+  my ($hash, $sender, $old_name, $key) = @_;
+  my $type = $hash->{TYPE};
+  my $new_name = $hash->{NAME};
+
+  my $old_deviceKey = $type . "_" . $old_name . "_" . $key;
+  my $new_deviceKey = $type . "_" . $new_name . "_" . $key;
+
+  my ($getKeyError, $value) = getKeyValue($old_deviceKey);
+
+  if(defined($getKeyError))
+  {
+    Log3($new_name, 3, "$sender($new_name) - getKeyValue $old_deviceKey error: $getKeyError");
+  }
+  else
+  {
+    Log3($new_name, 5, "$sender($new_name) - getKeyValue: $old_deviceKey -> $value");
+
+    my $setKeyError = setKeyValue($new_deviceKey, $value);
+    if(defined($setKeyError))
+    {
+      Log3($new_name, 3, "$sender($new_name) - setKeyValue $new_deviceKey error: $setKeyError");
+    }
+    else
+    {
+      Log3($new_name, 5, "$sender($new_name) - setKeyValue: $new_deviceKey -> $value");
+    }
+  }
+
+  # delete old key
+  setKeyValue($old_deviceKey, undef);
+}
+
+##################################
+# GroheOndusSmartDevice_GetLTZStringFromLUTC($)
+sub GroheOndusSmartDevice_GetLTZStringFromLUTC($)
+{
+  my ( $timestampUTCString ) = @_;
+
+  if(defined($timestampUTCString) and
+    $timestampUTCString ne "")
+  {
+    # force the timestamp-seconds-string to have a well known length
+    # fill with leading zeros
+    my $timestamp_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($timestampUTCString);
+    my $timestamp_LTZ_s = time_str2num($timestamp_LTZ);
+    my $timestamp_LTZ_s_string = sprintf ("%0${ForcedTimeStampLength}d", $timestamp_LTZ_s);
+    return $timestamp_LTZ_s_string;
+  }
+  else
+  {
+    return undef;
+  }
+}
+
+
+##################################
+# GroheOndusSmartDevice_GetLTZFromLUTC($)
+sub GroheOndusSmartDevice_GetLTZFromLUTC($)
+{
+  my ( $timestampUTCString ) = @_;
+
+  if(defined($timestampUTCString) and
+    $timestampUTCString ne "")
+  {
+    my $dataTimestamp_LTZ = substr($timestampUTCString, 0, 19);
+    return $dataTimestamp_LTZ;
+  }
+  else
+  {
+    return undef;
+  }
+}
+
+##################################
+# GroheOndusSmartDevice_GetUTCFromLUTC($)
+sub GroheOndusSmartDevice_GetUTCFromLUTC($)
+{
+  my ( $timestampUTCString ) = @_;
+
+  if(defined($timestampUTCString) and
+    $timestampUTCString ne "")
+  {
+    my ($ss, $mm, $hh, $day, $month, $year, $zone_s) = strptime($timestampUTCString);
+    my $dataTimestamp_SubStr = substr($timestampUTCString, 0, 19);
+    my $timestampLocal_s = time_str2num($dataTimestamp_SubStr) - $zone_s;
+    my @t = localtime($timestampLocal_s);
+    return sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+  }
+  else
+  {
+    return undef;
+  }
+}
+
+##################################
+# GroheOndusSmartDevice_GetUTCFromLTZ()
+sub GroheOndusSmartDevice_GetUTCFromLTZ($)
+{
+  my ( $timestampLTZ ) = @_;
+
+  if(defined($timestampLTZ) and
+    $timestampLTZ ne "")
+  {
+    my $timestampLocal_s = time_str2num($timestampLTZ);
+    my @t = gmtime($timestampLocal_s);
+    return sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+  }
+  else
+  {
+    return undef;
+  }
 }
 
 ##################################
@@ -3542,39 +4508,34 @@ sub GroheOndusSmartDevice_GetUTCOffset()
 sub GroheOndusSmartDevice_GetUTCMidnightDate($)
 {
   my ( $offset_hour ) = @_;
-  
-  # it seems that the timestamp for this command has to be in UTC
-  # we want to request all data from within the current day beginning from 00:00:00
-  # so we need to transform the current date 00:00:00 to UTC
-  # localtime           -> request UTC
-  # 2019.31.08T23:xx:xx -> 2019.30.08T22:00:00
-  # 2019.01.09T00:xx:xx -> 2019.30.08T22:00:00
-  # 2019.01.09T01:xx:xx -> 2019.30.08T22:00:00
-  # 2019.01.09T02:xx:xx -> 2019.31.08T22:00:00
-  # 2019.01.09T03:xx:xx -> 2019.31.08T22:00:00
-  my $currentTimestamp = gettimeofday();
 
-  # calculate the offset between localtime and UTC in hours
-  my $offsetLocalTimeUTC_hours = GroheOndusSmartDevice_GetUTCOffset();
+  my $timestamp_LTZ_s = time_str2num(GroheOndusSmartDevice_GetLTZMidnightDate());
+  my $currentTimestamp_s = $timestamp_LTZ_s - ($offset_hour * 3600);
 
-  # current date in Greenwich
-  my ( $d, $m, $y ) = ( gmtime($currentTimestamp) )[ 3, 4, 5 ];
+  my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) = gmtime($currentTimestamp_s);
 
-  # Greenwich"s date minus offset
-  my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) = gmtime( timegm( 0, 0, 0, $d, $m, $y ) - ($offsetLocalTimeUTC_hours - $offset_hour) * 3600 );
-
-  # today -> get all data from within this day
-  #my $requestFromTimestamp = sprintf("%04d-%02d-%02d", $year+1900, $month+1, $mday);
   my $gmtMidnightDate = sprintf( "%04d-%02d-%02dT%02d:00:00", $year + 1900, $month + 1, $mday, $hour );
 
   return $gmtMidnightDate;
 }
 
 ##################################
-# GroheOndusSmartDevice_FileLog_MeasureValueWrite
-sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$@)
+# GroheOndusSmartDevice_GetLTZMidnightDate()
+sub GroheOndusSmartDevice_GetLTZMidnightDate()
 {
-  my ( $hash, $timestamp_s, @valueTupleList ) = @_;
+  my $currentTimestamp_s = gettimeofday();
+  my ( $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst ) = localtime($currentTimestamp_s);
+
+  my $localMidnightDate = sprintf( "%04d-%02d-%02dT%02d:00:00", $year + 1900, $month + 1, $mday, 0 );
+
+  return $localMidnightDate;
+}
+
+##################################
+# GroheOndusSmartDevice_FileLog_MeasureValueWrite
+sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$$@)
+{
+  my ( $hash, $title, $timestamp_s, @valueTupleList ) = @_;
   my $name = $hash->{NAME};
 
   # check if LogFile is enabled
@@ -3584,19 +4545,23 @@ sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$@)
   my $filenamePattern = $hash->{helper}{LogFilePattern};
   $filenamePattern = $filenamePattern =~ s/<name>/$name/r; # replace placeholder with $name
   my @t = localtime($timestamp_s);
+  my $timestampString = sprintf("%04d-%02d-%02d_%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
   
-  my $fileName = ResolveDateWildcards($filenamePattern, @t);
-  my $oldLogFileName = $hash->{helper}{LogFileName};
+  my $oldLogFileName  = $hash->{helper}{LogFileName};
+  my $fileName        = ResolveDateWildcards($filenamePattern, @t);
+  my $fileHandle      = undef;
 
-  # filename has changed
-  # -> if new file exists, delete it
+  # filename has changed and new file exists?
+  # then open file for (over)write else open it for append
   if(defined($oldLogFileName) and
     $oldLogFileName ne $fileName)
   {
-    GroheOndusSmartDevice_FileLog_Delete($hash, $fileName); # delete current logfile
+    open($fileHandle, ">", $fileName);
   }
-
-  my $timestampString = sprintf("%04d-%02d-%02d_%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
+  else
+  {
+    open($fileHandle, ">>", $fileName);
+  }
 
   my $logfileFormat = $hash->{helper}{LogFileFormat};
   my $measureValueString = ""; 
@@ -3606,29 +4571,37 @@ sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$@)
     foreach my $currentData ( @valueTupleList )
     {
       my ($reading, $value ) = @$currentData;
+
+      $value = "undef"
+        if(not defined($value));
+
       $measureValueString .= "$timestampString $name $reading: $value\n";
     }
   }
   else # default: elsif($logfileFormat eq "Measurement")
   {
-    $measureValueString .= "$timestampString $name Measurement:";
+    $measureValueString .= "$timestampString $name $title:";
     
     foreach my $currentData ( @valueTupleList )
     {
       my ($reading, $value ) = @$currentData;
+      
+      $value = "undef"
+        if(not defined($value));
+      
       $measureValueString .=  " $value";
     }
     $measureValueString .= "\n";
   }
 
-  open(my $fileHandle, ">>", $fileName);
+  # write data to logfile
   print $fileHandle $measureValueString;
-  close $fileHandle;
+  close($fileHandle);
 
   if(not defined($hash->{helper}{LogFileName}) or
     $hash->{helper}{LogFileName} ne $fileName)
   {
-    $hash->{helper}{LogFileName} = $fileName;    # GroheOndusSmartDevice_FileLog_Delete sets LogFileName to undef
+    $hash->{helper}{LogFileName} = $fileName;
     GroheOndusSmartDevice_UpdateInternals($hash);
   }
 
@@ -3641,9 +4614,18 @@ sub GroheOndusSmartDevice_FileLog_Delete($$)
 {
   my ( $hash, $fileName ) = @_;
   my $name = $hash->{NAME};
-  
+
   # delete file
-  unlink $fileName;
+  my $result = unlink($fileName);
+
+  Log3($name, 4, "GroheOndusSmartDevice_FileLog_Delete($name) - $fileName Result: $result");
+
+  if(-e $fileName) 
+  {
+    Log3($name, 3, "GroheOndusSmartDevice_FileLog_Delete($name) - $fileName still exists!");
+  }
+  
+  return;
 }
 
 ##################################
@@ -3669,9 +4651,33 @@ sub GroheOndusSmartDevice_FileLog_Create_FileLogDevice($;$)
 
   # set FileLog device in same room like this
   my $room = AttrVal( $name, "room", "none" );
-  if ( $room ne "none" )
+  if( $room ne "none" )
   {
     CommandAttr( undef, $logFileName . " room " . $room );
+  }
+}
+
+##################################
+# GroheOndusSmartDevice_Getnum
+sub GroheOndusSmartDevice_Getnum($)
+{
+#    use POSIX qw(strtod);
+  my ( $str ) = @_;
+
+  $str =~ s/^\s+//;
+  $str =~ s/\s+$//;
+  $! = 0;
+
+  my($num, $unparsed) = strtod($str);
+
+  if(($str eq '') || 
+    ($unparsed != 0) || $!) 
+  {
+    return undef;
+  }
+  else 
+  {
+    return $num;
   }
 }
 
@@ -3735,8 +4741,8 @@ sub GroheOndusSmartDevice_PostFn($$)
     In combination with FHEM module <a href="#GroheOndusSmartBridge">GroheOndusSmartBridge</a> this module represents a grohe appliance like <b>Sense</b> or <b>SenseGuard</b>.<br>
     It communicates over <a href="#GroheOndusSmartBridge">GroheOndusSmartBridge</a> to the <b>Grohe-Cloud</b> to get the configuration and measured values of the appliance.<br>
     <br>
-    Once the Bridge device is created, the connected devices are recognized and created automatically in FHEM.<br>
-    From now on the devices can be controlled and changes in the GroheOndusAPP are synchronized with the state and readings of the devices.<br>
+    Once the Bridge device is created, the connected devices are recognized and created automatically as GroheOndusSmartDevices in FHEM.<br>
+    From now on the appliances can be controlled and the measured values are synchronized with the state and readings of the devices.<br>
     <br>
     <br>
     <b>Notes</b>
@@ -3764,25 +4770,26 @@ sub GroheOndusSmartDevice_PostFn($$)
     <br>
     <a name="GroheOndusSmartDevicetimestampproblem"></a><b>The Timestamp-Problem</b><br>
     <br>
-    The Grohe appliances <b>Sense</b> and <b>SenseGuard</b> send their data to the cloud on a specific period of time.<br>
+    The Grohe appliances <b>Sense</b> and <b>SenseGuard</b> send their data to the <b>Grohe-Cloud</b> on a specific period of time.<br>
     <br>
     <ul>
-      <li><b>SenseGuard</b> measures every withdrawal and sends the data in a period of <b>15 minutes</b> to the cloud</li>
-      <li><b>Sense</b> measures once per hour and sends the data in a period of only <b>24 hours</b> to the cloud</li>
+      <li><b>SenseGuard</b> measures every withdrawal and sends the data in a period of <b>15 minutes</b> to the <b>Grohe-Cloud</b></li>
+      <li><b>Sense</b> measures once per hour and sends the data in a period of only <b>24 hours</b> to the <b>Grohe-Cloud</b></li>
     </ul>
     <br>
-    So, if this module gets new data from the cloud the timestamps of the measurements are lying in the past.<br>
+    So, if this module gets new data from the <b>Grohe-Cloud</b> the timestamps of the measurements are lying in the past.<br>
     <br>
     <b>Problem:</b><br>
-    When setting the received new data to this module's readings FHEM's logging-mechanism (<a href="#FileLog">FileLog</a>, <a href="#DbLog">DbLog</a>) will take the current <b>system time</b> - not the timestamps of the measurements - to store the readings' values.<br>
+    When setting the received new data to this module's readings, FHEM's logging-mechanism (<a href="#FileLog">FileLog</a>, <a href="#DbLog">DbLog</a>) will take the current <b>system time</b> - not the timestamps of the measurements - to store the readings' values.<br>
+    So plots can't be created the common way with because of the inconsistent timestamp-value-combinations in the logfiles.<br> 
     <br>
-    To solve the timestamp-problem this module writes a timestamp-measurevalue-combination to the additional <b>"Measurement"-readings</b> and a plot has to split that combination again to get the plot-points.<br>
+    To solve the timestamp-problem this module writes a timestamp-value-combination string to the additional <b>"Measurement"-readings</b> and a plot has to split that string again to get the plot-points.<br>
     See Plot Example below.<br>
     <br>
     Another solution to solve this problem is to enable the <b>LogFile-Mode</b> by setting the attribute <b>logFileModeEnabled</b> to <b>"1"</b>.<br>
     With enabled <b>LogFile-Mode</b> this module is writing new measurevalues additionally to an own logfile with consistent timestamp-value-combinations.<br>
     Define the logfile-name with the attribute <b>logFileNamePattern</b>.<br>
-    You can access the logfile in your known way - i.E. from within a plot - by defining a <a href="#FileLog">FileLog</a> device in <b>readonly</b> mode.<br>
+    You can access the logfile in your known way - i.E. from within a plot - by defining a <a href="#FileLog">FileLog</a> device in <b>readonly</b> mode or just set the command <b>logFileCreateFileLogDevice</b>.<br>
     <br>
     With enabled <b>LogFile-Mode</b> you have the possibility to fetch <b>all historic data from the cloud</b> and store it in the logfile(s) by setting the command <b>logFileGetHistoricData</b>.<br>
     <br> 
@@ -3829,16 +4836,70 @@ sub GroheOndusSmartDevice_PostFn($$)
         <b>off</b> close valve.<br>
       </li>
       <br>
+      <li><a name="GroheOndusSmartDeviceTotalWaterConsumption">TotalWaterConsumption</a><br>
+        Adjust the reading <b>TotalWaterConsumption</b> to the given value by setting the attribute <b>offsetTotalWaterConsumption</b>.<br>
+        <br>
+        <code>
+          set &lt;name&gt; TotalWaterConsumption 398086.3
+        </code>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDeviceTotalHotWaterShare">TotalHotWaterShare</a><br>
+        Adjust the reading <b>TotalHotWaterShare</b> to the given value by setting the attribute <b>offsetTotalHotWaterShare</b>.<br>
+        <br>
+        <code>
+          set &lt;name&gt; TotalHotWaterShare 398086.3
+        </code>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDeviceTotalWaterCost">TotalWaterCost</a><br>
+        Adjust the reading <b>TotalWaterCost</b> to the given value by setting the attribute <b>offsetTotalWaterCost</b>.<br>
+        <br>
+        <code>
+          set &lt;name&gt; TotalWaterCost 580.05235
+        </code>
+      </li>
+      <br>
+      <li><a name="GroheOndusSmartDeviceTotalEnergyCost">TotalEnergyCost</a><br>
+        Adjust the reading <b>TotalEnergyCost</b> to the given value by setting the attribute <b>offsetTotalEnergyCost</b>.<br>
+        <br>
+        <code>
+          set &lt;name&gt; TotalEnergyCost 580.05235
+        </code>
+      </li>
+      <br>
       <b><i>LogFile-Mode</i></b><br>
       <i>If logfile-Mode is enabled (attribute logFileEnabled) all data is additionally written to logfiles(s).</i><br>
       <i>Hint: Set logfile-name pattern with attribute logFilePattern</i><br>
       <br>
       <li><a name="GroheOndusSmartDevicelogFileGetHistoricData">logFileGetHistoricData</a><br>
-        Write all historic data since ApplianceInstallationDate to the logfile(s).<br>
         <br>
         <code>
-          set &lt;name&gt; logFileGetHistoricData
+          set &lt;name&gt; logFileGetHistoricData [&lt;startdate&gt;|&lt;stop&gt;]
         </code>
+        <br>
+        <br>
+        If parameter <b>startdate</b> is set then start getting all historic data since <b>startdate</b>.<br>
+        <br>
+        Format is: <b>2021-11-20</b> or <b>2021-11-20T05:42:34</b><br>
+        <br>
+        Else start getting all historic data since the greater value of the reading <b>ApplianceInstallationDate</b> or the value of attribute <b>logFileGetDataStartDate</b> if set.<br>
+        <br>
+        If getting historic values is running then the command <b>stop</b> will break that.<br>
+        <br>
+        Consider setting attribute <b>logFileEnabled</b> to <b>1</b> before start getting historic values to save the values in data-logfiles.<br> 
+        <br>
+        <i>Hint: you can create a matching <b>readonly</b>-mode <b>FileLog</b> device by setting command <b>logFileCreateFileLogDevice</b>.</i><br>
+        <br>
+        <b>Attention:<br>
+        All former data-logfiles will be cleared and filled with the new values!</b><br>
+        <br>
+        <b>Attention:<br>
+        Depending on the start date this may produce a lot of data and last very long!</b><br>
+        <br>
+        <br>
+        Because of the huge amount of data a SenseGuard device fetches the measurements and withdrawals of only one day per telegram.<br>
+        A Sense device fetches the data of 30 days per telegram.
         <br>
       </li>
       <br>
@@ -3984,22 +5045,29 @@ sub GroheOndusSmartDevice_PostFn($$)
         </ul><br>
       </li>
       <br>
+      <li><a name="GroheOndusSmartDevicelogFileGetDataStartDate">logFileGetDataStartDate</a><br>
+        Set the local start date for the command <b>logFileGetHistoricData</b><br>
+        If this attribute is deleted or not set then <b>ApplianceInstallationDate</b> is used for start date.<br>
+        <br>
+        Format is: <b>2021-11-20</b> or <b>2021-11-20T05:42:34</b><br>
+      </li>
+      <br>
       <b><i>SenseGuard-only</i></b><br>
       <i>Only visible for SenseGuard appliance</i><br>
       <br>
-      <li><a name="GroheOndusSmartDeviceoffsetEnergyCost">offsetEnergyCost</a><br>
+      <li><a name="GroheOndusSmartDeviceoffsetTotalEnergyCost">offsetTotalEnergyCost</a><br>
         Offset value for calculating reading TotalEnergyCost.<br>
       </li>
       <br>
-      <li><a name="GroheOndusSmartDeviceoffsetWaterCost">offsetWaterCost</a><br>
+      <li><a name="GroheOndusSmartDeviceoffsetTotalWaterCost">offsetTotalWaterCost</a><br>
         Offset value for calculating reading TotalWaterCost.<br>
       </li>
       <br>
-      <li><a name="GroheOndusSmartDeviceoffsetWaterConsumption">offsetWaterConsumption</a><br>
+      <li><a name="GroheOndusSmartDeviceoffsetTotalWaterConsumption">offsetTotalWaterConsumption</a><br>
         Offset value for calculating reading TotalWaterConsumption.<br>
       </li>
       <br>
-      <li><a name="GroheOndusSmartDeviceoffsetHotWaterShare">offsetHotWaterShare</a><br>
+      <li><a name="GroheOndusSmartDeviceoffsetTotalHotWaterShare">offsetTotalHotWaterShare</a><br>
         Offset value for calculating reading TotalHotWaterShare.<br>
       </li>
     </ul><br>
