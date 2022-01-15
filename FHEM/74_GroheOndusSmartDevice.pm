@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.1.0";
+my $VERSION = "3.1.1";
 
 use strict;
 use warnings;
@@ -2043,7 +2043,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
         my $currentWithdrawal = shift(@withdrawalList);
 
         my $todayMidnight_LTZ = GroheOndusSmartDevice_GetLTZMidnightDate();
-        Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) - midnight: $todayMidnight_LTZ");
+        Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) - midnight: $todayMidnight_LTZ");
 
         # get first entries of both lists if defined
         my ($currentMeasurementDataTimestamp_LTZ_s, $currentMeasurementDataTimestamp_LUTC, $currentMeasurementData) = @{$currentMeasurement}
@@ -2242,7 +2242,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
             }
             else
             {
-              Log3($name, 3, "GroheOndusSmartDevice_SenseGuard_GetData($name) -  Withdrawal: finished");
+              Log3($name, 5, "GroheOndusSmartDevice_SenseGuard_GetData($name) -  Withdrawal: finished");
             }
           }
         }
@@ -3891,7 +3891,7 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
         if($hash->{helper}{GetInProgress} ne "0" and 
           $hash->{helper}{GetSuspendReadings} ne "0")
         {
-          readingsBulkUpdateIfChanged( $hash, "state", "getting historic data finished", 1 );
+          readingsBulkUpdateIfChanged($hash, "state", "getting historic data finished", 1);
         }
 
         $hash->{helper}{GetSuspendReadings} = "0";
@@ -3900,11 +3900,11 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
         $hash->{helper}{GetInProgress} = "0";
         GroheOndusSmartDevice_UpdateInternals($hash);
 
-        readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $currentDataTimestamp_LUTC, 1 )
+        readingsBulkUpdateIfChanged($hash, "LastDataTimestamp", $currentDataTimestamp_LUTC, 1)
           if(defined($currentDataTimestamp_LUTC));
-        readingsBulkUpdateIfChanged( $hash, "LastHumidity", $currentDataHumidity, 1 )
+        readingsBulkUpdateIfChanged($hash, "LastHumidity", $currentDataHumidity, 1)
           if(defined($currentDataHumidity));
-        readingsBulkUpdateIfChanged( $hash, "LastTemperature", $currentDataTemperature, 1 )
+        readingsBulkUpdateIfChanged($hash, "LastTemperature", $currentDataTemperature, 1)
           if(defined($currentDataTemperature));
           
         readingsEndUpdate( $hash, 1 );
