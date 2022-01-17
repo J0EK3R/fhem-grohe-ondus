@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.1.1";
+my $VERSION = "3.1.2";
 
 use strict;
 use warnings;
@@ -1912,7 +1912,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
           foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
           {
             # is this the correct dataset?
-            if( defined( $currentData->{timestamp} ) )
+            if(defined($currentData->{timestamp}))
             {
               my $currentDataTimestamp_LUTC = $currentData->{timestamp};
 
@@ -2166,7 +2166,8 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
                   if(defined($currentWithdrawalCostWater));
                 $hash->{helper}{TodayEnergyCost} = $currentWithdrawalCostEnergy
                   if(defined($currentWithdrawalCostEnergy));
-                $hash->{helper}{TodayMaxFlowrate} = $currentWithdrawalMaxFlowrate;
+                $hash->{helper}{TodayMaxFlowrate} = $currentWithdrawalMaxFlowrate
+                  if(defined($currentWithdrawalMaxFlowrate));
                 $hash->{helper}{TodayWithdrawalCount} = 1;
                 $todaysValuesChanged = 1;
               }
@@ -2181,7 +2182,8 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
                   if(defined($currentWithdrawalCostWater));
                 $hash->{helper}{TodayEnergyCost} += $currentWithdrawalCostEnergy
                   if(defined($currentWithdrawalCostEnergy));
-                $hash->{helper}{TodayMaxFlowrate} = $currentWithdrawalMaxFlowrate if($hash->{helper}{TodayMaxFlowrate} < $currentWithdrawalMaxFlowrate);
+                $hash->{helper}{TodayMaxFlowrate} = $currentWithdrawalMaxFlowrate
+                  if(defined($currentWithdrawalMaxFlowrate));
                 $hash->{helper}{TodayWithdrawalCount}++;
                 $todaysValuesChanged = 1;
               }
