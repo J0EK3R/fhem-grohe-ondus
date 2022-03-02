@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.1.2";
+my $VERSION = "3.1.3";
 
 use strict;
 use warnings;
@@ -616,7 +616,7 @@ sub GroheOndusSmartBridge_UpdateInternals($)
     $hash->{DEBUG_WRITEMETHOD}              = $hash->{helper}{WRITEMETHOD};
     $hash->{DEBUG_WRITEURL}                 = $hash->{helper}{WRITEURL};
     $hash->{DEBUG_WRITEHEADER}              = $hash->{helper}{WRITEHEADER};
-    $hash->{DEBUG_WRITEPAYLOAD}             = $hash->{helper}{WRITEPAYLOAD};
+    $hash->{DEBUG_WRITEDATA}                = $hash->{helper}{WRITEDATA};
     $hash->{DEBUG_WRITEHTTPVERSION}         = $hash->{helper}{WRITEHTTPVERSION};
     $hash->{DEBUG_WRITEIGNOREREDIRECTS}     = $hash->{helper}{WRITEIGNOREREDIRECTS};
     $hash->{DEBUG_WRITEKEEPALIVE}           = $hash->{helper}{WRITEKEEPALIVE};
@@ -1813,13 +1813,13 @@ sub GroheOndusSmartBridge_RequestParam($$)
     $param->{retryCallback} = \&GroheOndusSmartBridge_SendReceive;
     $param->{leftRetries} = $hash->{RETRIES};
 
-    $hash->{helper}{WRITEMETHOD} = $param->{method};
-    $hash->{helper}{WRITEURL} = $param->{url};
-    $hash->{helper}{WRITEHEADER} = $param->{header};
-    $hash->{helper}{WRITEPAYLOAD} = $param->{payload};
-    $hash->{helper}{WRITEHTTPVERSION} = $param->{httpversion};
+    $hash->{helper}{WRITEMETHOD}          = $param->{method};
+    $hash->{helper}{WRITEURL}             = $param->{url};
+    $hash->{helper}{WRITEHEADER}          = $param->{header};
+    $hash->{helper}{WRITEDATA}            = $param->{data};
+    $hash->{helper}{WRITEHTTPVERSION}     = $param->{httpversion};
     $hash->{helper}{WRITEIGNOREREDIRECTS} = $param->{ignoreredirects};
-    $hash->{helper}{WRITEKEEPALIVE} = $param->{keepalive};
+    $hash->{helper}{WRITEKEEPALIVE}       = $param->{keepalive};
 
     GroheOndusSmartBridge_UpdateInternals($hash);
 

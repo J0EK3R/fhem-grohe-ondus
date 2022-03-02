@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.1.2";
+my $VERSION = "3.1.3";
 
 use strict;
 use warnings;
@@ -74,7 +74,9 @@ sub GroheOndusSmartDevice_SenseGuard_GetData_Stop($);
 sub GroheOndusSmartDevice_SenseGuard_GetData_StartCampain($$;$$);
 sub GroheOndusSmartDevice_SenseGuard_GetData_TimerExecute($);
 sub GroheOndusSmartDevice_SenseGuard_GetData_TimerRemove($);
+
 sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$);
+sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$);
 
 sub GroheOndusSmartDevice_Sense_Update($);
 sub GroheOndusSmartDevice_Sense_GetState($;$$);
@@ -114,7 +116,7 @@ sub GroheOndusSmartDevice_PostFn($$);
 my $GetLoopDataInterval                   = 1;     # interval of the data-get-timer
 
 my $SenseGuard_DefaultInterval            = 60 * 1; # default value for the polling interval in seconds
-my $SenseGuard_DefaultStateFormat         =  "State: state<br/>Valve: CmdValveState<br/>Consumption: TodayWaterConsumption l<br/>Temperature: LastTemperature Grad C<br/>Pressure: LastPressure bar";
+my $SenseGuard_DefaultStateFormat         = "State: state<br/>Valve: CmdValveState<br/>Consumption: TodayWaterConsumption l<br/>Temperature: LastTemperature Grad C<br/>Pressure: LastPressure bar";
 my $SenseGuard_DefaultWebCmdFormat        = "valve on:valve off"; # "update:valve on:valve off"
 my $SenseGuard_DefaultGetTimespan         = 60 * 60 * 24 * 1; # 1 days
 
