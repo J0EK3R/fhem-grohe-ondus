@@ -1,2 +1,2 @@
-UPD 2022-04-17_03:50:30 75873   FHEM/73_GroheOndusSmartBridge.pm
-UPD 2022-04-17_03:50:30 210075  FHEM/74_GroheOndusSmartDevice.pm
+UPD 2022-04-17_04:33:08 75873   FHEM/73_GroheOndusSmartBridge.pm
+UPD 2022-04-17_04:33:08 210170  FHEM/74_GroheOndusSmartDevice.pm
