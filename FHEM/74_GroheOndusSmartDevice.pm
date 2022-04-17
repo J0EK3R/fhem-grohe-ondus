@@ -1,12 +1,12 @@
 ###############################################################################
 #
-# Developed with eclipse
+# Developed with eclipse on windows os using fiddler to catch ip communication.
 #
 #  (c) 2019 Copyright: J.K. (J0EK3R at gmx dot net)
 #  All rights reserved
 #
-#   Special thanks goes to comitters:
-#
+#  Special thanks goes to committers:
+#  * me
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.1.3";
+my $VERSION = "3.1.4";
 
 use strict;
 use warnings;
@@ -984,7 +984,7 @@ sub GroheOndusSmartDevice_Upgrade($)
 
 #####################################
 # GroheOndusSmartDevice_UpdateInternals( $hash )
-# This methode copies values from $hash-{helper} to visible intzernals 
+# This methode copies values from $hash-{helper} to visible internals 
 sub GroheOndusSmartDevice_UpdateInternals($)
 {
   my ( $hash ) = @_;

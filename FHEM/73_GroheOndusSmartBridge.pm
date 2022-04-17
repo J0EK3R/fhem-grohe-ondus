@@ -1,12 +1,12 @@
 ###############################################################################
 #
-# Developed with eclipse
+# Developed with eclipse on windows os using fiddler to catch ip communication.
 #
 #  (c) 2019 Copyright: J.K. (J0EK3R at gmx dot net)
 #  All rights reserved
 #
-#   Special thanks goes to comitters:
-#
+#  Special thanks goes to committers:
+#  * me
 #
 #  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.1.3";
+my $VERSION = "3.1.4";
 
 use strict;
 use warnings;
@@ -83,17 +83,16 @@ sub GroheOndusSmartBridge_Header_AddAuthorization($$);
 sub GroheOndusSmartBridge_Header_AddCookies($$);
 
 
-my $DefaultRetries = 3;                                # default number of retries
-my $DefaultInterval = 60;                              # default value for the polling interval in seconds
-my $DefaultTimeout = 5;                                # default value for response timeout in seconds
+my $DefaultRetries    = 3;                                                      # default number of retries
+my $DefaultInterval   = 60;                                                     # default value for the polling interval in seconds
+my $DefaultTimeout    = 5;                                                      # default value for response timeout in seconds
 
-my $DefaultAPIVersion = "/v3";                         # default API-Version
-my $DefaultURL = "https://idp2-apigw.cloud.grohe.com"; # default URL
-my $LoginURL = "/iot/oidc/login";
+my $DefaultURL        = "https://idp2-apigw.cloud.grohe.com/v3";                # default URL
+my $LoginURL          = "https://idp2-apigw.cloud.grohe.com/v3/iot/oidc/login";
 
-my $TimeStampFormat = "%Y-%m-%dT%I:%M:%S";
+my $TimeStampFormat   = "%Y-%m-%dT%H:%M:%S";
 
-my $ReloginOffset_s = -60;                             # (negative) timespan in seconds to add "expires_in" timespan to relogin
+my $ReloginOffset_s   = -60;                                                    # (negative) timespan in seconds to add "expires_in" timespan to relogin
 
 #####################################
 # GroheOndusSmartBridge_Initialize( $hash )
@@ -151,7 +150,7 @@ sub GroheOndusSmartBridge_Define($$)
   my $name = $a[0];
   $hash->{VERSION}                       = $VERSION;
   $hash->{NOTIFYDEV}                     = "global,$name";
-  $hash->{URL}                           = $DefaultURL . $DefaultAPIVersion;
+  $hash->{URL}                           = $DefaultURL;
   $hash->{INTERVAL}                      = $DefaultInterval;
   $hash->{TIMEOUT}                       = $DefaultTimeout;
   $hash->{RETRIES}                       = $DefaultRetries;
@@ -901,13 +900,13 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
   # GET https://idp2-apigw.cloud.grohe.com/v1/sso/auth/realms/idm-apigw/protocol/openid-connect/auth?redirect_uri=ondus://idp2-apigw.cloud.grohe.com/v3/iot/oidc/token&scope=openid&response_type=code&client_id=iot&state=f425421e-c03c-44d1-ae43-275c5ee94f81 HTTP/1.1
 
   my $param = {};
-  $param->{method} = "GET";
-  $param->{url} = $hash->{URL} . $LoginURL;
-  $param->{header} = "";
-  $param->{data} = "";
-  $param->{httpversion} = "1.1";
+  $param->{method}          = "GET";
+  $param->{url}             = $LoginURL;
+  $param->{header}          = "";
+  $param->{data}            = "";
+  $param->{httpversion}     = "1.1";
   $param->{ignoreredirects} = 0;
-  $param->{keepalive} = 1;
+  $param->{keepalive}       = 1;
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
@@ -1258,13 +1257,13 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
   my $jsondata = { "refresh_token" => $hash->{helper}{refresh_token} };
 
   my $param = {};
-  $param->{method} = "POST";
-  $param->{url}    = $hash->{URL} . "/iot/oidc/refresh";
-  $param->{header} = "Content-Type: application/json; charset=utf-8";
-  $param->{data} = encode_json($jsondata);
-  $param->{httpversion} = "1.1";
+  $param->{method}          = "POST";
+  $param->{url}             = $hash->{URL} . "/iot/oidc/refresh";
+  $param->{header}          = "Content-Type: application/json; charset=utf-8";
+  $param->{data}            = encode_json($jsondata);
+  $param->{httpversion}     = "1.1";
   $param->{ignoreredirects} = 0;
-  $param->{keepalive} = 1;
+  $param->{keepalive}       = 1;
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
@@ -1400,13 +1399,13 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
   }; 
 
   my $param = {};
-  $param->{method} = "GET";
-  $param->{url}    = $hash->{URL} . "/iot/locations";
-  $param->{header} = "Content-Type: application/json";
-  $param->{data} = "{}";
-  $param->{httpversion} = "1.0";
+  $param->{method}          = "GET";
+  $param->{url}             = $hash->{URL} . "/iot/locations";
+  $param->{header}          = "Content-Type: application/json";
+  $param->{data}            = "{}";
+  $param->{httpversion}     = "1.0";
   $param->{ignoreredirects} = 0;
-  $param->{keepalive} = 1;
+  $param->{keepalive}       = 1;
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
@@ -1500,13 +1499,13 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
   }; 
 
   my $param = {};
-  $param->{method} = "GET";
-  $param->{url}    = $hash->{URL} . "/iot/locations/" . $current_location_id . "/rooms";
-  $param->{header} = "Content-Type: application/json";
-  $param->{data} = "{}";
-  $param->{httpversion} = "1.0";
+  $param->{method}          = "GET";
+  $param->{url}             = $hash->{URL} . "/iot/locations/" . $current_location_id . "/rooms";
+  $param->{header}          = "Content-Type: application/json";
+  $param->{data}            = "{}";
+  $param->{httpversion}     = "1.0";
   $param->{ignoreredirects} = 0;
-  $param->{keepalive} = 1;
+  $param->{keepalive}       = 1;
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
@@ -1767,13 +1766,13 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
   };
   
   my $param = {};
-  $param->{method} = "GET";
-  $param->{url}    = $hash->{URL} . "/iot/locations/" . $current_location_id . "/rooms/" . $current_room_id . "/appliances";
-  $param->{header} = "Content-Type: application/json";
-  $param->{data} = "{}";
-  $param->{httpversion} = "1.0";
+  $param->{method}          = "GET";
+  $param->{url}             = $hash->{URL} . "/iot/locations/" . $current_location_id . "/rooms/" . $current_room_id . "/appliances";
+  $param->{header}          = "Content-Type: application/json";
+  $param->{data}            = "{}";
+  $param->{httpversion}     = "1.0";
   $param->{ignoreredirects} = 0;
-  $param->{keepalive} = 1;
+  $param->{keepalive}       = 1;
 
   $param->{hash} = $hash;
   $param->{resultCallback} = $resultCallback;
