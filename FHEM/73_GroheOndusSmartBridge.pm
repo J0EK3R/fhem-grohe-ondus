@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.1.4";
+my $VERSION = "3.1.5";
 
 use strict;
 use warnings;

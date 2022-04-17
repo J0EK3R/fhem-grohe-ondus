@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.1.4";
+my $VERSION = "3.1.5";
 
 use strict;
 use warnings;
@@ -2433,9 +2433,9 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
     }
     else
     {
-      # error -> historic get has broken
-      #$hash->{helper}{GetInProgress} = "0";
-      #GroheOndusSmartDevice_UpdateInternals($hash);
+      # error -> historic get failed
+      $hash->{helper}{GetInProgress} = "0";
+      GroheOndusSmartDevice_UpdateInternals($hash);
 
       readingsSingleUpdate( $hash, "state", $errorMsg, 1 );
 
@@ -2483,22 +2483,22 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
       my $requestToTimestamp_UTC = sprintf("%04d-%02d-%02dT%02d:%02d:%02d", $t[5] + 1900, $t[4] + 1, $t[3], $t[2], $t[1], $t[0]);
       
       my $param = {};
-      $param->{method}                    = "GET";
-      $param->{url}                       = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
-      $param->{header}                    = "Content-Type: application/json";
-      $param->{data}                      = "{}";
-      $param->{httpversion}               = "1.0";
-      $param->{ignoreredirects}           = 0;
-      $param->{keepalive}                 = 1;
-      $param->{timeout}                   = 10;
-      $param->{incrementalTimeout}        = 1;
+      $param->{method}                          = "GET";
+      $param->{url}                             = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
+      $param->{header}                          = "Content-Type: application/json";
+      $param->{data}                            = "{}";
+      $param->{httpversion}                     = "1.0";
+      $param->{ignoreredirects}                 = 0;
+      $param->{keepalive}                       = 1;
+      $param->{timeout}                         = 10;
+      $param->{incrementalTimeout}              = 1;
 
-      $param->{resultCallback}            = $resultCallback;
-      $param->{requestFromTimestamp_UTC}  = $requestFromTimestamp_UTC;
-      $param->{requestToTimestamp_UTC}    = $requestToTimestamp_UTC;
-      $param->{GetCampain}                = $hash->{helper}{GetCampain};
-      $param->{ApplianceTDT_LUTC_GetData} = $applianceTDT_LUTC;
-      $param->{timestampStart} = gettimeofday();
+      $param->{resultCallback}                  = $resultCallback;
+      $param->{requestFromTimestamp_UTC}        = $requestFromTimestamp_UTC;
+      $param->{requestToTimestamp_UTC}          = $requestToTimestamp_UTC;
+      $param->{GetCampain}                      = $hash->{helper}{GetCampain};
+      $param->{ApplianceTDT_LUTC_GetData}       = $applianceTDT_LUTC;
+      $param->{timestampStart}                  = gettimeofday();
 
       $hash->{helper}{GetInProgress}            = "1";
       $hash->{helper}{Telegram_GetDataIOWrite}  = strftime($TimeStampFormat, localtime($param->{timestampStart}));
