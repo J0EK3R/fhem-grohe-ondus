@@ -1,5 +1,5 @@
 FHEM Grohe Ondus last changes:
 2023-08-05
- - Version 4.0.0.0
+ - Version 4.0.1
 
-Added Blue-Integration
+* Added some more Blue JSON-structures
