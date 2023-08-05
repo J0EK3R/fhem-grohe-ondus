@@ -47,6 +47,7 @@ eval {use JSON;1 or $missingModul .= "JSON "};
 # Forward declaration
 sub GroheOndusSmartDevice_Initialize($);
 sub GroheOndusSmartDevice_Define($$);
+sub GroheOndusSmartDevice_Ready($);
 sub GroheOndusSmartDevice_Undef($$);
 sub GroheOndusSmartDevice_Delete($$);
 sub GroheOndusSmartDevice_Rename($$);
@@ -437,6 +438,18 @@ sub GroheOndusSmartDevice_Define($$)
   return undef;
 }
 
+####################################
+# GroheOndusSmartDevice_Ready($)
+sub GroheOndusSmartDevice_Ready($)
+{
+  my ($hash)  = @_;
+  my $name    = $hash->{NAME};
+
+  Log3($name, 4, "GroheOndusSmartDevice_Ready($name)");
+
+  GroheOndusSmartDevice_Upgrade($hash);
+}
+
 #####################################
 # GroheOndusSmartDevice_Undef( $hash, $arg )
 sub GroheOndusSmartDevice_Undef($$)
@@ -803,12 +816,33 @@ sub GroheOndusSmartDevice_Notify($$)
   # process "global" events
   if($devtype eq "Global")
   {
-    # global Initialization is done
-    if(grep(m/^INITIALIZED|REREADCFG$/, @{$events}))
+    if (grep(m/^INITIALIZED$/, @{$events}))
     {
-      Log3($name, 3, "GroheOndusSmartDevice_Notify($name) - global event INITIALIZED was catched");
+      # this is the initial call after fhem has startet
+      Log3($name, 3, "GroheOndusSmartDevice_Notify($name) - INITIALIZED");
+
+      GroheOndusSmartDevice_Ready($hash);
+    }
+
+    elsif (grep(m/^REREADCFG$/, @{$events}))
+    {
+      Log3($name, 3, "GroheOndusSmartDevice_Notify($name) - REREADCFG");
 
       GroheOndusSmartDevice_Upgrade($hash);
+    }
+
+    elsif (grep(m/^DEFINED.$name$/, @{$events}) )
+    {
+      Log3($name, 3, "GroheOndusSmartDevice_Notify($name) - DEFINED");
+    }
+
+    elsif (grep(m/^MODIFIED.$name$/, @{$events}))
+    {
+      Log3($name, 3, "GroheOndusSmartDevice_Notify($name) - MODIFIED");
+    }
+
+    if ($init_done)
+    {
     }
   }
   
