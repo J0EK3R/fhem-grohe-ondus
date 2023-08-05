@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "3.1.5";
+my $VERSION = "3.1.6";
 
 use strict;
 use warnings;
@@ -47,7 +47,6 @@ eval {use JSON;1 or $missingModul .= "JSON "};
 # Forward declaration
 sub GroheOndusSmartBridge_Initialize($);
 sub GroheOndusSmartBridge_Define($$);
-sub GroheOndusSmartBridge_Ready($);
 sub GroheOndusSmartBridge_Undef($$);
 sub GroheOndusSmartBridge_Delete($$);
 sub GroheOndusSmartBridge_Rename(@);
@@ -180,16 +179,6 @@ sub GroheOndusSmartBridge_Define($$)
   $modules{GroheOndusSmartBridge}{defptr}{BRIDGE} = $hash;
 
   return undef;
-}
-
-####################################
-# GroheOndusSmartBridge_Ready( $hash )
-sub GroheOndusSmartBridge_Ready($)
-{
-  my ($hash)  = @_;
-  my $name    = $hash->{NAME};
-
-  Log3($name, 4, "GroheOndusSmartBridge_Ready($name)");
 }
 
 #####################################
@@ -390,7 +379,6 @@ sub GroheOndusSmartBridge_Notify($$)
       # this is the initial call after fhem has startet
       Log3($name, 3, "GroheOndusSmartBridge_Notify($name) - INITIALIZED");
 
-      GroheOndusSmartBridge_Ready($hash);
       GroheOndusSmartBridge_TimerExecute($hash);
     }
 
@@ -2279,7 +2267,7 @@ sub GroheOndusSmartBridge_DeletePassword($)
     <a name="GroheOndusSmartBridgeattr"></a><b>Attributes</b><br>
     <ul>
       <li><a name="GroheOndusSmartBridgegroheOndusAccountEmail">groheOndusAccountEmail</a><br>
-        Your registered Email-address to login to the grohe cloud.
+        Your registered Email-address to login to the grohe clound.
       </li>
       <br>
       <li><a name="GroheOndusSmartBridgeautocreatedevices">autocreatedevices</a><br>
