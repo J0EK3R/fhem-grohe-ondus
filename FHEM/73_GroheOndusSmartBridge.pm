@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "4.0.1";
+my $VERSION = "4.0.2";
 
 use strict;
 use warnings;
@@ -1891,7 +1891,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
   {
     $code = "$param->{code}";
 
-    if( $param->{code} == 200 ) ###
+    if( $param->{code} == 200 ) ### OK
     {
     }
     elsif( $param->{code} == 302 ) ###
@@ -1901,6 +1901,11 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     {
       #$errorMsg = "wrong password";
       #$leftRetries = 0; # no retry
+    }
+    elsif( $param->{code} == 404 ) ### Appliance(s) not found
+    {
+      $errorMsg = "Appliance(s) not found";
+      $leftRetries = 0; # no retry
     }
     elsif( $param->{code} == 429 ) ### To many requests
     {
@@ -1921,7 +1926,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     }
     else
     {
-      # no error
+      $errorMsg = "error " . $param->{code};
     }
   }
 
