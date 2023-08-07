@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "4.0.3";
+my $VERSION = "4.0.4";
 
 use strict;
 use warnings;
@@ -1308,6 +1308,11 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
 
     if( $errorMsg eq "")
     {
+      if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+      {
+        readingsSingleUpdate( $hash, "GetLocations_RAW", "\"" . $data . "\"", 1 );
+      }
+
       my $decode_json = eval { decode_json($data) };
       if ($@)
       {
@@ -1315,10 +1320,7 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
 
         if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
-          readingsBulkUpdate( $hash, "JSON_ERROR_STRING", "\"" . $data . "\"", 1 );
-          readingsEndUpdate( $hash, 1 );
+          readingsSingleUpdate( $hash, "JSON_ERROR", $@, 1 );
         }
         $errorMsg = "GETLOCATIONS: JSON_ERROR";
       }
@@ -1430,6 +1432,11 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
 
     if( $errorMsg eq "" )
     {
+      if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+      {
+        readingsSingleUpdate( $hash, "GetRooms_RAW_" . $current_location_id, "\"" . $data . "\"", 1 );
+      }
+
       my $decode_json = eval { decode_json($data) };
       if ($@)
       {
@@ -1437,10 +1444,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
 
         if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
         {
-          readingsBeginUpdate($hash);
-          readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
-          readingsBulkUpdate( $hash, "JSON_ERROR_STRING", "\"" . $data . "\"", 1 );
-          readingsEndUpdate( $hash, 1 );
+          readingsSingleUpdate( $hash, "JSON_ERROR", $@, 1 );
         }
         $errorMsg = "GETROOMS: JSON_ERROR";
       }
@@ -1529,6 +1533,11 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
+    if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
+    {
+      readingsSingleUpdate( $hash, "GetAppliances_RAW_" . $current_location_id . "_" . $current_room_id, "\"" . $data . "\"", 1 );
+    }
+
     my $decode_json = eval { decode_json($data) };
     if ($@)
     {
@@ -1536,10 +1545,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
 
       if ( AttrVal( $name, "debugJSON", 0 ) == 1 )
       {
-        readingsBeginUpdate($hash);
-        readingsBulkUpdate( $hash, "JSON_ERROR", $@, 1 );
-        readingsBulkUpdate( $hash, "JSON_ERROR_STRING", "\"" . $data . "\"", 1 );
-        readingsEndUpdate( $hash, 1 );
+        readingsSingleUpdate( $hash, "JSON_ERROR", $@, 1 );
       }
       $errorMsg = "GETAPPLIANCES: JSON_ERROR";
     }
