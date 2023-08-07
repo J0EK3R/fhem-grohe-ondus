@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "4.0.2";
+my $VERSION = "4.0.3";
 
 use strict;
 use warnings;
@@ -5129,9 +5129,26 @@ sub GroheOndusSmartDevice_Blue_GetData($$;$$)
 
     my $lastProcessedTimestamp_LUTC = $hash->{helper}{LastProcessedTimestamp_LUTC};
     
-    my $currentDataTimestamp_LUTC   = undef;
-    my $currentDataHumidity         = undef;
-    my $currentDataTemperature      = undef;
+    my $currentDataTimestamp_LUTC              = undef;
+    my $current_open_close_cycles_still        = undef;
+    my $current_open_close_cycles_carbonated   = undef;
+    my $current_water_running_time_still       = undef;
+    my $current_water_running_time_medium      = undef;
+    my $current_water_running_time_carbonated  = undef;
+    my $current_operating_time                 = undef;
+    my $current_max_idle_time                  = undef;
+    my $current_pump_count                     = undef;
+    my $current_pump_running_time              = undef;
+    my $current_remaining_filter               = undef;
+    my $current_remaining_co2                  = undef;
+    my $current_date_of_filter_replacement     = undef;
+    my $current_date_of_co2_replacement        = undef;
+    my $current_date_of_cleaning               = undef;
+    my $current_power_cut_count                = undef;
+    my $current_time_since_restart             = undef;
+    my $current_time_since_last_withdrawal     = undef;
+    my $current_filter_change_count            = undef;
+    my $current_cleaning_count                 = undef;
 
     if($callbackparam->{GetCampain} != $hash->{helper}{GetCampain})
     {
@@ -5169,21 +5186,34 @@ sub GroheOndusSmartDevice_Blue_GetData($$;$$)
         #     "measurement":
         #     [
         #       {
-        #         "timestamp":"2019-01-30T08:04:27.000+01:00",
-        #         "humidity":54,
-        #         "temperature":19.4
+        #         "timestamp":"2023-08-06T00:18:06.000+02:00",
+        #         "open_close_cycles_still":173,
+        #         "open_close_cycles_carbonated":165,
+        #         "water_running_time_still":5,
+        #         "water_running_time_medium":2,
+        #         "water_running_time_carbonated":22,
+        #         "operating_time":245,
+        #         "max_idle_time":1003,
+        #         "pump_count":271,
+        #         "pump_running_time":45,
+        #         "remaining_filter":759,
+        #         "remaining_co2":34,
+        #         "date_of_filter_replacement":"2023-07-26T19:55:21.000+02:00",
+        #         "date_of_co2_replacement":"2023-07-28T22:23:55.000+02:00",
+        #         "date_of_cleaning":"2023-07-26T17:33:15.000+02:00",
+        #         "power_cut_count":18,
+        #         "time_since_restart":536887329,
+        #         "time_since_last_withdrawal":57,
+        #         "filter_change_count":0,
+        #         "cleaning_count":0
         #       },
-        #       {
-        #         "timestamp":"2019-01-30T08:04:28.000+01:00",
-        #         "humidity":53,
-        #         "temperature":19.4
-        #       }
         #     ],
         #     "withdrawals":
-        #      [
-        #      ]
-        #    },
-        # }
+        #     [
+        #     ]
+        #   }
+        # } 
+
         if( defined( $decode_json ) and
           defined( $decode_json->{data}->{measurement} ) and
           ref( $decode_json->{data}->{measurement} ) eq "ARRAY" )
@@ -5192,52 +5222,137 @@ sub GroheOndusSmartDevice_Blue_GetData($$;$$)
           my $dataTimestamp = undef;
           my $loopCounter = 0;
 
-#          foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
-#          {
-#            # is this the correct dataset?
-#            if( defined( $currentData->{timestamp} ) and 
-#              defined( $currentData->{humidity} ) and 
-#              defined( $currentData->{temperature} ) )
-#            {
-#              $currentDataTimestamp_LUTC = $currentData->{timestamp};
-#              $currentDataHumidity       = $currentData->{humidity};
-#              $currentDataTemperature    = $currentData->{temperature};
-#              
-#              # don't process measurevalues with timestamp before $lastProcessedTimestamp
-#              if($currentDataTimestamp_LUTC gt $lastProcessedTimestamp_LUTC)
-#              {
-#                # force the timestamp-seconds-string to have a well known length
-#                # fill with leading zeros
-#                my $currentDataTimestamp_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestamp_LUTC);
-#                my $currentDataTimestamp_LTZ_s = time_str2num($currentDataTimestamp_LTZ);
-#                my $currentDataTimestamp_LTZ_s_string = GroheOndusSmartDevice_GetLTZStringFromLUTC($currentDataTimestamp_LUTC);
-#
-#                if( $hash->{helper}{GetSuspendReadings} eq "0")
-#                {
-#                  readingsBeginUpdate($hash);
-#    
-#                  readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
-#                    if( defined($currentDataTimestamp_LUTC) );
-#                  readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataHumidity )
-#                    if( defined($currentDataHumidity) );
-#                  readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTemperature )
-#                    if( defined($currentDataTemperature) );
-#    
-#                  readingsEndUpdate( $hash, 1 );
-#                }
-#
-#                # if enabled write MeasureValues to own FileLog
-#                GroheOndusSmartDevice_FileLog_MeasureValueWrite($hash, "Measurement", $currentDataTimestamp_LTZ_s, 
-#                  ["MeasurementDataTimestamp",  $currentDataTimestamp_LUTC],
-#                  ["MeasurementHumidity",       $currentDataHumidity],
-#                  ["MeasurementTemperature",    $currentDataTemperature])
-#                  if( $hash->{helper}{LogFileEnabled} eq "1" ); # only if LogFile in use
-#                
-#                $lastProcessedTimestamp_LUTC = $currentDataTimestamp_LUTC;
-#              }
-#            }
-#            $loopCounter++;
-#          }
+          foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
+          {
+            # is this the correct dataset?
+            if( defined( $currentData->{timestamp} ) and 
+              defined( $currentData->{open_close_cycles_still} ) and 
+              defined( $currentData->{open_close_cycles_carbonated} ) and 
+              defined( $currentData->{water_running_time_still} ) and 
+              defined( $currentData->{water_running_time_medium} ) and 
+              defined( $currentData->{water_running_time_carbonated} ) and 
+              defined( $currentData->{operating_time} ) and 
+              defined( $currentData->{max_idle_time} ) and 
+              defined( $currentData->{pump_count} ) and 
+              defined( $currentData->{pump_running_time} ) and 
+              defined( $currentData->{remaining_filter} ) and 
+              defined( $currentData->{remaining_co2} ) and 
+              defined( $currentData->{date_of_filter_replacement} ) and 
+              defined( $currentData->{date_of_co2_replacement} ) and 
+              defined( $currentData->{date_of_cleaning} ) and 
+              defined( $currentData->{power_cut_count} ) and 
+              defined( $currentData->{time_since_restart} ) and 
+              defined( $currentData->{time_since_last_withdrawal} ) and 
+              defined( $currentData->{filter_change_count} ) and 
+              defined( $currentData->{cleaning_count} ) )
+            {
+              $currentDataTimestamp_LUTC              = $currentData->{timestamp};
+              $current_open_close_cycles_still        = $currentData->{open_close_cycles_still};
+              $current_open_close_cycles_carbonated   = $currentData->{open_close_cycles_carbonated};
+              $current_water_running_time_still       = $currentData->{water_running_time_still};
+              $current_water_running_time_medium      = $currentData->{water_running_time_medium};
+              $current_water_running_time_carbonated  = $currentData->{water_running_time_carbonated};
+              $current_operating_time                 = $currentData->{operating_time};
+              $current_max_idle_time                  = $currentData->{max_idle_time};
+              $current_pump_count                     = $currentData->{pump_count};
+              $current_pump_running_time              = $currentData->{pump_running_time};
+              $current_remaining_filter               = $currentData->{remaining_filter};
+              $current_remaining_co2                  = $currentData->{remaining_co2};
+              $current_date_of_filter_replacement     = $currentData->{date_of_filter_replacement};
+              $current_date_of_co2_replacement        = $currentData->{date_of_co2_replacement};
+              $current_date_of_cleaning               = $currentData->{date_of_cleaning};
+              $current_power_cut_count                = $currentData->{power_cut_count};
+              $current_time_since_restart             = $currentData->{time_since_restart};
+              $current_time_since_last_withdrawal     = $currentData->{time_since_last_withdrawal};
+              $current_filter_change_count            = $currentData->{filter_change_count};
+              $current_cleaning_count                 = $currentData->{cleaning_count};
+              
+              # don't process measurevalues with timestamp before $lastProcessedTimestamp
+              if($currentDataTimestamp_LUTC gt $lastProcessedTimestamp_LUTC)
+              {
+                # force the timestamp-seconds-string to have a well known length
+                # fill with leading zeros
+                my $currentDataTimestamp_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestamp_LUTC);
+                my $currentDataTimestamp_LTZ_s = time_str2num($currentDataTimestamp_LTZ);
+                my $currentDataTimestamp_LTZ_s_string = GroheOndusSmartDevice_GetLTZStringFromLUTC($currentDataTimestamp_LUTC);
+
+                if( $hash->{helper}{GetSuspendReadings} eq "0")
+                {
+                  readingsBeginUpdate($hash);
+    
+                  readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
+                    if( defined($currentDataTimestamp_LUTC) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_open_close_cycles_still", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_open_close_cycles_still )
+                    if( defined($current_open_close_cycles_still) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_open_close_cycles_carbonated", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_open_close_cycles_carbonated )
+                    if( defined($current_open_close_cycles_carbonated) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_water_running_time_still", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_water_running_time_still )
+                    if( defined($current_water_running_time_still) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_water_running_time_medium", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_water_running_time_medium )
+                    if( defined($current_water_running_time_medium) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_water_running_time_carbonated", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_water_running_time_carbonated )
+                    if( defined($current_water_running_time_carbonated) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_operating_time", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_operating_time )
+                    if( defined($current_operating_time) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_max_idle_time", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_max_idle_time )
+                    if( defined($current_max_idle_time) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_pump_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_pump_count )
+                    if( defined($current_pump_count) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_pump_running_time", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_pump_running_time )
+                    if( defined($current_pump_running_time) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_remaining_filter", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_remaining_filter )
+                    if( defined($current_remaining_filter) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_remaining_co2", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_remaining_co2 )
+                    if( defined($current_remaining_co2) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_date_of_filter_replacement", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_date_of_filter_replacement )
+                    if( defined($current_date_of_filter_replacement) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_date_of_co2_replacement", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_date_of_co2_replacement )
+                    if( defined($current_date_of_co2_replacement) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_date_of_cleaning", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_date_of_cleaning )
+                    if( defined($current_date_of_cleaning) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_power_cut_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_power_cut_count )
+                    if( defined($current_power_cut_count) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_time_since_restart", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_time_since_restart )
+                    if( defined($current_time_since_restart) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_time_since_last_withdrawal", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_time_since_last_withdrawal )
+                    if( defined($current_time_since_last_withdrawal) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_filter_change_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_filter_change_count )
+                    if( defined($current_filter_change_count) );
+                  readingsBulkUpdateIfChanged( $hash, "Measurement_cleaning_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_cleaning_count )
+                    if( defined($current_cleaning_count) );
+
+                  readingsEndUpdate( $hash, 1 );
+                }
+
+                # if enabled write MeasureValues to own FileLog
+                GroheOndusSmartDevice_FileLog_MeasureValueWrite($hash, "Measurement", $currentDataTimestamp_LTZ_s, 
+                  ["MeasurementDataTimestamp", $currentDataTimestamp_LUTC],
+                  ["Measurement_open_close_cycles_still", $current_open_close_cycles_still],
+                  ["Measurement_open_close_cycles_carbonated", $current_open_close_cycles_carbonated],
+                  ["Measurement_water_running_time_still", $current_water_running_time_still],
+                  ["Measurement_water_running_time_medium", $current_water_running_time_medium],
+                  ["Measurement_water_running_time_carbonated", $current_water_running_time_carbonated],
+                  ["Measurement_operating_time", $current_operating_time],
+                  ["Measurement_max_idle_time", $current_max_idle_time],
+                  ["Measurement_pump_count", $current_pump_count],
+                  ["Measurement_pump_running_time", $current_pump_running_time],
+                  ["Measurement_remaining_filter", $current_remaining_filter],
+                  ["Measurement_remaining_co2", $current_remaining_co2],
+                  ["Measurement_date_of_filter_replacement", $current_date_of_filter_replacement],
+                  ["Measurement_date_of_co2_replacement", $current_date_of_co2_replacement],
+                  ["Measurement_date_of_cleaning", $current_date_of_cleaning],
+                  ["Measurement_power_cut_count", $current_power_cut_count],
+                  ["Measurement_time_since_restart", $current_time_since_restart],
+                  ["Measurement_time_since_last_withdrawal", $current_time_since_last_withdrawal],
+                  ["Measurement_filter_change_count", $current_filter_change_count],
+                  ["Measurement_cleaning_count", $current_cleaning_count])
+                  if( $hash->{helper}{LogFileEnabled} eq "1" ); # only if LogFile in use
+                
+                $lastProcessedTimestamp_LUTC = $currentDataTimestamp_LUTC;
+              }
+            }
+            $loopCounter++;
+          }
 
           $hash->{helper}{LastProcessedTimestamp_LUTC}      = $lastProcessedTimestamp_LUTC;
           $hash->{helper}{Telegram_GetDataLoopMeasurement}  = $loopCounter;
@@ -5308,10 +5423,42 @@ sub GroheOndusSmartDevice_Blue_GetData($$;$$)
 
         readingsBulkUpdateIfChanged($hash, "LastDataTimestamp", $currentDataTimestamp_LUTC, 1)
           if(defined($currentDataTimestamp_LUTC));
-        readingsBulkUpdateIfChanged($hash, "LastHumidity", $currentDataHumidity, 1)
-          if(defined($currentDataHumidity));
-        readingsBulkUpdateIfChanged($hash, "LastTemperature", $currentDataTemperature, 1)
-          if(defined($currentDataTemperature));
+        readingsBulkUpdateIfChanged($hash, "Last_open_close_cycles_still", $current_open_close_cycles_still, 1)
+          if(defined($current_open_close_cycles_still));
+        readingsBulkUpdateIfChanged($hash, "Last_open_close_cycles_carbonated", $current_open_close_cycles_carbonated, 1)
+          if(defined($current_open_close_cycles_carbonated));
+        readingsBulkUpdateIfChanged($hash, "Last_water_running_time_still", $current_water_running_time_still, 1)
+          if(defined($current_water_running_time_still));
+        readingsBulkUpdateIfChanged($hash, "Last_water_running_time_medium", $current_water_running_time_medium, 1)
+          if(defined($current_water_running_time_medium));
+        readingsBulkUpdateIfChanged($hash, "Last_water_running_time_carbonated", $current_water_running_time_carbonated, 1)
+          if(defined($current_water_running_time_carbonated));
+        readingsBulkUpdateIfChanged($hash, "Last_operating_time", $current_operating_time, 1)
+          if(defined($current_operating_time));
+        readingsBulkUpdateIfChanged($hash, "Last_max_idle_time", $current_max_idle_time, 1)
+          if(defined($current_max_idle_time));
+        readingsBulkUpdateIfChanged($hash, "Last_pump_count", $current_pump_count, 1)
+          if(defined($current_pump_count));
+        readingsBulkUpdateIfChanged($hash, "Last_pump_running_time", $current_pump_running_time, 1)
+          if(defined($current_pump_running_time));
+        readingsBulkUpdateIfChanged($hash, "Last_remaining_filter", $current_remaining_filter, 1)
+          if(defined($current_remaining_filter));
+        readingsBulkUpdateIfChanged($hash, "Last_remaining_co2", $current_remaining_co2, 1)
+          if(defined($current_remaining_co2));
+        readingsBulkUpdateIfChanged($hash, "Last_date_of_filter_replacement", $current_date_of_filter_replacement, 1)
+          if(defined($current_date_of_filter_replacement));
+        readingsBulkUpdateIfChanged($hash, "Last_date_of_cleaning", $current_date_of_co2_replacement, 1)
+          if(defined($current_date_of_co2_replacement));
+        readingsBulkUpdateIfChanged($hash, "Last_power_cut_count", $current_date_of_cleaning, 1)
+          if(defined($current_date_of_cleaning));
+        readingsBulkUpdateIfChanged($hash, "Last_time_since_restart", $current_time_since_restart, 1)
+          if(defined($current_time_since_restart));
+        readingsBulkUpdateIfChanged($hash, "Last_time_since_last_withdrawal", $current_time_since_last_withdrawal, 1)
+          if(defined($current_time_since_last_withdrawal));
+        readingsBulkUpdateIfChanged($hash, "Last_filter_change_count", $current_filter_change_count, 1)
+          if(defined($current_filter_change_count));
+        readingsBulkUpdateIfChanged($hash, "Last_cleaning_count", $current_cleaning_count, 1)
+          if(defined($current_cleaning_count));
           
         readingsEndUpdate( $hash, 1 );
 
