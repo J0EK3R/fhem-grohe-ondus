@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "4.0.4";
+my $VERSION = "4.0.5";
 
 use strict;
 use warnings;
@@ -1387,10 +1387,11 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
     }
     else
     {
-      readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
-      readingsEndUpdate( $hash, 1 );
-      
+      # readingsBeginUpdate($hash);
+      # readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      # readingsEndUpdate( $hash, 1 );
+      Log3($name, 4, "GroheOndusSmartBridge_GetLocations($name) - $errorMsg");
+
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
@@ -1483,16 +1484,21 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
         readingsSingleUpdate( $hash, "count_rooms", $hash->{helper}{CountRooms}, 0 );
       }
     }
+    else
+    {
+      $errorMsg = "GETROOMS: WRONG JSON STRUCTURE (LocationId:$current_location_id)";
+    }
 
     if( $errorMsg eq "" )
     {
     }
     else
     {
-      readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
-      readingsEndUpdate( $hash, 1 );
-      
+      # readingsBeginUpdate($hash);
+      # readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      # readingsEndUpdate( $hash, 1 );
+      Log3($name, 4, "GroheOndusSmartBridge_GetRooms($name) - $errorMsg");
+
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
@@ -1740,7 +1746,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
     }
     else
     {
-      $errorMsg = "GETAPPLIANCES: WRONG JSON STRUCTURE";
+      $errorMsg = "GETAPPLIANCES: WRONG JSON STRUCTURE (LocationId:$current_location_id RoomId:$current_room_id)";
     }
      
     if( $errorMsg eq "" )
@@ -1758,10 +1764,11 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
     }
     else
     {
-      readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
-      readingsEndUpdate( $hash, 1 );
-      
+      # readingsBeginUpdate($hash);
+      # readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      # readingsEndUpdate( $hash, 1 );
+      Log3($name, 4, "GroheOndusSmartBridge_GetAppliances($name) - $errorMsg");
+
       # if there is a callback then call it
       if( defined($callbackFail) )
       {
