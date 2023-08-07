@@ -1,5 +1,5 @@
 FHEM Grohe Ondus last changes:
 2023-08-07
- - Version 4.0.3
+ - V 4.0.4
 
-Added Blue Data
+Attribute "debugJSON" prints JSON structures to readings
