@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "4.0.6";
+my $VERSION = "4.0.7";
 
 use strict;
 use warnings;
@@ -241,7 +241,7 @@ sub GroheOndusSmartBridge_Attr(@)
       GroheOndusSmartBridge_TimerRemove($hash);
 
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", "inactive", 1 );
+      readingsBulkUpdate( $hash, "state", "inactive", 1 );
       readingsEndUpdate( $hash, 1 );
     } 
     else
@@ -251,7 +251,7 @@ sub GroheOndusSmartBridge_Attr(@)
       $hash->{helper}{IsDisabled} = "0";
 
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", "active", 1 );
+      readingsBulkUpdate( $hash, "state", "active", 1 );
       readingsEndUpdate( $hash, 1 );
       
       GroheOndusSmartBridge_TimerExecute($hash);      
@@ -737,7 +737,7 @@ sub GroheOndusSmartBridge_ClearLogin($)
   Log3($name, 4, "GroheOndusSmartBridge_ClearLogin($name)");
 
   readingsBeginUpdate($hash);
-  readingsBulkUpdateIfChanged( $hash, "state", "login cleared", 1 );
+  readingsBulkUpdate( $hash, "state", "login cleared", 1 );
   readingsEndUpdate( $hash, 1 );
 
   # clear $hash->{helper} to reset statemachines
@@ -784,7 +784,7 @@ sub GroheOndusSmartBridge_Login($;$$)
     GroheOndusSmartBridge_UpdateInternals($hash);
 
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged( $hash, "state", "logging in", 1 );
+    readingsBulkUpdate( $hash, "state", "logging in", 1 );
     readingsEndUpdate( $hash, 1 );
 
     my $loginSuccess = sub
@@ -822,7 +822,7 @@ sub GroheOndusSmartBridge_Login($;$$)
   else
   {
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+    readingsBulkUpdate( $hash, "state", $errorMsg, 1 );
     readingsEndUpdate( $hash, 1 );
     
     # if there is a callback then call it
@@ -883,7 +883,7 @@ sub GroheOndusSmartBridge_Login_GetLoginAddress($;$$)
     else
     {
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      readingsBulkUpdate( $hash, "state", $errorMsg, 1 );
       readingsEndUpdate( $hash, 1 );
 
       # if there is a callback then call it
@@ -976,7 +976,7 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
     else
     {
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      readingsBulkUpdate( $hash, "state", $errorMsg, 1 );
       readingsEndUpdate( $hash, 1 );
 
       # if there is a callback then call it
@@ -1102,7 +1102,7 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
     if( $errorMsg eq "" )
     {
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", "logged in", 1 );
+      readingsBulkUpdate( $hash, "state", "logged in", 1 );
       readingsEndUpdate( $hash, 1 );
 
       # if there is a callback then call it
@@ -1115,7 +1115,7 @@ sub GroheOndusSmartBridge_Login_GetToken($;$$)
     else
     {
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      readingsBulkUpdate( $hash, "state", $errorMsg, 1 );
       readingsEndUpdate( $hash, 1 );
       
       # if there is a callback then call it
@@ -1229,7 +1229,7 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
     if( $errorMsg eq "" )
     {
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", "logged in", 1 );
+      readingsBulkUpdate( $hash, "state", "logged in", 1 );
       readingsEndUpdate( $hash, 1 );
 
       # if there is a callback then call it
@@ -1242,7 +1242,7 @@ sub GroheOndusSmartBridge_Login_Refresh($;$$)
     else
     {
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      readingsBulkUpdate( $hash, "state", $errorMsg, 1 );
       readingsEndUpdate( $hash, 1 );
       
       # if there is a callback then call it
@@ -1388,7 +1388,7 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
     else
     {
       # readingsBeginUpdate($hash);
-      # readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      # readingsBulkUpdate( $hash, "state", $errorMsg, 1 );
       # readingsEndUpdate( $hash, 1 );
       Log3($name, 4, "GroheOndusSmartBridge_GetLocations($name) - $errorMsg");
 
@@ -1495,7 +1495,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
     else
     {
       # readingsBeginUpdate($hash);
-      # readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      # readingsBulkUpdate( $hash, "state", $errorMsg, 1 );
       # readingsEndUpdate( $hash, 1 );
       Log3($name, 4, "GroheOndusSmartBridge_GetRooms($name) - $errorMsg");
 
@@ -1752,7 +1752,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
     if( $errorMsg eq "" )
     {
       readingsBeginUpdate($hash);
-      readingsBulkUpdateIfChanged( $hash, "state", "connected to cloud", 1 );
+      readingsBulkUpdate( $hash, "state", "connected to cloud", 1 );
       readingsEndUpdate( $hash, 1 );
 
       # if there is a callback then call it
@@ -1765,7 +1765,7 @@ sub GroheOndusSmartBridge_GetAppliances($$$;$$)
     else
     {
       # readingsBeginUpdate($hash);
-      # readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+      # readingsBulkUpdate( $hash, "state", $errorMsg, 1 );
       # readingsEndUpdate( $hash, 1 );
       Log3($name, 4, "GroheOndusSmartBridge_GetAppliances($name) - $errorMsg");
 
@@ -1975,7 +1975,7 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     GroheOndusSmartBridge_UpdateInternals($hash);
 
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged( $hash, "state", $errorMsg, 1 );
+    readingsBulkUpdate( $hash, "state", $errorMsg, 1 );
     readingsEndUpdate( $hash, 1 );
   }
   

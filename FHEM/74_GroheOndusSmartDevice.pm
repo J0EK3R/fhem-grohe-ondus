@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "4.0.6";
+my $VERSION = "4.0.7";
 
 use strict;
 use warnings;
@@ -896,7 +896,7 @@ sub GroheOndusSmartDevice_Notify($$)
       else
       {
         readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged($hash, "state", "bridge " . $ioDeviceState, 1);
+        readingsBulkUpdate($hash, "state", "bridge " . $ioDeviceState, 1);
         readingsEndUpdate($hash, 1);
       }
     }
@@ -993,7 +993,7 @@ sub GroheOndusSmartDevice_Parse($$)
       {
         # change state to "connected to cloud" -> Notify -> load timer
         readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged( $hash, "state", "connected over bridge to cloud", 1 );
+        readingsBulkUpdate( $hash, "state", "connected over bridge to cloud", 1 );
         readingsEndUpdate( $hash, 1 );
       }
 
@@ -1318,22 +1318,22 @@ sub GroheOndusSmartDevice_SenseGuard_GetState($;$$)
             if( $currentData->{type} eq "update_available"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateUpdateAvailable", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateUpdateAvailable", $currentData->{value} );
             } 
             elsif( $currentData->{type} eq "connection"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateConnection", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateConnection", $currentData->{value} );
             } 
             elsif( $currentData->{type} eq "wifi_quality"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateWifiQuality", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateWifiQuality", $currentData->{value} );
             } 
             else
             {
               # write json string to reading "unknown"
-              readingsBulkUpdateIfChanged( $hash, "State_unknown-data", encode_json($currentData) );
+              readingsBulkUpdate( $hash, "State_unknown-data", encode_json($currentData) );
             }
           }
 
@@ -1564,29 +1564,29 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
           if( defined( $currentEntry )
             and ref( $currentEntry ) eq "HASH" )
           {
-            readingsBulkUpdateIfChanged( $hash, "ApplianceID", "$currentEntry->{appliance_id}" )
+            readingsBulkUpdate( $hash, "ApplianceID", "$currentEntry->{appliance_id}" )
               if( defined( $currentEntry->{appliance_id} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceInstallationDate", "$currentEntry->{installation_date}" )
+            readingsBulkUpdate( $hash, "ApplianceInstallationDate", "$currentEntry->{installation_date}" )
               if( defined( $currentEntry->{installation_date} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceName", "$currentEntry->{name}" )
+            readingsBulkUpdate( $hash, "ApplianceName", "$currentEntry->{name}" )
               if( defined( $currentEntry->{name} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceSerialNumber", "$currentEntry->{serial_number}" )
+            readingsBulkUpdate( $hash, "ApplianceSerialNumber", "$currentEntry->{serial_number}" )
               if( defined( $currentEntry->{serial_number} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceType", "$currentEntry->{type}" )
+            readingsBulkUpdate( $hash, "ApplianceType", "$currentEntry->{type}" )
               if( defined( $currentEntry->{type} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceVersion", "$currentEntry->{version}" )
+            readingsBulkUpdate( $hash, "ApplianceVersion", "$currentEntry->{version}" )
               if( defined( $currentEntry->{version} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceTDT", "$currentEntry->{tdt}" )
+            readingsBulkUpdate( $hash, "ApplianceTDT", "$currentEntry->{tdt}" )
               if( defined( $currentEntry->{tdt} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceTimezone", "$currentEntry->{timezone}" )
+            readingsBulkUpdate( $hash, "ApplianceTimezone", "$currentEntry->{timezone}" )
               if( defined( $currentEntry->{timezone} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceRole", "$currentEntry->{role}" )
+            readingsBulkUpdate( $hash, "ApplianceRole", "$currentEntry->{role}" )
               if( defined( $currentEntry->{role} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceRegistrationComplete", "$currentEntry->{registration_complete}" )
+            readingsBulkUpdate( $hash, "ApplianceRegistrationComplete", "$currentEntry->{registration_complete}" )
               if( defined( $currentEntry->{registration_complete} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceCalculateAverageSince", "$currentEntry->{calculate_average_since}" )
+            readingsBulkUpdate( $hash, "ApplianceCalculateAverageSince", "$currentEntry->{calculate_average_since}" )
               if( defined( $currentEntry->{calculate_average_since} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceSnoozeStatus", "$currentEntry->{snooze_status}" )
+            readingsBulkUpdate( $hash, "ApplianceSnoozeStatus", "$currentEntry->{snooze_status}" )
               if( defined( $currentEntry->{snooze_status} ) );
 
             $hash->{helper}{ApplianceTDT_LUTC} = "$currentEntry->{tdt}"
@@ -1634,91 +1634,91 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
             if( defined( $currentConfig )
               and ref( $currentConfig ) eq "HASH" )
             {
-              readingsBulkUpdateIfChanged( $hash, "ConfigMeasurementPeriod", "$currentConfig->{measurement_period}" )
+              readingsBulkUpdate( $hash, "ConfigMeasurementPeriod", "$currentConfig->{measurement_period}" )
                 if( defined( $currentConfig->{measurement_period} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigMeasurementTransmissionInterval", "$currentConfig->{measurement_transmission_intervall}" )
+              readingsBulkUpdate( $hash, "ConfigMeasurementTransmissionInterval", "$currentConfig->{measurement_transmission_intervall}" )
                 if( defined( $currentConfig->{measurement_transmission_intervall} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigMeasurementTransmissionIntervalOffset", "$currentConfig->{measurement_transmission_intervall_offset}" )
+              readingsBulkUpdate( $hash, "ConfigMeasurementTransmissionIntervalOffset", "$currentConfig->{measurement_transmission_intervall_offset}" )
                 if( defined( $currentConfig->{measurement_transmission_intervall_offset} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigMeasurementDetectionInterval", "$currentConfig->{detection_interval}" )
+              readingsBulkUpdate( $hash, "ConfigMeasurementDetectionInterval", "$currentConfig->{detection_interval}" )
                 if( defined( $currentConfig->{detection_interval} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigMeasurementImpulseIgnore", "$currentConfig->{impulse_ignore}" )
+              readingsBulkUpdate( $hash, "ConfigMeasurementImpulseIgnore", "$currentConfig->{impulse_ignore}" )
                 if( defined( $currentConfig->{impulse_ignore} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigMeasurementTimeIgnore", "$currentConfig->{time_ignore}" )
+              readingsBulkUpdate( $hash, "ConfigMeasurementTimeIgnore", "$currentConfig->{time_ignore}" )
                 if( defined( $currentConfig->{time_ignore} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigMeasurementDetectionTime", "$currentConfig->{detection_time}" )
+              readingsBulkUpdate( $hash, "ConfigMeasurementDetectionTime", "$currentConfig->{detection_time}" )
                 if( defined( $currentConfig->{detection_time} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigMeasurementSystemErrorMonitor", "$currentConfig->{monitor_system_error}" )
+              readingsBulkUpdate( $hash, "ConfigMeasurementSystemErrorMonitor", "$currentConfig->{monitor_system_error}" )
                 if( defined( $currentConfig->{monitor_system_error} ) );
 
               # Withdrawel
-              readingsBulkUpdateIfChanged( $hash, "ConfigWithdrawelAmountLimit", "$currentConfig->{withdrawel_amount_limit}" )
+              readingsBulkUpdate( $hash, "ConfigWithdrawelAmountLimit", "$currentConfig->{withdrawel_amount_limit}" )
                 if( defined( $currentConfig->{withdrawel_amount_limit} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigWithdrawelAmountLimitBreachMonitor", "$currentConfig->{monitor_withdrawel_amount_limit_breach}" )
+              readingsBulkUpdate( $hash, "ConfigWithdrawelAmountLimitBreachMonitor", "$currentConfig->{monitor_withdrawel_amount_limit_breach}" )
                 if( defined( $currentConfig->{monitor_withdrawel_amount_limit_breach} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigWithdrawelAmountLimitBreachAction", "$currentConfig->{action_on_withdrawel_amount_limit_breach}" )
+              readingsBulkUpdate( $hash, "ConfigWithdrawelAmountLimitBreachAction", "$currentConfig->{action_on_withdrawel_amount_limit_breach}" )
                 if( defined( $currentConfig->{action_on_withdrawel_amount_limit_breach} ) );
 
               # Flowrate
-              readingsBulkUpdateIfChanged( $hash, "ConfigFlowrateLimitLowerMonitor", "$currentConfig->{monitor_lower_flow_limit}" )
+              readingsBulkUpdate( $hash, "ConfigFlowrateLimitLowerMonitor", "$currentConfig->{monitor_lower_flow_limit}" )
                 if( defined( $currentConfig->{monitor_lower_flow_limit} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigFlowrateLimitUpperMonitor", "$currentConfig->{monitor_upper_flow_limit}" )
+              readingsBulkUpdate( $hash, "ConfigFlowrateLimitUpperMonitor", "$currentConfig->{monitor_upper_flow_limit}" )
                 if( defined( $currentConfig->{monitor_upper_flow_limit} ) );
 
               # Pressure
-              readingsBulkUpdateIfChanged( $hash, "ConfigPressureLimitLowerMonitor", "$currentConfig->{monitor_lower_pressure_limit}" )
+              readingsBulkUpdate( $hash, "ConfigPressureLimitLowerMonitor", "$currentConfig->{monitor_lower_pressure_limit}" )
                 if( defined( $currentConfig->{monitor_lower_pressure_limit} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigPressureLimitUpperMonitor", "$currentConfig->{monitor_upper_pressure_limit}" )
+              readingsBulkUpdate( $hash, "ConfigPressureLimitUpperMonitor", "$currentConfig->{monitor_upper_pressure_limit}" )
                 if( defined( $currentConfig->{monitor_upper_pressure_limit} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigPressureToleranceBand", "$currentConfig->{pressure_tolerance_band}" )
+              readingsBulkUpdate( $hash, "ConfigPressureToleranceBand", "$currentConfig->{pressure_tolerance_band}" )
                 if( defined( $currentConfig->{pressure_tolerance_band} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigPressureDrop", "$currentConfig->{pressure_drop}" )
+              readingsBulkUpdate( $hash, "ConfigPressureDrop", "$currentConfig->{pressure_drop}" )
                 if( defined( $currentConfig->{pressure_drop} ) );
 
               # Temperature
-              readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureFrostAlertMonitor", "$currentConfig->{monitor_frost_alert}" )
+              readingsBulkUpdate( $hash, "ConfigTemperatureFrostAlertMonitor", "$currentConfig->{monitor_frost_alert}" )
                 if( defined( $currentConfig->{monitor_frost_alert} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureLimitLowerMonitor", "$currentConfig->{monitor_lower_temperature_limit}" )
+              readingsBulkUpdate( $hash, "ConfigTemperatureLimitLowerMonitor", "$currentConfig->{monitor_lower_temperature_limit}" )
                 if( defined( $currentConfig->{monitor_lower_temperature_limit} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureLimitUpperMonitor", "$currentConfig->{monitor_upper_temperature_limit}" )
+              readingsBulkUpdate( $hash, "ConfigTemperatureLimitUpperMonitor", "$currentConfig->{monitor_upper_temperature_limit}" )
                 if( defined( $currentConfig->{monitor_upper_temperature_limit} ) );
 
               # Leakage
-              readingsBulkUpdateIfChanged( $hash, "ConfigLeakageMajorMonitor", "$currentConfig->{monitor_major_leakage}" )
+              readingsBulkUpdate( $hash, "ConfigLeakageMajorMonitor", "$currentConfig->{monitor_major_leakage}" )
                 if( defined( $currentConfig->{monitor_major_leakage} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigLeakageMajorAction", "$currentConfig->{action_on_major_leakage}" )
+              readingsBulkUpdate( $hash, "ConfigLeakageMajorAction", "$currentConfig->{action_on_major_leakage}" )
                 if( defined( $currentConfig->{action_on_major_leakage} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigLeakageMinorMonitor", "$currentConfig->{monitor_minor_leakage}" )
+              readingsBulkUpdate( $hash, "ConfigLeakageMinorMonitor", "$currentConfig->{monitor_minor_leakage}" )
                 if( defined( $currentConfig->{monitor_minor_leakage} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigLeakageMinorAction", "$currentConfig->{action_on_minor_leakage}" )
+              readingsBulkUpdate( $hash, "ConfigLeakageMinorAction", "$currentConfig->{action_on_minor_leakage}" )
                 if( defined( $currentConfig->{action_on_minor_leakage} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigLeakageMicroMonitor", "$currentConfig->{monitor_micro_leakage}" )
+              readingsBulkUpdate( $hash, "ConfigLeakageMicroMonitor", "$currentConfig->{monitor_micro_leakage}" )
                 if( defined( $currentConfig->{monitor_micro_leakage} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigLeakageMicroAction", "$currentConfig->{action_on_micro_leakage}" )
+              readingsBulkUpdate( $hash, "ConfigLeakageMicroAction", "$currentConfig->{action_on_micro_leakage}" )
                 if( defined( $currentConfig->{action_on_micro_leakage} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigLeakageBtw01And08Monitor", "$currentConfig->{monitor_btw_0_1_and_0_8_leakage}" )
+              readingsBulkUpdate( $hash, "ConfigLeakageBtw01And08Monitor", "$currentConfig->{monitor_btw_0_1_and_0_8_leakage}" )
                 if( defined( $currentConfig->{monitor_btw_0_1_and_0_8_leakage} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigLeakageBtw01And08Action", "$currentConfig->{action_on_btw_0_1_and_0_8_leakage}" )
+              readingsBulkUpdate( $hash, "ConfigLeakageBtw01And08Action", "$currentConfig->{action_on_btw_0_1_and_0_8_leakage}" )
                 if( defined( $currentConfig->{action_on_btw_0_1_and_0_8_leakage} ) );
 
               # SprinklerMode
-              readingsBulkUpdateIfChanged( $hash, "ConfigSprinklerModeStartTime", "$currentConfig->{sprinkler_mode_start_time}" )
+              readingsBulkUpdate( $hash, "ConfigSprinklerModeStartTime", "$currentConfig->{sprinkler_mode_start_time}" )
                 if( defined( $currentConfig->{sprinkler_mode_start_time} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigSprinklerModeStopTime", "$currentConfig->{sprinkler_mode_stop_time}" )
+              readingsBulkUpdate( $hash, "ConfigSprinklerModeStopTime", "$currentConfig->{sprinkler_mode_stop_time}" )
                 if( defined( $currentConfig->{sprinkler_mode_stop_time} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigSprinklerModeActiveMonday", "$currentConfig->{sprinkler_mode_active_monday}" )
+              readingsBulkUpdate( $hash, "ConfigSprinklerModeActiveMonday", "$currentConfig->{sprinkler_mode_active_monday}" )
                 if( defined( $currentConfig->{sprinkler_mode_active_monday} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigSprinklerModeActiveTuesday", "$currentConfig->{sprinkler_mode_active_tuesday}" )
+              readingsBulkUpdate( $hash, "ConfigSprinklerModeActiveTuesday", "$currentConfig->{sprinkler_mode_active_tuesday}" )
                 if( defined( $currentConfig->{sprinkler_mode_active_tuesday} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigSprinklerModeActiveWednesday", "$currentConfig->{sprinkler_mode_active_wednesday}" )
+              readingsBulkUpdate( $hash, "ConfigSprinklerModeActiveWednesday", "$currentConfig->{sprinkler_mode_active_wednesday}" )
                 if( defined( $currentConfig->{sprinkler_mode_active_wednesday} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigSprinklerModeActiveThursday", "$currentConfig->{sprinkler_mode_active_thursday}" )
+              readingsBulkUpdate( $hash, "ConfigSprinklerModeActiveThursday", "$currentConfig->{sprinkler_mode_active_thursday}" )
                 if( defined( $currentConfig->{sprinkler_mode_active_thursday} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigSprinklerModeActiveFriday", "$currentConfig->{sprinkler_mode_active_friday}" )
+              readingsBulkUpdate( $hash, "ConfigSprinklerModeActiveFriday", "$currentConfig->{sprinkler_mode_active_friday}" )
                 if( defined( $currentConfig->{sprinkler_mode_active_friday} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigSprinklerModeActiveSaturday", "$currentConfig->{sprinkler_mode_active_saturday}" )
+              readingsBulkUpdate( $hash, "ConfigSprinklerModeActiveSaturday", "$currentConfig->{sprinkler_mode_active_saturday}" )
                 if( defined( $currentConfig->{sprinkler_mode_active_saturday} ) );
-              readingsBulkUpdateIfChanged( $hash, "ConfigSprinklerModeActiveSunday", "$currentConfig->{sprinkler_mode_active_sunday}" )
+              readingsBulkUpdate( $hash, "ConfigSprinklerModeActiveSunday", "$currentConfig->{sprinkler_mode_active_sunday}" )
                 if( defined( $currentConfig->{sprinkler_mode_active_sunday} ) );
 
               # "thresholds":
@@ -1771,12 +1771,12 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
                   {
                     if( "$currentThreshold->{type}" eq "max" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigFlowrateThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigFlowrateThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
                     elsif( "$currentThreshold->{type}" eq "min" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigFlowrateThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigFlowrateThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     }
                   } 
@@ -1784,12 +1784,12 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
                   {
                     if( "$currentThreshold->{type}" eq "max" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigPressureThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigPressureThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
                     elsif( "$currentThreshold->{type}" eq "min" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigPressureThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigPressureThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     }
                   }
@@ -1797,12 +1797,12 @@ sub GroheOndusSmartDevice_SenseGuard_GetConfig($;$$)
                   {
                     if( "$currentThreshold->{type}" eq "max" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigTemperatureThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
                     elsif( "$currentThreshold->{type}" eq "min" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigTemperatureThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     }
                   }
@@ -2181,13 +2181,13 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
               {
                 readingsBeginUpdate($hash);
   
-                readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
+                readingsBulkUpdate( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
                   if( defined($currentDataTimestamp_LUTC) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementFlowrate", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataFlowrate )
+                readingsBulkUpdate( $hash, "MeasurementFlowrate", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataFlowrate )
                   if( defined($currentDataFlowrate) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTemperature )
+                readingsBulkUpdate( $hash, "MeasurementTemperature", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTemperature )
                   if( defined($currentDataTemperature) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementPressure", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataPressure )
+                readingsBulkUpdate( $hash, "MeasurementPressure", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataPressure )
                   if( defined($currentDataPressure) );
   
                 readingsEndUpdate( $hash, 1 );
@@ -2300,21 +2300,21 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
               {
                 readingsBeginUpdate($hash);
   
-                readingsBulkUpdateIfChanged( $hash, "MeasurementWithdrawalTimestampStart", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalTimestampStart_LUTC )
+                readingsBulkUpdate( $hash, "MeasurementWithdrawalTimestampStart", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalTimestampStart_LUTC )
                   if( defined($currentWithdrawalTimestampStart_LUTC) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementWithdrawalTimestampStop", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalTimestampStop_LUTC )
+                readingsBulkUpdate( $hash, "MeasurementWithdrawalTimestampStop", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalTimestampStop_LUTC )
                   if( defined($currentWithdrawalTimestampStop_LUTC) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementWithdrawalDuration", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalDuration )
+                readingsBulkUpdate( $hash, "MeasurementWithdrawalDuration", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalDuration )
                   if( defined($currentWithdrawalDuration) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementWaterConsumption", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalConsumption )
+                readingsBulkUpdate( $hash, "MeasurementWaterConsumption", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalConsumption )
                   if( defined($currentWithdrawalConsumption) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementMaxFlowrate", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalMaxFlowrate )
+                readingsBulkUpdate( $hash, "MeasurementMaxFlowrate", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalMaxFlowrate )
                   if( defined($currentWithdrawalMaxFlowrate) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementHotWaterShare", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalHotWaterShare )
+                readingsBulkUpdate( $hash, "MeasurementHotWaterShare", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalHotWaterShare )
                   if( defined($currentWithdrawalHotWaterShare) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementWaterCost", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalCostWater )
+                readingsBulkUpdate( $hash, "MeasurementWaterCost", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalCostWater )
                   if( defined($currentWithdrawalCostWater) );
-                readingsBulkUpdateIfChanged( $hash, "MeasurementEnergyCost", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalCostEnergy )
+                readingsBulkUpdate( $hash, "MeasurementEnergyCost", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalCostEnergy )
                   if( defined($currentWithdrawalCostEnergy) );
   
                 readingsEndUpdate( $hash, 1 );
@@ -2435,7 +2435,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
         if($hash->{helper}{GetInProgress} ne "0" and 
           $hash->{helper}{GetSuspendReadings} ne "0")
         {
-          readingsBulkUpdateIfChanged($hash, "state", "getting historic data finished", 1);
+          readingsBulkUpdate($hash, "state", "getting historic data finished", 1);
         }
 
         $hash->{helper}{GetSuspendReadings} = "0";
@@ -2444,62 +2444,62 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
         $hash->{helper}{GetInProgress} = "0";
         GroheOndusSmartDevice_UpdateInternals($hash);
 
-        readingsBulkUpdateIfChanged( $hash, "LastDataTimestamp", $currentDataTimestamp_LUTC )
+        readingsBulkUpdate( $hash, "LastDataTimestamp", $currentDataTimestamp_LUTC )
           if(defined($currentDataTimestamp_LUTC));
-        readingsBulkUpdateIfChanged( $hash, "LastFlowrate", $currentDataFlowrate )
+        readingsBulkUpdate( $hash, "LastFlowrate", $currentDataFlowrate )
           if(defined($currentDataFlowrate));
-        readingsBulkUpdateIfChanged( $hash, "LastTemperature", $currentDataTemperature )
+        readingsBulkUpdate( $hash, "LastTemperature", $currentDataTemperature )
           if(defined($currentDataTemperature));
-        readingsBulkUpdateIfChanged( $hash, "LastPressure", $currentDataPressure )
+        readingsBulkUpdate( $hash, "LastPressure", $currentDataPressure )
           if(defined($currentDataPressure));
 
-        readingsBulkUpdateIfChanged( $hash, "LastWithdrawalTimestampStart", $currentWithdrawalTimestampStart_LUTC )
+        readingsBulkUpdate( $hash, "LastWithdrawalTimestampStart", $currentWithdrawalTimestampStart_LUTC )
           if(defined($currentWithdrawalTimestampStart_LUTC));
-        readingsBulkUpdateIfChanged( $hash, "LastWithdrawalTimestampStop", $currentWithdrawalTimestampStop_LUTC )
+        readingsBulkUpdate( $hash, "LastWithdrawalTimestampStop", $currentWithdrawalTimestampStop_LUTC )
           if(defined($currentWithdrawalTimestampStop_LUTC));
-        readingsBulkUpdateIfChanged( $hash, "LastWithdrawalDuration", $currentWithdrawalDuration )
+        readingsBulkUpdate( $hash, "LastWithdrawalDuration", $currentWithdrawalDuration )
           if(defined($currentWithdrawalDuration));
-        readingsBulkUpdateIfChanged( $hash, "LastWaterConsumption", $currentWithdrawalConsumption )
+        readingsBulkUpdate( $hash, "LastWaterConsumption", $currentWithdrawalConsumption )
           if(defined($currentWithdrawalConsumption));
-        readingsBulkUpdateIfChanged( $hash, "LastEnergyCost", $currentWithdrawalCostEnergy )
+        readingsBulkUpdate( $hash, "LastEnergyCost", $currentWithdrawalCostEnergy )
           if(defined($currentWithdrawalCostEnergy));
-        readingsBulkUpdateIfChanged( $hash, "LastWaterCost", $currentWithdrawalCostWater )
+        readingsBulkUpdate( $hash, "LastWaterCost", $currentWithdrawalCostWater )
           if(defined($currentWithdrawalCostWater));
-        readingsBulkUpdateIfChanged( $hash, "LastHotWaterShare", $currentWithdrawalHotWaterShare )
+        readingsBulkUpdate( $hash, "LastHotWaterShare", $currentWithdrawalHotWaterShare )
           if(defined($currentWithdrawalHotWaterShare));
-        readingsBulkUpdateIfChanged( $hash, "LastMaxFlowrate", $currentWithdrawalMaxFlowrate )
+        readingsBulkUpdate( $hash, "LastMaxFlowrate", $currentWithdrawalMaxFlowrate )
           if(defined($currentWithdrawalMaxFlowrate));
 
-        readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeStartTimestamp", $hash->{helper}{TodayAnalyzeStartTimestamp} )
+        readingsBulkUpdate( $hash, "TodayAnalyzeStartTimestamp", $hash->{helper}{TodayAnalyzeStartTimestamp} )
           if(defined($hash->{helper}{TodayAnalyzeStartTimestamp}));
-        readingsBulkUpdateIfChanged( $hash, "TodayAnalyzeEndTimestamp", $hash->{helper}{TodayAnalyzeEndTimestamp} )
+        readingsBulkUpdate( $hash, "TodayAnalyzeEndTimestamp", $hash->{helper}{TodayAnalyzeEndTimestamp} )
           if(defined($hash->{helper}{TodayAnalyzeEndTimestamp}));
-        readingsBulkUpdateIfChanged( $hash, "TodayWaterConsumption", $hash->{helper}{TodayWaterConsumption} )
+        readingsBulkUpdate( $hash, "TodayWaterConsumption", $hash->{helper}{TodayWaterConsumption} )
           if(defined($hash->{helper}{TodayWaterConsumption}));
-        readingsBulkUpdateIfChanged( $hash, "TodayWithdrawalCount", $hash->{helper}{TodayWithdrawalCount} )
+        readingsBulkUpdate( $hash, "TodayWithdrawalCount", $hash->{helper}{TodayWithdrawalCount} )
           if(defined($hash->{helper}{TodayWithdrawalCount}));
-        readingsBulkUpdateIfChanged( $hash, "TodayEnergyCost", $hash->{helper}{TodayEnergyCost} )
+        readingsBulkUpdate( $hash, "TodayEnergyCost", $hash->{helper}{TodayEnergyCost} )
           if(defined($hash->{helper}{TodayEnergyCost}));
-        readingsBulkUpdateIfChanged( $hash, "TodayWaterCost", $hash->{helper}{TodayWaterCost} )
+        readingsBulkUpdate( $hash, "TodayWaterCost", $hash->{helper}{TodayWaterCost} )
           if(defined($hash->{helper}{TodayWaterCost}));
-        readingsBulkUpdateIfChanged( $hash, "TodayHotWaterShare", $hash->{helper}{TodayHotWaterShare} )
+        readingsBulkUpdate( $hash, "TodayHotWaterShare", $hash->{helper}{TodayHotWaterShare} )
           if(defined($hash->{helper}{TodayHotWaterShare}));
-        readingsBulkUpdateIfChanged( $hash, "TodayMaxFlowrate", $hash->{helper}{TodayMaxFlowrate} )
+        readingsBulkUpdate( $hash, "TodayMaxFlowrate", $hash->{helper}{TodayMaxFlowrate} )
           if(defined($hash->{helper}{TodayMaxFlowrate}));
 
-        readingsBulkUpdateIfChanged( $hash, "TotalAnalyzeStartTimestamp", $hash->{helper}{TotalAnalyzeStartTimestamp} )
+        readingsBulkUpdate( $hash, "TotalAnalyzeStartTimestamp", $hash->{helper}{TotalAnalyzeStartTimestamp} )
           if(defined($hash->{helper}{TotalAnalyzeStartTimestamp}));
-        readingsBulkUpdateIfChanged( $hash, "TotalAnalyzeEndTimestamp", $hash->{helper}{TotalAnalyzeEndTimestamp} )
+        readingsBulkUpdate( $hash, "TotalAnalyzeEndTimestamp", $hash->{helper}{TotalAnalyzeEndTimestamp} )
           if(defined($hash->{helper}{TotalAnalyzeEndTimestamp}));
-        readingsBulkUpdateIfChanged( $hash, "TotalWaterConsumption", $hash->{helper}{TotalWaterConsumption} )
+        readingsBulkUpdate( $hash, "TotalWaterConsumption", $hash->{helper}{TotalWaterConsumption} )
           if(defined($hash->{helper}{TotalWaterConsumption}));
-        readingsBulkUpdateIfChanged( $hash, "TotalWithdrawalCount", $hash->{helper}{TotalWithdrawalCount} )
+        readingsBulkUpdate( $hash, "TotalWithdrawalCount", $hash->{helper}{TotalWithdrawalCount} )
           if(defined($hash->{helper}{TotalWithdrawalCount}));
-        readingsBulkUpdateIfChanged( $hash, "TotalEnergyCost", $hash->{helper}{TotalEnergyCost} )
+        readingsBulkUpdate( $hash, "TotalEnergyCost", $hash->{helper}{TotalEnergyCost} )
           if(defined($hash->{helper}{TotalEnergyCost}));
-        readingsBulkUpdateIfChanged( $hash, "TotalWaterCost", $hash->{helper}{TotalWaterCost} )
+        readingsBulkUpdate( $hash, "TotalWaterCost", $hash->{helper}{TotalWaterCost} )
           if(defined($hash->{helper}{TotalWaterCost}));
-        readingsBulkUpdateIfChanged( $hash, "TotalHotWaterShare", $hash->{helper}{TotalHotWaterShare} )
+        readingsBulkUpdate( $hash, "TotalHotWaterShare", $hash->{helper}{TotalHotWaterShare} )
           if(defined($hash->{helper}{TotalHotWaterShare}));
 
         readingsEndUpdate( $hash, 1 );
@@ -2518,7 +2518,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
         GroheOndusSmartDevice_UpdateInternals($hash);
 
         readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged( $hash, "state", "getting historic data $callbackparam->{requestToTimestamp_UTC}", 1 );
+        readingsBulkUpdate( $hash, "state", "getting historic data $callbackparam->{requestToTimestamp_UTC}", 1 );
         readingsEndUpdate( $hash, 1 );
 
         # reload timer
@@ -2683,7 +2683,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData_Stop($)
     GroheOndusSmartDevice_UpdateInternals($hash);
 
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged($hash, "state", "getting historic data stopped", 1);
+    readingsBulkUpdate($hash, "state", "getting historic data stopped", 1);
     readingsEndUpdate( $hash, 1 );
   }
 }
@@ -2826,12 +2826,12 @@ sub GroheOndusSmartDevice_SenseGuard_GetApplianceCommand($;$$)
           my $buzzer_sound_profile = $decode_json->{command}->{buzzer_sound_profile};
 
           # update readings
-          readingsBulkUpdateIfChanged( $hash, "CmdMeasureNow",         "$measure_now" );
-          readingsBulkUpdateIfChanged( $hash, "CmdTempUserUnlockOn",   "$temp_user_unlock_on" );
-          readingsBulkUpdateIfChanged( $hash, "CmdValveOpen",          "$valve_open" );
-          readingsBulkUpdateIfChanged( $hash, "CmdValveState",          $valve_open == 1 ? "Open" : "Closed" );
-          readingsBulkUpdateIfChanged( $hash, "CmdBuzzerOn",           "$buzzer_on" );
-          readingsBulkUpdateIfChanged( $hash, "CmdBuzzerSoundProfile", "$buzzer_sound_profile" );
+          readingsBulkUpdate( $hash, "CmdMeasureNow",         "$measure_now" );
+          readingsBulkUpdate( $hash, "CmdTempUserUnlockOn",   "$temp_user_unlock_on" );
+          readingsBulkUpdate( $hash, "CmdValveOpen",          "$valve_open" );
+          readingsBulkUpdate( $hash, "CmdValveState",          $valve_open == 1 ? "Open" : "Closed" );
+          readingsBulkUpdate( $hash, "CmdBuzzerOn",           "$buzzer_on" );
+          readingsBulkUpdate( $hash, "CmdBuzzerSoundProfile", "$buzzer_sound_profile" );
 
           $hash->{helper}{Telegram_GetCommandCounter}++;
         }
@@ -3260,14 +3260,14 @@ sub GroheOndusSmartDevice_SenseGuard_SetApplianceCommand($$$;$$)
           my $valve_open                   = $decode_json->{command}->{valve_open};
 
           # update readings
-          readingsBulkUpdateIfChanged( $hash, "CmdBuzzerOn",                   "$buzzer_on" );
-          readingsBulkUpdateIfChanged( $hash, "CmdBuzzerSoundProfile",         "$buzzer_sound_profile" );
-          readingsBulkUpdateIfChanged( $hash, "CmdMeasureNow",                 "$measure_now" );
-          readingsBulkUpdateIfChanged( $hash, "CmdPressureMeasurementRunning", "$pressure_measurement_running" );
-          readingsBulkUpdateIfChanged( $hash, "CmdReasonForChange",            "$reason_for_change" );
-          readingsBulkUpdateIfChanged( $hash, "CmdTempUserUnlockOn",           "$temp_user_unlock_on" );
-          readingsBulkUpdateIfChanged( $hash, "CmdValveOpen",                  "$valve_open" );
-          readingsBulkUpdateIfChanged( $hash, "CmdValveState",                  $valve_open == 1 ? "Open" : "Closed" );
+          readingsBulkUpdate( $hash, "CmdBuzzerOn",                   "$buzzer_on" );
+          readingsBulkUpdate( $hash, "CmdBuzzerSoundProfile",         "$buzzer_sound_profile" );
+          readingsBulkUpdate( $hash, "CmdMeasureNow",                 "$measure_now" );
+          readingsBulkUpdate( $hash, "CmdPressureMeasurementRunning", "$pressure_measurement_running" );
+          readingsBulkUpdate( $hash, "CmdReasonForChange",            "$reason_for_change" );
+          readingsBulkUpdate( $hash, "CmdTempUserUnlockOn",           "$temp_user_unlock_on" );
+          readingsBulkUpdate( $hash, "CmdValveOpen",                  "$valve_open" );
+          readingsBulkUpdate( $hash, "CmdValveState",                  $valve_open == 1 ? "Open" : "Closed" );
 
           $hash->{helper}{Telegram_SetCommandCounter}++;
         }
@@ -3456,27 +3456,27 @@ sub GroheOndusSmartDevice_Sense_GetState($;$$)
             if( $currentData->{type} eq "update_available"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateUpdateAvailable", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateUpdateAvailable", $currentData->{value} );
             } 
             elsif( $currentData->{type} eq "battery"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateBattery", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateBattery", $currentData->{value} );
             } 
             elsif( $currentData->{type} eq "connection"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateConnection", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateConnection", $currentData->{value} );
             } 
             elsif( $currentData->{type} eq "wifi_quality"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateWifiQuality", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateWifiQuality", $currentData->{value} );
             } 
             else
             {
               # write json string to reading "unknown"
-              readingsBulkUpdateIfChanged( $hash, "State_unknown-data", encode_json($currentData) );
+              readingsBulkUpdate( $hash, "State_unknown-data", encode_json($currentData) );
             }
           }
 
@@ -3653,25 +3653,25 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
           if( defined( $currentEntry )
             and ref( $currentEntry ) eq "HASH" )
           {
-            readingsBulkUpdateIfChanged( $hash, "ApplianceID", "$currentEntry->{appliance_id}" )
+            readingsBulkUpdate( $hash, "ApplianceID", "$currentEntry->{appliance_id}" )
               if( defined( $currentEntry->{appliance_id} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceInstallationDate", "$currentEntry->{installation_date}" )
+            readingsBulkUpdate( $hash, "ApplianceInstallationDate", "$currentEntry->{installation_date}" )
               if( defined( $currentEntry->{installation_date} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceName", "$currentEntry->{name}" )
+            readingsBulkUpdate( $hash, "ApplianceName", "$currentEntry->{name}" )
               if( defined( $currentEntry->{name} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceSerialNumber", "$currentEntry->{serial_number}" )
+            readingsBulkUpdate( $hash, "ApplianceSerialNumber", "$currentEntry->{serial_number}" )
               if( defined( $currentEntry->{serial_number} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceType", "$currentEntry->{type}" )
+            readingsBulkUpdate( $hash, "ApplianceType", "$currentEntry->{type}" )
               if( defined( $currentEntry->{type} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceVersion", "$currentEntry->{version}" )
+            readingsBulkUpdate( $hash, "ApplianceVersion", "$currentEntry->{version}" )
               if( defined( $currentEntry->{version} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceTDT", "$currentEntry->{tdt}" )
+            readingsBulkUpdate( $hash, "ApplianceTDT", "$currentEntry->{tdt}" )
               if( defined( $currentEntry->{tdt} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceTimezone", "$currentEntry->{timezone}" )
+            readingsBulkUpdate( $hash, "ApplianceTimezone", "$currentEntry->{timezone}" )
               if( defined( $currentEntry->{timezone} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceRole", "$currentEntry->{role}" )
+            readingsBulkUpdate( $hash, "ApplianceRole", "$currentEntry->{role}" )
               if( defined( $currentEntry->{role} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceRegistrationComplete", "$currentEntry->{registration_complete}" )
+            readingsBulkUpdate( $hash, "ApplianceRegistrationComplete", "$currentEntry->{registration_complete}" )
               if( defined( $currentEntry->{registration_complete} ) );
 
             $hash->{helper}{ApplianceTDT_LUTC} = "$currentEntry->{tdt}"
@@ -3724,12 +3724,12 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
                   {
                     if( "$currentThreshold->{type}" eq "max" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigTemperatureThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
                     elsif( "$currentThreshold->{type}" eq "min" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigTemperatureThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigTemperatureThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     }
                   } 
@@ -3737,12 +3737,12 @@ sub GroheOndusSmartDevice_Sense_GetConfig($;$$)
                   {
                     if( "$currentThreshold->{type}" eq "max" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigHumidityThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigHumidityThresholdMax", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     } 
                     elsif( "$currentThreshold->{type}" eq "min" )
                     {
-                      readingsBulkUpdateIfChanged( $hash, "ConfigHumidityThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
+                      readingsBulkUpdate( $hash, "ConfigHumidityThresholdMin", $currentThreshold->{enabled} ? $currentThreshold->{value} : "off" );
                       next;
                     }
                   }
@@ -3929,11 +3929,11 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
                 {
                   readingsBeginUpdate($hash);
     
-                  readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
+                  readingsBulkUpdate( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
                     if( defined($currentDataTimestamp_LUTC) );
-                  readingsBulkUpdateIfChanged( $hash, "MeasurementHumidity", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataHumidity )
+                  readingsBulkUpdate( $hash, "MeasurementHumidity", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataHumidity )
                     if( defined($currentDataHumidity) );
-                  readingsBulkUpdateIfChanged( $hash, "MeasurementTemperature", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTemperature )
+                  readingsBulkUpdate( $hash, "MeasurementTemperature", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTemperature )
                     if( defined($currentDataTemperature) );
     
                   readingsEndUpdate( $hash, 1 );
@@ -4010,7 +4010,7 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
         if($hash->{helper}{GetInProgress} ne "0" and 
           $hash->{helper}{GetSuspendReadings} ne "0")
         {
-          readingsBulkUpdateIfChanged($hash, "state", "getting historic data finished", 1);
+          readingsBulkUpdate($hash, "state", "getting historic data finished", 1);
         }
 
         $hash->{helper}{GetSuspendReadings} = "0";
@@ -4019,11 +4019,11 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
         $hash->{helper}{GetInProgress} = "0";
         GroheOndusSmartDevice_UpdateInternals($hash);
 
-        readingsBulkUpdateIfChanged($hash, "LastDataTimestamp", $currentDataTimestamp_LUTC, 1)
+        readingsBulkUpdate($hash, "LastDataTimestamp", $currentDataTimestamp_LUTC, 1)
           if(defined($currentDataTimestamp_LUTC));
-        readingsBulkUpdateIfChanged($hash, "LastHumidity", $currentDataHumidity, 1)
+        readingsBulkUpdate($hash, "LastHumidity", $currentDataHumidity, 1)
           if(defined($currentDataHumidity));
-        readingsBulkUpdateIfChanged($hash, "LastTemperature", $currentDataTemperature, 1)
+        readingsBulkUpdate($hash, "LastTemperature", $currentDataTemperature, 1)
           if(defined($currentDataTemperature));
           
         readingsEndUpdate( $hash, 1 );
@@ -4042,7 +4042,7 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
         GroheOndusSmartDevice_UpdateInternals($hash);
 
         readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged( $hash, "state", "getting historic data $callbackparam->{requestToTimestamp_UTC}", 1 );
+        readingsBulkUpdate( $hash, "state", "getting historic data $callbackparam->{requestToTimestamp_UTC}", 1 );
         readingsEndUpdate( $hash, 1 );
 
         # reload timer
@@ -4209,7 +4209,7 @@ sub GroheOndusSmartDevice_Sense_GetData_Stop($)
     GroheOndusSmartDevice_UpdateInternals($hash);
 
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged($hash, "state", "getting historic data stopped", 1);
+    readingsBulkUpdate($hash, "state", "getting historic data stopped", 1);
     readingsEndUpdate($hash, 1);
   }
 }
@@ -4547,27 +4547,27 @@ sub GroheOndusSmartDevice_Blue_GetState($;$$)
             if( $currentData->{type} eq "update_available"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateUpdateAvailable", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateUpdateAvailable", $currentData->{value} );
             } 
             elsif( $currentData->{type} eq "battery"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateBattery", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateBattery", $currentData->{value} );
             } 
             elsif( $currentData->{type} eq "connection"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateConnection", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateConnection", $currentData->{value} );
             } 
             elsif( $currentData->{type} eq "wifi_quality"
               and defined( $currentData->{value} ) )
             {
-              readingsBulkUpdateIfChanged( $hash, "StateWifiQuality", $currentData->{value} );
+              readingsBulkUpdate( $hash, "StateWifiQuality", $currentData->{value} );
             } 
             else
             {
               # write json string to reading "unknown"
-              readingsBulkUpdateIfChanged( $hash, "State_unknown-data", encode_json($currentData) );
+              readingsBulkUpdate( $hash, "State_unknown-data", encode_json($currentData) );
             }
           }
 
@@ -4789,27 +4789,27 @@ sub GroheOndusSmartDevice_Blue_GetConfig($;$$)
           if( defined( $currentEntry )
             and ref( $currentEntry ) eq "HASH" )
           {
-            readingsBulkUpdateIfChanged( $hash, "ApplianceID", "$currentEntry->{appliance_id}" )
+            readingsBulkUpdate( $hash, "ApplianceID", "$currentEntry->{appliance_id}" )
               if( defined( $currentEntry->{appliance_id} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceInstallationDate", "$currentEntry->{installation_date}" )
+            readingsBulkUpdate( $hash, "ApplianceInstallationDate", "$currentEntry->{installation_date}" )
               if( defined( $currentEntry->{installation_date} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceName", "$currentEntry->{name}" )
+            readingsBulkUpdate( $hash, "ApplianceName", "$currentEntry->{name}" )
               if( defined( $currentEntry->{name} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceSerialNumber", "$currentEntry->{serial_number}" )
+            readingsBulkUpdate( $hash, "ApplianceSerialNumber", "$currentEntry->{serial_number}" )
               if( defined( $currentEntry->{serial_number} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceType", "$currentEntry->{type}" )
+            readingsBulkUpdate( $hash, "ApplianceType", "$currentEntry->{type}" )
               if( defined( $currentEntry->{type} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceVersion", "$currentEntry->{version}" )
+            readingsBulkUpdate( $hash, "ApplianceVersion", "$currentEntry->{version}" )
               if( defined( $currentEntry->{version} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceTDT", "$currentEntry->{tdt}" )
+            readingsBulkUpdate( $hash, "ApplianceTDT", "$currentEntry->{tdt}" )
               if( defined( $currentEntry->{tdt} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceTimezone", "$currentEntry->{timezone}" )
+            readingsBulkUpdate( $hash, "ApplianceTimezone", "$currentEntry->{timezone}" )
               if( defined( $currentEntry->{timezone} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceRole", "$currentEntry->{role}" )
+            readingsBulkUpdate( $hash, "ApplianceRole", "$currentEntry->{role}" )
               if( defined( $currentEntry->{role} ) );
-            readingsBulkUpdateIfChanged( $hash, "ApplianceRegistrationComplete", "$currentEntry->{registration_complete}" )
+            readingsBulkUpdate( $hash, "ApplianceRegistrationComplete", "$currentEntry->{registration_complete}" )
               if( defined( $currentEntry->{registration_complete} ) );
-            readingsBulkUpdateIfChanged( $hash, "AppliancePresharedkey", "$currentEntry->{presharedkey}" )
+            readingsBulkUpdate( $hash, "AppliancePresharedkey", "$currentEntry->{presharedkey}" )
               if( defined( $currentEntry->{presharedkey} ) );
 
             $hash->{helper}{ApplianceTDT_LUTC} = "$currentEntry->{tdt}"
@@ -4836,29 +4836,29 @@ sub GroheOndusSmartDevice_Blue_GetConfig($;$$)
             #     "flow_rate_medium":24,
             #     "flow_rate_carbonated":18
             #   },
-              readingsBulkUpdateIfChanged( $hash, "Config_co2_type", "$currentConfig->{co2_type}" )
+              readingsBulkUpdate( $hash, "Config_co2_type", "$currentConfig->{co2_type}" )
                 if( defined( $currentConfig->{co2_type} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_hose_length", "$currentConfig->{hose_length}" )
+              readingsBulkUpdate( $hash, "Config_hose_length", "$currentConfig->{hose_length}" )
                 if( defined( $currentConfig->{hose_length} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_co2_consumption_medium", "$currentConfig->{co2_consumption_medium}" )
+              readingsBulkUpdate( $hash, "Config_co2_consumption_medium", "$currentConfig->{co2_consumption_medium}" )
                 if( defined( $currentConfig->{co2_consumption_medium} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_cco2_consumption_carbonated", "$currentConfig->{co2_consumption_carbonated}" )
+              readingsBulkUpdate( $hash, "Config_cco2_consumption_carbonated", "$currentConfig->{co2_consumption_carbonated}" )
                 if( defined( $currentConfig->{co2_consumption_medium} ) );
-              readingsBulkUpdateIfChanged( $hash, "co2_guest_mode_active", "$currentConfig->{guest_mode_active}" )
+              readingsBulkUpdate( $hash, "co2_guest_mode_active", "$currentConfig->{guest_mode_active}" )
                 if( defined( $currentConfig->{guest_mode_active} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_auto_flush_active", "$currentConfig->{auto_flush_active}" )
+              readingsBulkUpdate( $hash, "Config_auto_flush_active", "$currentConfig->{auto_flush_active}" )
                 if( defined( $currentConfig->{auto_flush_active} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_flush_confirmed", "$currentConfig->{flush_confirmed}" )
+              readingsBulkUpdate( $hash, "Config_flush_confirmed", "$currentConfig->{flush_confirmed}" )
                 if( defined( $currentConfig->{flush_confirmed} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_f_parameter", "$currentConfig->{f_parameter}" )
+              readingsBulkUpdate( $hash, "Config_f_parameter", "$currentConfig->{f_parameter}" )
                 if( defined( $currentConfig->{f_parameter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_l_parameter", "$currentConfig->{l_parameter}" )
+              readingsBulkUpdate( $hash, "Config_l_parameter", "$currentConfig->{l_parameter}" )
                 if( defined( $currentConfig->{l_parameter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_flow_rate_still", "$currentConfig->{flow_rate_still}" )
+              readingsBulkUpdate( $hash, "Config_flow_rate_still", "$currentConfig->{flow_rate_still}" )
                 if( defined( $currentConfig->{flow_rate_still} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_flow_rate_medium", "$currentConfig->{flow_rate_medium}" )
+              readingsBulkUpdate( $hash, "Config_flow_rate_medium", "$currentConfig->{flow_rate_medium}" )
                 if( defined( $currentConfig->{flow_rate_medium} ) );
-              readingsBulkUpdateIfChanged( $hash, "Config_flow_rate_carbonated", "$currentConfig->{flow_rate_carbonated}" )
+              readingsBulkUpdate( $hash, "Config_flow_rate_carbonated", "$currentConfig->{flow_rate_carbonated}" )
                 if( defined( $currentConfig->{flow_rate_carbonated} ) );
             }
 
@@ -4878,19 +4878,19 @@ sub GroheOndusSmartDevice_Blue_GetConfig($;$$)
               #     "product_information_notif":true
               #   },
 
-              readingsBulkUpdateIfChanged( $hash, "Params_water_hardness", "$currentParams->{water_hardness}" )
+              readingsBulkUpdate( $hash, "Params_water_hardness", "$currentParams->{water_hardness}" )
                 if( defined( $currentParams->{water_hardness} ) );
-              readingsBulkUpdateIfChanged( $hash, "Params_carbon_hardness", "$currentParams->{carbon_hardness}" )
+              readingsBulkUpdate( $hash, "Params_carbon_hardness", "$currentParams->{carbon_hardness}" )
                 if( defined( $currentParams->{carbon_hardness} ) );
-              readingsBulkUpdateIfChanged( $hash, "Params_filter_type", "$currentParams->{filter_type}" )
+              readingsBulkUpdate( $hash, "Params_filter_type", "$currentParams->{filter_type}" )
                 if( defined( $currentParams->{filter_type} ) );
-              readingsBulkUpdateIfChanged( $hash, "Params_variant", "$currentParams->{variant}" )
+              readingsBulkUpdate( $hash, "Params_variant", "$currentParams->{variant}" )
                 if( defined( $currentParams->{variant} ) );
-              readingsBulkUpdateIfChanged( $hash, "Params_auto_flush_reminder_notif", "$currentParams->{auto_flush_reminder_notif}" )
+              readingsBulkUpdate( $hash, "Params_auto_flush_reminder_notif", "$currentParams->{auto_flush_reminder_notif}" )
                 if( defined( $currentParams->{auto_flush_reminder_notif} ) );
-              readingsBulkUpdateIfChanged( $hash, "Params_consumables_low_notif", "$currentParams->{water_consumables_low_notif}" )
+              readingsBulkUpdate( $hash, "Params_consumables_low_notif", "$currentParams->{water_consumables_low_notif}" )
                 if( defined( $currentParams->{consumables_low_notif} ) );
-              readingsBulkUpdateIfChanged( $hash, "Params_product_information_notif", "$currentParams->{product_information_notif}" )
+              readingsBulkUpdate( $hash, "Params_product_information_notif", "$currentParams->{product_information_notif}" )
                 if( defined( $currentParams->{product_information_notif} ) );
             }
 
@@ -4912,25 +4912,25 @@ sub GroheOndusSmartDevice_Blue_GetConfig($;$$)
               #     "flush_confirmation_required":false,
               #     "System_error_bitfield":0
               #   }
-              readingsBulkUpdateIfChanged( $hash, "State_start_time", "$currentState->{start_time}" )
+              readingsBulkUpdate( $hash, "State_start_time", "$currentState->{start_time}" )
                 if( defined( $currentState->{start_time} ) );
-              readingsBulkUpdateIfChanged( $hash, "State_APPLIANCE_SUCCESSFUL_CONFIGURED", "$currentState->{APPLIANCE_SUCCESSFUL_CONFIGURED}" )
+              readingsBulkUpdate( $hash, "State_APPLIANCE_SUCCESSFUL_CONFIGURED", "$currentState->{APPLIANCE_SUCCESSFUL_CONFIGURED}" )
                 if( defined( $currentState->{APPLIANCE_SUCCESSFUL_CONFIGURED} ) );
-              readingsBulkUpdateIfChanged( $hash, "State_co2_empty", "$currentState->{co2_empty}" )
+              readingsBulkUpdate( $hash, "State_co2_empty", "$currentState->{co2_empty}" )
                 if( defined( $currentState->{co2_empty} ) );
-              readingsBulkUpdateIfChanged( $hash, "State_co2_20l_reached", "$currentState->{co2_20l_reached}" )
+              readingsBulkUpdate( $hash, "State_co2_20l_reached", "$currentState->{co2_20l_reached}" )
                 if( defined( $currentState->{co2_20l_reached} ) );
-              readingsBulkUpdateIfChanged( $hash, "State_filter_empty", "$currentState->{filter_empty}" )
+              readingsBulkUpdate( $hash, "State_filter_empty", "$currentState->{filter_empty}" )
                 if( defined( $currentState->{filter_empty} ) );
-              readingsBulkUpdateIfChanged( $hash, "State_filter_20l_reached", "$currentState->{filter_20l_reached}" )
+              readingsBulkUpdate( $hash, "State_filter_20l_reached", "$currentState->{filter_20l_reached}" )
                 if( defined( $currentState->{filter_20l_reached} ) );
-              readingsBulkUpdateIfChanged( $hash, "State_cleaning_mode_active", "$currentState->{cleaning_mode_active}" )
+              readingsBulkUpdate( $hash, "State_cleaning_mode_active", "$currentState->{cleaning_mode_active}" )
                 if( defined( $currentState->{cleaning_mode_active} ) );
-              readingsBulkUpdateIfChanged( $hash, "State_cleaning_needed", "$currentState->{cleaning_needed}" )
+              readingsBulkUpdate( $hash, "State_cleaning_needed", "$currentState->{cleaning_needed}" )
                 if( defined( $currentState->{cleaning_needed} ) );
-              readingsBulkUpdateIfChanged( $hash, "State_flush_confirmation_required", "$currentState->{flush_confirmation_required}" )
+              readingsBulkUpdate( $hash, "State_flush_confirmation_required", "$currentState->{flush_confirmation_required}" )
                 if( defined( $currentState->{flush_confirmation_required} ) );
-              readingsBulkUpdateIfChanged( $hash, "State_System_error_bitfield", "$currentState->{System_error_bitfield}" )
+              readingsBulkUpdate( $hash, "State_System_error_bitfield", "$currentState->{System_error_bitfield}" )
                 if( defined( $currentState->{System_error_bitfield} ) );
             }
 
@@ -4975,70 +4975,70 @@ sub GroheOndusSmartDevice_Blue_GetConfig($;$$)
               #     "error15_counter":0,
               #     "error16_counter":0
               #   },
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_1", "$currentError->{errors_1}" )
+              readingsBulkUpdate( $hash, "Error_errors_1", "$currentError->{errors_1}" )
                 if( defined( $currentError->{errors_1} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_2", "$currentError->{errors_2}" )
+              readingsBulkUpdate( $hash, "Error_errors_2", "$currentError->{errors_2}" )
                 if( defined( $currentError->{errors_2} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_3", "$currentError->{errors_3}" )
+              readingsBulkUpdate( $hash, "Error_errors_3", "$currentError->{errors_3}" )
                 if( defined( $currentError->{errors_3} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_4", "$currentError->{errors_4}" )
+              readingsBulkUpdate( $hash, "Error_errors_4", "$currentError->{errors_4}" )
                 if( defined( $currentError->{errors_4} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_5", "$currentError->{errors_5}" )
+              readingsBulkUpdate( $hash, "Error_errors_5", "$currentError->{errors_5}" )
                 if( defined( $currentError->{errors_5} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_6", "$currentError->{errors_6}" )
+              readingsBulkUpdate( $hash, "Error_errors_6", "$currentError->{errors_6}" )
                 if( defined( $currentError->{errors_6} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_7", "$currentError->{errors_7}" )
+              readingsBulkUpdate( $hash, "Error_errors_7", "$currentError->{errors_7}" )
                 if( defined( $currentError->{errors_7} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_8", "$currentError->{errors_8}" )
+              readingsBulkUpdate( $hash, "Error_errors_8", "$currentError->{errors_8}" )
                 if( defined( $currentError->{errors_8} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_9", "$currentError->{errors_9}" )
+              readingsBulkUpdate( $hash, "Error_errors_9", "$currentError->{errors_9}" )
                 if( defined( $currentError->{errors_9} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_10", "$currentError->{errors_10}" )
+              readingsBulkUpdate( $hash, "Error_errors_10", "$currentError->{errors_10}" )
                 if( defined( $currentError->{errors_10} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_11", "$currentError->{errors_11}" )
+              readingsBulkUpdate( $hash, "Error_errors_11", "$currentError->{errors_11}" )
                 if( defined( $currentError->{errors_11} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_12", "$currentError->{errors_12}" )
+              readingsBulkUpdate( $hash, "Error_errors_12", "$currentError->{errors_12}" )
                 if( defined( $currentError->{errors_12} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_13", "$currentError->{errors_13}" )
+              readingsBulkUpdate( $hash, "Error_errors_13", "$currentError->{errors_13}" )
                 if( defined( $currentError->{errors_13} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_14", "$currentError->{errors_14}" )
+              readingsBulkUpdate( $hash, "Error_errors_14", "$currentError->{errors_14}" )
                 if( defined( $currentError->{errors_14} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_15", "$currentError->{errors_15}" )
+              readingsBulkUpdate( $hash, "Error_errors_15", "$currentError->{errors_15}" )
                 if( defined( $currentError->{errors_15} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_errors_16", "$currentError->{errors_16}" )
+              readingsBulkUpdate( $hash, "Error_errors_16", "$currentError->{errors_16}" )
                 if( defined( $currentError->{errors_16} ) );
 
-              readingsBulkUpdateIfChanged( $hash, "Error_error1_counter", "$currentError->{error1_counter}" )
+              readingsBulkUpdate( $hash, "Error_error1_counter", "$currentError->{error1_counter}" )
                 if( defined( $currentError->{error1_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error2_counter", "$currentError->{error2_counter}" )
+              readingsBulkUpdate( $hash, "Error_error2_counter", "$currentError->{error2_counter}" )
                 if( defined( $currentError->{error2_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error3_counter", "$currentError->{error3_counter}" )
+              readingsBulkUpdate( $hash, "Error_error3_counter", "$currentError->{error3_counter}" )
                 if( defined( $currentError->{error3_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error4_counter", "$currentError->{error4_counter}" )
+              readingsBulkUpdate( $hash, "Error_error4_counter", "$currentError->{error4_counter}" )
                 if( defined( $currentError->{error4_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error5_counter", "$currentError->{error5_counter}" )
+              readingsBulkUpdate( $hash, "Error_error5_counter", "$currentError->{error5_counter}" )
                 if( defined( $currentError->{error5_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error6_counter", "$currentError->{error6_counter}" )
+              readingsBulkUpdate( $hash, "Error_error6_counter", "$currentError->{error6_counter}" )
                 if( defined( $currentError->{error6_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error7_counter", "$currentError->{error7_counter}" )
+              readingsBulkUpdate( $hash, "Error_error7_counter", "$currentError->{error7_counter}" )
                 if( defined( $currentError->{error7_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error8_counter", "$currentError->{error8_counter}" )
+              readingsBulkUpdate( $hash, "Error_error8_counter", "$currentError->{error8_counter}" )
                 if( defined( $currentError->{error8_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error9_counter", "$currentError->{error9_counter}" )
+              readingsBulkUpdate( $hash, "Error_error9_counter", "$currentError->{error9_counter}" )
                 if( defined( $currentError->{error9_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error10_counter", "$currentError->{error10_counter}" )
+              readingsBulkUpdate( $hash, "Error_error10_counter", "$currentError->{error10_counter}" )
                 if( defined( $currentError->{error10_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error11_counter", "$currentError->{error11_counter}" )
+              readingsBulkUpdate( $hash, "Error_error11_counter", "$currentError->{error11_counter}" )
                 if( defined( $currentError->{error11_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error12_counter", "$currentError->{error12_counter}" )
+              readingsBulkUpdate( $hash, "Error_error12_counter", "$currentError->{error12_counter}" )
                 if( defined( $currentError->{error12_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error13_counter", "$currentError->{error13_counter}" )
+              readingsBulkUpdate( $hash, "Error_error13_counter", "$currentError->{error13_counter}" )
                 if( defined( $currentError->{error13_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error14_counter", "$currentError->{error14_counter}" )
+              readingsBulkUpdate( $hash, "Error_error14_counter", "$currentError->{error14_counter}" )
                 if( defined( $currentError->{error14_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error15_counter", "$currentError->{error15_counter}" )
+              readingsBulkUpdate( $hash, "Error_error15_counter", "$currentError->{error15_counter}" )
                 if( defined( $currentError->{error15_counter} ) );
-              readingsBulkUpdateIfChanged( $hash, "Error_error16_counter", "$currentError->{error16_counter}" )
+              readingsBulkUpdate( $hash, "Error_error16_counter", "$currentError->{error16_counter}" )
                 if( defined( $currentError->{error16_counter} ) );
             }
           }
@@ -5283,45 +5283,45 @@ sub GroheOndusSmartDevice_Blue_GetData($$;$$)
                 {
                   readingsBeginUpdate($hash);
     
-                  readingsBulkUpdateIfChanged( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
+                  readingsBulkUpdate( $hash, "MeasurementDataTimestamp", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $currentDataTimestamp_LUTC )
                     if( defined($currentDataTimestamp_LUTC) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_open_close_cycles_still", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_open_close_cycles_still )
+                  readingsBulkUpdate( $hash, "Measurement_open_close_cycles_still", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_open_close_cycles_still )
                     if( defined($current_open_close_cycles_still) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_open_close_cycles_carbonated", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_open_close_cycles_carbonated )
+                  readingsBulkUpdate( $hash, "Measurement_open_close_cycles_carbonated", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_open_close_cycles_carbonated )
                     if( defined($current_open_close_cycles_carbonated) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_water_running_time_still", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_water_running_time_still )
+                  readingsBulkUpdate( $hash, "Measurement_water_running_time_still", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_water_running_time_still )
                     if( defined($current_water_running_time_still) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_water_running_time_medium", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_water_running_time_medium )
+                  readingsBulkUpdate( $hash, "Measurement_water_running_time_medium", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_water_running_time_medium )
                     if( defined($current_water_running_time_medium) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_water_running_time_carbonated", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_water_running_time_carbonated )
+                  readingsBulkUpdate( $hash, "Measurement_water_running_time_carbonated", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_water_running_time_carbonated )
                     if( defined($current_water_running_time_carbonated) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_operating_time", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_operating_time )
+                  readingsBulkUpdate( $hash, "Measurement_operating_time", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_operating_time )
                     if( defined($current_operating_time) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_max_idle_time", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_max_idle_time )
+                  readingsBulkUpdate( $hash, "Measurement_max_idle_time", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_max_idle_time )
                     if( defined($current_max_idle_time) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_pump_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_pump_count )
+                  readingsBulkUpdate( $hash, "Measurement_pump_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_pump_count )
                     if( defined($current_pump_count) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_pump_running_time", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_pump_running_time )
+                  readingsBulkUpdate( $hash, "Measurement_pump_running_time", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_pump_running_time )
                     if( defined($current_pump_running_time) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_remaining_filter", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_remaining_filter )
+                  readingsBulkUpdate( $hash, "Measurement_remaining_filter", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_remaining_filter )
                     if( defined($current_remaining_filter) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_remaining_co2", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_remaining_co2 )
+                  readingsBulkUpdate( $hash, "Measurement_remaining_co2", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_remaining_co2 )
                     if( defined($current_remaining_co2) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_date_of_filter_replacement", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_date_of_filter_replacement )
+                  readingsBulkUpdate( $hash, "Measurement_date_of_filter_replacement", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_date_of_filter_replacement )
                     if( defined($current_date_of_filter_replacement) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_date_of_co2_replacement", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_date_of_co2_replacement )
+                  readingsBulkUpdate( $hash, "Measurement_date_of_co2_replacement", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_date_of_co2_replacement )
                     if( defined($current_date_of_co2_replacement) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_date_of_cleaning", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_date_of_cleaning )
+                  readingsBulkUpdate( $hash, "Measurement_date_of_cleaning", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_date_of_cleaning )
                     if( defined($current_date_of_cleaning) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_power_cut_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_power_cut_count )
+                  readingsBulkUpdate( $hash, "Measurement_power_cut_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_power_cut_count )
                     if( defined($current_power_cut_count) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_time_since_restart", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_time_since_restart )
+                  readingsBulkUpdate( $hash, "Measurement_time_since_restart", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_time_since_restart )
                     if( defined($current_time_since_restart) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_time_since_last_withdrawal", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_time_since_last_withdrawal )
+                  readingsBulkUpdate( $hash, "Measurement_time_since_last_withdrawal", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_time_since_last_withdrawal )
                     if( defined($current_time_since_last_withdrawal) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_filter_change_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_filter_change_count )
+                  readingsBulkUpdate( $hash, "Measurement_filter_change_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_filter_change_count )
                     if( defined($current_filter_change_count) );
-                  readingsBulkUpdateIfChanged( $hash, "Measurement_cleaning_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_cleaning_count )
+                  readingsBulkUpdate( $hash, "Measurement_cleaning_count", $CurrentMeasurementFormatVersion . $currentDataTimestamp_LTZ_s_string . " " . $current_cleaning_count )
                     if( defined($current_cleaning_count) );
 
                   readingsEndUpdate( $hash, 1 );
@@ -5415,7 +5415,7 @@ sub GroheOndusSmartDevice_Blue_GetData($$;$$)
         if($hash->{helper}{GetInProgress} ne "0" and 
           $hash->{helper}{GetSuspendReadings} ne "0")
         {
-          readingsBulkUpdateIfChanged($hash, "state", "getting historic data finished", 1);
+          readingsBulkUpdate($hash, "state", "getting historic data finished", 1);
         }
 
         $hash->{helper}{GetSuspendReadings} = "0";
@@ -5424,43 +5424,43 @@ sub GroheOndusSmartDevice_Blue_GetData($$;$$)
         $hash->{helper}{GetInProgress} = "0";
         GroheOndusSmartDevice_UpdateInternals($hash);
 
-        readingsBulkUpdateIfChanged($hash, "LastDataTimestamp", $currentDataTimestamp_LUTC, 1)
+        readingsBulkUpdate($hash, "LastDataTimestamp", $currentDataTimestamp_LUTC, 1)
           if(defined($currentDataTimestamp_LUTC));
-        readingsBulkUpdateIfChanged($hash, "Last_open_close_cycles_still", $current_open_close_cycles_still, 1)
+        readingsBulkUpdate($hash, "Last_open_close_cycles_still", $current_open_close_cycles_still, 1)
           if(defined($current_open_close_cycles_still));
-        readingsBulkUpdateIfChanged($hash, "Last_open_close_cycles_carbonated", $current_open_close_cycles_carbonated, 1)
+        readingsBulkUpdate($hash, "Last_open_close_cycles_carbonated", $current_open_close_cycles_carbonated, 1)
           if(defined($current_open_close_cycles_carbonated));
-        readingsBulkUpdateIfChanged($hash, "Last_water_running_time_still", $current_water_running_time_still, 1)
+        readingsBulkUpdate($hash, "Last_water_running_time_still", $current_water_running_time_still, 1)
           if(defined($current_water_running_time_still));
-        readingsBulkUpdateIfChanged($hash, "Last_water_running_time_medium", $current_water_running_time_medium, 1)
+        readingsBulkUpdate($hash, "Last_water_running_time_medium", $current_water_running_time_medium, 1)
           if(defined($current_water_running_time_medium));
-        readingsBulkUpdateIfChanged($hash, "Last_water_running_time_carbonated", $current_water_running_time_carbonated, 1)
+        readingsBulkUpdate($hash, "Last_water_running_time_carbonated", $current_water_running_time_carbonated, 1)
           if(defined($current_water_running_time_carbonated));
-        readingsBulkUpdateIfChanged($hash, "Last_operating_time", $current_operating_time, 1)
+        readingsBulkUpdate($hash, "Last_operating_time", $current_operating_time, 1)
           if(defined($current_operating_time));
-        readingsBulkUpdateIfChanged($hash, "Last_max_idle_time", $current_max_idle_time, 1)
+        readingsBulkUpdate($hash, "Last_max_idle_time", $current_max_idle_time, 1)
           if(defined($current_max_idle_time));
-        readingsBulkUpdateIfChanged($hash, "Last_pump_count", $current_pump_count, 1)
+        readingsBulkUpdate($hash, "Last_pump_count", $current_pump_count, 1)
           if(defined($current_pump_count));
-        readingsBulkUpdateIfChanged($hash, "Last_pump_running_time", $current_pump_running_time, 1)
+        readingsBulkUpdate($hash, "Last_pump_running_time", $current_pump_running_time, 1)
           if(defined($current_pump_running_time));
-        readingsBulkUpdateIfChanged($hash, "Last_remaining_filter", $current_remaining_filter, 1)
+        readingsBulkUpdate($hash, "Last_remaining_filter", $current_remaining_filter, 1)
           if(defined($current_remaining_filter));
-        readingsBulkUpdateIfChanged($hash, "Last_remaining_co2", $current_remaining_co2, 1)
+        readingsBulkUpdate($hash, "Last_remaining_co2", $current_remaining_co2, 1)
           if(defined($current_remaining_co2));
-        readingsBulkUpdateIfChanged($hash, "Last_date_of_filter_replacement", $current_date_of_filter_replacement, 1)
+        readingsBulkUpdate($hash, "Last_date_of_filter_replacement", $current_date_of_filter_replacement, 1)
           if(defined($current_date_of_filter_replacement));
-        readingsBulkUpdateIfChanged($hash, "Last_date_of_cleaning", $current_date_of_co2_replacement, 1)
+        readingsBulkUpdate($hash, "Last_date_of_cleaning", $current_date_of_co2_replacement, 1)
           if(defined($current_date_of_co2_replacement));
-        readingsBulkUpdateIfChanged($hash, "Last_power_cut_count", $current_date_of_cleaning, 1)
+        readingsBulkUpdate($hash, "Last_power_cut_count", $current_date_of_cleaning, 1)
           if(defined($current_date_of_cleaning));
-        readingsBulkUpdateIfChanged($hash, "Last_time_since_restart", $current_time_since_restart, 1)
+        readingsBulkUpdate($hash, "Last_time_since_restart", $current_time_since_restart, 1)
           if(defined($current_time_since_restart));
-        readingsBulkUpdateIfChanged($hash, "Last_time_since_last_withdrawal", $current_time_since_last_withdrawal, 1)
+        readingsBulkUpdate($hash, "Last_time_since_last_withdrawal", $current_time_since_last_withdrawal, 1)
           if(defined($current_time_since_last_withdrawal));
-        readingsBulkUpdateIfChanged($hash, "Last_filter_change_count", $current_filter_change_count, 1)
+        readingsBulkUpdate($hash, "Last_filter_change_count", $current_filter_change_count, 1)
           if(defined($current_filter_change_count));
-        readingsBulkUpdateIfChanged($hash, "Last_cleaning_count", $current_cleaning_count, 1)
+        readingsBulkUpdate($hash, "Last_cleaning_count", $current_cleaning_count, 1)
           if(defined($current_cleaning_count));
           
         readingsEndUpdate( $hash, 1 );
@@ -5479,7 +5479,7 @@ sub GroheOndusSmartDevice_Blue_GetData($$;$$)
         GroheOndusSmartDevice_UpdateInternals($hash);
 
         readingsBeginUpdate($hash);
-        readingsBulkUpdateIfChanged( $hash, "state", "getting historic data $callbackparam->{requestToTimestamp_UTC}", 1 );
+        readingsBulkUpdate( $hash, "state", "getting historic data $callbackparam->{requestToTimestamp_UTC}", 1 );
         readingsEndUpdate( $hash, 1 );
 
         # reload timer
@@ -5645,7 +5645,7 @@ sub GroheOndusSmartDevice_Blue_GetData_Stop($)
     GroheOndusSmartDevice_UpdateInternals($hash);
 
     readingsBeginUpdate($hash);
-    readingsBulkUpdateIfChanged($hash, "state", "getting historic data stopped", 1);
+    readingsBulkUpdate($hash, "state", "getting historic data stopped", 1);
     readingsEndUpdate($hash, 1);
   }
 }
@@ -5914,7 +5914,7 @@ sub GroheOndusSmartDevice_Blue_GetApplianceCommand($;$$)
 
       if( AttrVal( $name, "debugJSON", 0 ) == 1 )
       {
-        readingsBulkUpdate( $hash, "Command_RAW", "\"" . $data . "\"", 1 );
+        readingsBulkUpdate( $hash, "Cmd_RAW", "\"" . $data . "\"", 1 );
       }
 
       my $decode_json = eval { decode_json($data) };
@@ -5956,12 +5956,12 @@ sub GroheOndusSmartDevice_Blue_GetApplianceCommand($;$$)
           my $buzzer_sound_profile = $decode_json->{command}->{buzzer_sound_profile};
 
           # update readings
-          readingsBulkUpdateIfChanged( $hash, "Cmd_MeasureNow",         "$measure_now" );
-          readingsBulkUpdateIfChanged( $hash, "Cmd_TempUserUnlockOn",   "$temp_user_unlock_on" );
-          readingsBulkUpdateIfChanged( $hash, "Cmd_ValveOpen",          "$valve_open" );
-          readingsBulkUpdateIfChanged( $hash, "Cmd_ValveState",          $valve_open == 1 ? "Open" : "Closed" );
-          readingsBulkUpdateIfChanged( $hash, "Cmd_BuzzerOn",           "$buzzer_on" );
-          readingsBulkUpdateIfChanged( $hash, "Cmd_BuzzerSoundProfile", "$buzzer_sound_profile" );
+          readingsBulkUpdate( $hash, "Cmd_MeasureNow",         "$measure_now" );
+          readingsBulkUpdate( $hash, "Cmd_TempUserUnlockOn",   "$temp_user_unlock_on" );
+          readingsBulkUpdate( $hash, "Cmd_ValveOpen",          "$valve_open" );
+          readingsBulkUpdate( $hash, "Cmd_ValveState",          $valve_open == 1 ? "Open" : "Closed" );
+          readingsBulkUpdate( $hash, "Cmd_BuzzerOn",           "$buzzer_on" );
+          readingsBulkUpdate( $hash, "Cmd_BuzzerSoundProfile", "$buzzer_sound_profile" );
 
           $hash->{helper}{Telegram_GetCommandCounter}++;
         }
