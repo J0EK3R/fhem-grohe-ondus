@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "4.0.5";
+my $VERSION = "4.0.6";
 
 use strict;
 use warnings;
@@ -101,6 +101,8 @@ sub GroheOndusSmartDevice_Blue_GetData_Stop($);
 sub GroheOndusSmartDevice_Blue_GetData_StartCampain($$;$$);
 sub GroheOndusSmartDevice_Blue_GetData_TimerExecute($);
 sub GroheOndusSmartDevice_Blue_GetData_TimerRemove($);
+
+sub GroheOndusSmartDevice_Blue_GetApplianceCommand($;$$);
 
 sub GroheOndusSmartDevice_FileLog_MeasureValueWrite($$$@);
 sub GroheOndusSmartDevice_FileLog_Delete($$);
@@ -4468,9 +4470,10 @@ sub GroheOndusSmartDevice_Blue_Update($)
   #GroheOndusSmartDevice_Blue_GetConfig($hash);
   
   # serial call:
-  my $getData   = sub { GroheOndusSmartDevice_Blue_GetData_Last($hash); };
-  my $getState  = sub { GroheOndusSmartDevice_Blue_GetState($hash, $getData); };
-  my $getConfig = sub { GroheOndusSmartDevice_Blue_GetConfig($hash, $getState); };
+  my $getApplianceCommand = sub { GroheOndusSmartDevice_Blue_GetApplianceCommand($hash); };
+  my $getData             = sub { GroheOndusSmartDevice_Blue_GetData_Last($hash, $getApplianceCommand); };
+  my $getState            = sub { GroheOndusSmartDevice_Blue_GetState($hash, $getData); };
+  my $getConfig           = sub { GroheOndusSmartDevice_Blue_GetConfig($hash, $getState); };
   
   $getConfig->();
 }
@@ -5888,6 +5891,145 @@ sub GroheOndusSmartDevice_Blue_Set($@)
   }
 }
 
+#################################
+# GroheOndusSmartDevice_Blue_GetApplianceCommand( $hash, $callbackSuccess, $callbackFail )
+sub GroheOndusSmartDevice_Blue_GetApplianceCommand($;$$)
+{
+  my ( $hash, $callbackSuccess, $callbackFail ) = @_;
+  my $name    = $hash->{NAME};
+
+  # definition of the lambda function wich is called to process received data
+  my $resultCallback = sub 
+  {
+    my ( $callbackparam, $data, $errorMsg ) = @_;
+
+    my $stopwatch = gettimeofday();
+    $hash->{helper}{Telegram_GetCommandTimeRequest}  = $stopwatch - $callbackparam->{timestampStart};
+    $hash->{helper}{Telegram_GetCommandCallback}     = strftime($TimeStampFormat, localtime($stopwatch));
+    Log3($name, 4, "GroheOndusSmartDevice_Blue_GetApplianceCommand($name) - resultCallback");
+
+    if( $errorMsg eq "" )
+    {
+      readingsBeginUpdate($hash);
+
+      if( AttrVal( $name, "debugJSON", 0 ) == 1 )
+      {
+        readingsBulkUpdate( $hash, "Command_RAW", "\"" . $data . "\"", 1 );
+      }
+
+      my $decode_json = eval { decode_json($data) };
+    
+      if($@)
+      {
+        Log3($name, 3, "GroheOndusSmartDevice_Blue_GetApplianceCommand($name) - JSON error while request: $@");
+
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        {
+          readingsBulkUpdate( $hash, "Appliance_JSON_ERROR", $@, 1 );
+        }
+        $errorMsg = "GETAPPLIANCECommand_JSON_ERROR";
+      }
+      else
+      {
+      # ApplianceCommand:
+      # {
+      #   "commandb64":"AgI=",
+      #   "command":
+      #   {
+      #     "buzzer_on":false,
+      #     "measure_now":false,
+      #     "temp_user_unlock_on":false,
+      #     "valve_open":true,
+      #     "buzzer_sound_profile":2
+      #   },
+      #   "timestamp":"2019-08-07T04:17:02.985Z",
+      #   "appliance_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      #   "type":103
+      # }
+        if(defined( $decode_json->{command} ) and 
+          ref( $decode_json->{command} ) eq "HASH" )
+        {
+          my $measure_now          = $decode_json->{command}->{measure_now};
+          my $temp_user_unlock_on  = $decode_json->{command}->{temp_user_unlock_on};
+          my $valve_open           = $decode_json->{command}->{valve_open};
+          my $buzzer_on            = $decode_json->{command}->{buzzer_on};
+          my $buzzer_sound_profile = $decode_json->{command}->{buzzer_sound_profile};
+
+          # update readings
+          readingsBulkUpdateIfChanged( $hash, "Cmd_MeasureNow",         "$measure_now" );
+          readingsBulkUpdateIfChanged( $hash, "Cmd_TempUserUnlockOn",   "$temp_user_unlock_on" );
+          readingsBulkUpdateIfChanged( $hash, "Cmd_ValveOpen",          "$valve_open" );
+          readingsBulkUpdateIfChanged( $hash, "Cmd_ValveState",          $valve_open == 1 ? "Open" : "Closed" );
+          readingsBulkUpdateIfChanged( $hash, "Cmd_BuzzerOn",           "$buzzer_on" );
+          readingsBulkUpdateIfChanged( $hash, "Cmd_BuzzerSoundProfile", "$buzzer_sound_profile" );
+
+          $hash->{helper}{Telegram_GetCommandCounter}++;
+        }
+        else
+        {
+          $errorMsg = "UNKNOWN Data";
+        }
+        readingsEndUpdate( $hash, 1 );
+      }
+    }
+
+    $hash->{helper}{Telegram_GetCommandTimeProcess}  = gettimeofday() - $stopwatch;
+
+    if( $errorMsg eq "" )
+    {
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3($name, 4, "GroheOndusSmartDevice_Blue_GetApplianceCommand($name) - callbackSuccess");
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      readingsSingleUpdate( $hash, "state", $errorMsg, 1 );
+
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3($name, 4, "GroheOndusSmartDevice_Blue_GetApplianceCommand($name) - callbackFail");
+        $callbackFail->();
+      }
+    }
+  }; 
+
+  my $deviceId = $hash->{DEVICEID};
+  my $device_locationId = $hash->{ApplianceLocationId};
+  my $device_roomId     = $hash->{ApplianceRoomId};
+
+  if( defined( $device_locationId ) and
+    defined( $device_roomId ))
+  {
+    my $param = {};
+    $param->{method} = "GET";
+    $param->{url} = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/command";
+    $param->{header} = "Content-Type: application/json";
+    $param->{data} = "{}";
+    $param->{httpversion} = "1.0";
+    $param->{ignoreredirects} = 0;
+    $param->{keepalive} = 1;
+      
+    $param->{resultCallback} = $resultCallback;
+    $param->{timestampStart} = gettimeofday();
+    
+    $hash->{helper}{Telegram_GetCommandIOWrite}  = strftime($TimeStampFormat, localtime($param->{timestampStart}));
+
+    GroheOndusSmartDevice_IOWrite( $hash, $param );
+  }
+  else
+  {
+    # if there is a callback then call it
+    if( defined($callbackFail) )
+    {
+      Log3($name, 4, "GroheOndusSmartDevice_Blue_GetApplianceCommand($name) - callbackFail");
+      $callbackFail->();
+    }
+  }
+}
 ##################################
 # GroheOndusSmartDevice_Store
 sub GroheOndusSmartDevice_Store($$$$)
