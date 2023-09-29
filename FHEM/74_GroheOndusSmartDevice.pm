@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "4.0.8";
+my $VERSION = "5.0.1";
 
 use strict;
 use warnings;
@@ -149,6 +149,9 @@ my $DefaultLogfilePattern                 = "%L/<name>-Data-%Y-%m.log";
 my $DefaultLogfileFormat                  = "Measurement";
 
 my $TimeStampFormat                       = "%Y-%m-%dT%I:%M:%S";
+
+my $DateToTimeStampExtStart               = "T00:00:00.000";
+my $DateToTimeStampExtStop                = "T00:00:01.000";
 
 my $ForcedTimeStampLength                 = 10;
 my $CurrentMeasurementFormatVersion       = "00";
@@ -1948,14 +1951,14 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
       #     "measurement":
       #     [
       #       {
-      #         "timestamp":"2019-07-14T02:07:36.000+02:00",
+      #         "date":"2019-07-14",
       #         "flowrate":0,
       #         "temperature_guard":22.5,
       #         "pressure":3
       #       },
       #       {
-      #         "timestamp":"2019-07-14T02:22:36.000+02:00",
-      #        "temperature_guard":22.5,
+      #         "date":"2019-07-13",
+      #         "temperature_guard":22.5,
       #         "flowrate":0,
       #         "pressure":3
       #       }
@@ -1966,8 +1969,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
       #         "water_cost":0.01447,
       #         "hotWater_share":0,
       #         "waterconsumption":3.4,
-      #         "stoptime":"2019-07-14T03:16:51.000+02:00",
-      #         "starttime":"2019-07-14T03:16:24.000+02:00",
+      #         "date":"2019-07-14",
       #         "maxflowrate":10.7,
       #         "energy_cost":0
       #       },
@@ -1975,8 +1977,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
       #         "waterconsumption":7.6,
       #         "hotWater_share":0,
       #         "energy_cost":0,
-      #         "starttime":"2019-07-14T03:58:19.000+02:00",
-      #         "stoptime":"2019-07-14T03:59:13.000+02:00",
+      #         "date":"2019-07-13",
       #         "maxflowrate":10.9,
       #         "water_cost":0.032346
       #       }
@@ -2001,7 +2002,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
         
         # Measurement
         #       {
-        #         "timestamp":"2019-07-14T02:07:36.000+02:00",
+        #         "date":"2019-07-14",
         #         "flowrate":0,
         #         "temperature_guard":22.5,
         #         "pressure":3
@@ -2016,9 +2017,9 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
           foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
           {
             # is this the correct dataset?
-            if(defined($currentData->{timestamp}))
+            if(defined($currentData->{date}))
             {
-              my $currentDataTimestamp_LUTC = $currentData->{timestamp};
+              my $currentDataTimestamp_LUTC = $currentData->{date}.$DateToTimeStampExtStart;
 
               # extract the timestamp from UTC-string and get TimestampInSeconds
               my $currentDataTimestamp_LTZ   = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestamp_LUTC);
@@ -2063,8 +2064,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
         #         "water_cost":0.01447,
         #         "hotwater_share":0,
         #         "waterconsumption":3.4,
-        #         "stoptime":"2019-07-14T03:16:51.000+02:00",
-        #         "starttime":"2019-07-14T03:16:24.000+02:00",
+        #         "date":"2019-07-14",
         #         "maxflowrate":10.7,
         #         "energy_cost":0
         #       },
@@ -2072,8 +2072,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
         #         "waterconsumption":7.6,
         #         "hotwater_share":0,
         #         "energy_cost":0,
-        #         "starttime":"2019-07-14T03:58:19.000+02:00",
-        #         "stoptime":"2019-07-14T03:59:13.000+02:00",
+        #         "date":"2019-07-13",
         #         "maxflowrate":10.9,
         #         "water_cost":0.032346
         #       }
@@ -2088,12 +2087,14 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
           foreach my $currentData ( @{ $decode_json->{data}->{withdrawals} } )
           {
             # is this the correct dataset?
-            if( defined( $currentData->{starttime} ) and 
-              defined( $currentData->{stoptime} ) 
-            )
+            #if( defined( $currentData->{starttime} ) and 
+            #  defined( $currentData->{stoptime} ) 
+            if( defined( $currentData->{date} ) )
             {
-              my $currentDataTimestampStart_LUTC = $currentData->{starttime};
-              my $currentDataTimestampStop_LUTC  = $currentData->{stoptime};
+              #my $currentDataTimestampStart_LUTC = $currentData->{starttime};
+              #my $currentDataTimestampStop_LUTC  = $currentData->{stoptime};
+              my $currentDataTimestampStart_LUTC = $currentData->{date}.$DateToTimeStampExtStart;
+              my $currentDataTimestampStop_LUTC  = $currentData->{date}.$DateToTimeStampExtStop;
               
               # extract the timestamp from UTC-string and get TimestampInSeconds
               my $currentDataTimestampStart_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestampStart_LUTC);
@@ -2169,7 +2170,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
             }
             else
             {
-              $currentDataTimestamp_LUTC = $currentMeasurementData->{timestamp};
+              $currentDataTimestamp_LUTC = $currentMeasurementData->{date}.$DateToTimeStampExtStart;
               $currentDataTemperature    = $currentMeasurementData->{temperature_guard};
               $currentDataPressure       = $currentMeasurementData->{pressure};
               $currentDataFlowrate       = $currentMeasurementData->{flowrate};
@@ -2229,8 +2230,8 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
             }
             else
             {
-              $currentWithdrawalTimestampStart_LUTC = $currentWithdrawalData->{starttime};
-              $currentWithdrawalTimestampStop_LUTC  = $currentWithdrawalData->{stoptime};
+              $currentWithdrawalTimestampStart_LUTC = $currentWithdrawalData->{date}.$DateToTimeStampExtStart;
+              $currentWithdrawalTimestampStop_LUTC  = $currentWithdrawalData->{date}.$DateToTimeStampExtStop;
               $currentWithdrawalDuration            = $currentWithdrawalData->{duration};
               $currentWithdrawalConsumption         = $currentWithdrawalData->{waterconsumption};
               $currentWithdrawalMaxFlowrate         = $currentWithdrawalData->{maxflowrate};
@@ -2323,7 +2324,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
 
               # if enabled write MeasureValues to own FileLog
               GroheOndusSmartDevice_FileLog_MeasureValueWrite($hash, "Withdrawal", $currentMeasurementDataTimestamp_LTZ_s, 
-                  ["TimestampStart", $currentWithdrawalTimestampStart_LUTC],
+                  ["Date", $currentWithdrawalTimestampStart_LUTC],
                   ["TimestampStop",  $currentWithdrawalTimestampStop_LUTC],
                   ["Duration",       $currentWithdrawalDuration],
                   ["Consumption",    $currentWithdrawalConsumption],
@@ -2586,7 +2587,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
       
       my $param = {};
       $param->{method}                          = "GET";
-      $param->{url}                             = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
+      $param->{url}                             = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data/aggregated?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
       $param->{header}                          = "Content-Type: application/json";
       $param->{data}                            = "{}";
       $param->{httpversion}                     = "1.0";
@@ -3883,12 +3884,12 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
         #     "measurement":
         #     [
         #       {
-        #         "timestamp":"2019-01-30T08:04:27.000+01:00",
+        #         "date":"2019-01-30",
         #         "humidity":54,
         #         "temperature":19.4
         #       },
         #       {
-        #         "timestamp":"2019-01-30T08:04:28.000+01:00",
+        #         "date":"2019-01-29",
         #         "humidity":53,
         #         "temperature":19.4
         #       }
@@ -3909,11 +3910,11 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
           foreach my $currentData ( @{ $decode_json->{data}->{measurement} } )
           {
             # is this the correct dataset?
-            if( defined( $currentData->{timestamp} ) and 
+            if( defined( $currentData->{date} ) and 
               defined( $currentData->{humidity} ) and 
               defined( $currentData->{temperature} ) )
             {
-              $currentDataTimestamp_LUTC = $currentData->{timestamp};
+              $currentDataTimestamp_LUTC = $currentData->{date}.$DateToTimeStampExtStart;
               $currentDataHumidity       = $currentData->{humidity};
               $currentDataTemperature    = $currentData->{temperature};
               
@@ -4110,7 +4111,7 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
 
       my $param = {};
       $param->{method}                    = "GET";
-      $param->{url}                       = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
+      $param->{url}                       = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data/aggregated?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
       $param->{header}                    = "Content-Type: application/json";
       $param->{data}                      = "{}";
       $param->{httpversion}               = "1.0";
@@ -5547,7 +5548,7 @@ sub GroheOndusSmartDevice_Blue_GetData($$;$$)
 
       my $param = {};
       $param->{method}                    = "GET";
-      $param->{url}                       = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
+      $param->{url}                       = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . "/data/aggregated?from=" . $requestFromTimestamp_UTC . "&to=" . $requestToTimestamp_UTC;
       $param->{header}                    = "Content-Type: application/json";
       $param->{data}                      = "{}";
       $param->{httpversion}               = "1.0";
