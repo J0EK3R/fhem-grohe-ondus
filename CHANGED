@@ -1,5 +1,5 @@
 FHEM Grohe Ondus last changes:
 2023-09-29
- - V 5.0.0
+ - V 5.0.1
 
-API changes from Grohe
+extend date values to timestamps
