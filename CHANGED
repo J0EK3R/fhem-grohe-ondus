@@ -1,3 +1,5 @@
 FHEM Grohe Ondus last changes:
-2022-04-17
- - bugfix: reset "GetInProgress" on error
+2023-09-29
+ - V 5.0.0
+
+API changes from Grohe
