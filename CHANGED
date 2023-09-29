@@ -1,5 +1,5 @@
 FHEM Grohe Ondus last changes:
 2023-09-29
- - V 5.0.1
+ - V 5.0.2
 
-extend date values to timestamps
+Don't sum values
