@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "5.0.1";
+my $VERSION = "5.0.2";
 
 use strict;
 use warnings;
@@ -2279,13 +2279,13 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
               elsif(not ($currentWithdrawalDataTimestamp_LUTC lt $todayMidnight_LTZ)) # within today
               {
                 $hash->{helper}{TodayAnalyzeEndTimestamp} = $currentWithdrawalDataTimestamp_LUTC;
-                $hash->{helper}{TodayWaterConsumption} += $currentWithdrawalConsumption
+                $hash->{helper}{TodayWaterConsumption} = $currentWithdrawalConsumption
                   if(defined($currentWithdrawalConsumption));
-                $hash->{helper}{TodayHotWaterShare} += $currentWithdrawalHotWaterShare
+                $hash->{helper}{TodayHotWaterShare} = $currentWithdrawalHotWaterShare
                   if(defined($currentWithdrawalHotWaterShare));
-                $hash->{helper}{TodayWaterCost} += $currentWithdrawalCostWater
+                $hash->{helper}{TodayWaterCost} = $currentWithdrawalCostWater
                   if(defined($currentWithdrawalCostWater));
-                $hash->{helper}{TodayEnergyCost} += $currentWithdrawalCostEnergy
+                $hash->{helper}{TodayEnergyCost} = $currentWithdrawalCostEnergy
                   if(defined($currentWithdrawalCostEnergy));
                 $hash->{helper}{TodayMaxFlowrate} = $currentWithdrawalMaxFlowrate
                   if(defined($currentWithdrawalMaxFlowrate));
