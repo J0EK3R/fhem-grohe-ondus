@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "5.0.0";
+my $VERSION = "5.0.1";
 
 use strict;
 use warnings;
@@ -150,7 +150,8 @@ my $DefaultLogfileFormat                  = "Measurement";
 
 my $TimeStampFormat                       = "%Y-%m-%dT%I:%M:%S";
 
-my $DateToTimeStampExt                    = "T00:00:0.000";
+my $DateToTimeStampExtStart               = "T00:00:00.000";
+my $DateToTimeStampExtStop                = "T00:00:01.000";
 
 my $ForcedTimeStampLength                 = 10;
 my $CurrentMeasurementFormatVersion       = "00";
@@ -2018,7 +2019,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
             # is this the correct dataset?
             if(defined($currentData->{date}))
             {
-              my $currentDataTimestamp_LUTC = $currentData->{date}.$DateToTimeStampExt;
+              my $currentDataTimestamp_LUTC = $currentData->{date}.$DateToTimeStampExtStart;
 
               # extract the timestamp from UTC-string and get TimestampInSeconds
               my $currentDataTimestamp_LTZ   = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestamp_LUTC);
@@ -2092,17 +2093,18 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
             {
               #my $currentDataTimestampStart_LUTC = $currentData->{starttime};
               #my $currentDataTimestampStop_LUTC  = $currentData->{stoptime};
-              my $currentDataTimestampStart_LUTC = $currentData->{date}.$DateToTimeStampExt;
+              my $currentDataTimestampStart_LUTC = $currentData->{date}.$DateToTimeStampExtStart;
+              my $currentDataTimestampStop_LUTC  = $currentData->{date}.$DateToTimeStampExtStop;
               
               # extract the timestamp from UTC-string and get TimestampInSeconds
               my $currentDataTimestampStart_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestampStart_LUTC);
               my $currentDataTimestampStart_LTZ_s = time_str2num($currentDataTimestampStart_LTZ);
 
-              #my $currentDataTimestampStop_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestampStop_LUTC);
-              #my $currentDataTimestampStop_LTZ_s = time_str2num($currentDataTimestampStop_LTZ);
+              my $currentDataTimestampStop_LTZ = GroheOndusSmartDevice_GetLTZFromLUTC($currentDataTimestampStop_LUTC);
+              my $currentDataTimestampStop_LTZ_s = time_str2num($currentDataTimestampStop_LTZ);
               
-              #my $currentDataDuration_s = $currentDataTimestampStop_LTZ_s - $currentDataTimestampStart_LTZ_s;
-              #$currentData->{duration}  = $currentDataDuration_s;                        # extend structure
+              my $currentDataDuration_s = $currentDataTimestampStop_LTZ_s - $currentDataTimestampStart_LTZ_s;
+              $currentData->{duration}  = $currentDataDuration_s;                        # extend structure
 
               # put current measurement in list
               push(@withdrawalList, [$currentDataTimestampStart_LTZ_s, $currentDataTimestampStart_LUTC, $currentData]);
@@ -2168,7 +2170,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
             }
             else
             {
-              $currentDataTimestamp_LUTC = $currentMeasurementData->{date}.$DateToTimeStampExt;
+              $currentDataTimestamp_LUTC = $currentMeasurementData->{date}.$DateToTimeStampExtStart;
               $currentDataTemperature    = $currentMeasurementData->{temperature_guard};
               $currentDataPressure       = $currentMeasurementData->{pressure};
               $currentDataFlowrate       = $currentMeasurementData->{flowrate};
@@ -2228,9 +2230,9 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
             }
             else
             {
-              $currentWithdrawalTimestampStart_LUTC = $currentWithdrawalData->{date}.$DateToTimeStampExt;
-              #$currentWithdrawalTimestampStop_LUTC  = $currentWithdrawalData->{stoptime};
-              #$currentWithdrawalDuration            = $currentWithdrawalData->{duration};
+              $currentWithdrawalTimestampStart_LUTC = $currentWithdrawalData->{date}.$DateToTimeStampExtStart;
+              $currentWithdrawalTimestampStop_LUTC  = $currentWithdrawalData->{date}.$DateToTimeStampExtStop;
+              $currentWithdrawalDuration            = $currentWithdrawalData->{duration};
               $currentWithdrawalConsumption         = $currentWithdrawalData->{waterconsumption};
               $currentWithdrawalMaxFlowrate         = $currentWithdrawalData->{maxflowrate};
               $currentWithdrawalHotWaterShare       = $currentWithdrawalData->{hotwater_share};
@@ -2302,10 +2304,10 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
   
                 readingsBulkUpdate( $hash, "MeasurementWithdrawalTimestampStart", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalTimestampStart_LUTC )
                   if( defined($currentWithdrawalTimestampStart_LUTC) );
-                #readingsBulkUpdate( $hash, "MeasurementWithdrawalTimestampStop", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalTimestampStop_LUTC )
-                #  if( defined($currentWithdrawalTimestampStop_LUTC) );
-                #readingsBulkUpdate( $hash, "MeasurementWithdrawalDuration", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalDuration )
-                #  if( defined($currentWithdrawalDuration) );
+                readingsBulkUpdate( $hash, "MeasurementWithdrawalTimestampStop", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalTimestampStop_LUTC )
+                  if( defined($currentWithdrawalTimestampStop_LUTC) );
+                readingsBulkUpdate( $hash, "MeasurementWithdrawalDuration", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalDuration )
+                  if( defined($currentWithdrawalDuration) );
                 readingsBulkUpdate( $hash, "MeasurementWaterConsumption", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalConsumption )
                   if( defined($currentWithdrawalConsumption) );
                 readingsBulkUpdate( $hash, "MeasurementMaxFlowrate", $CurrentMeasurementFormatVersion . $currentWithdrawalTimestamp_LTZ_s_string . " " . $currentWithdrawalMaxFlowrate )
@@ -2323,7 +2325,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
               # if enabled write MeasureValues to own FileLog
               GroheOndusSmartDevice_FileLog_MeasureValueWrite($hash, "Withdrawal", $currentMeasurementDataTimestamp_LTZ_s, 
                   ["Date", $currentWithdrawalTimestampStart_LUTC],
-                  #["TimestampStop",  $currentWithdrawalTimestampStop_LUTC],
+                  ["TimestampStop",  $currentWithdrawalTimestampStop_LUTC],
                   ["Duration",       $currentWithdrawalDuration],
                   ["Consumption",    $currentWithdrawalConsumption],
                   ["MaxFlowrate",    $currentWithdrawalMaxFlowrate],
@@ -3912,7 +3914,7 @@ sub GroheOndusSmartDevice_Sense_GetData($$;$$)
               defined( $currentData->{humidity} ) and 
               defined( $currentData->{temperature} ) )
             {
-              $currentDataTimestamp_LUTC = $currentData->{date}.$DateToTimeStampExt;
+              $currentDataTimestamp_LUTC = $currentData->{date}.$DateToTimeStampExtStart;
               $currentDataHumidity       = $currentData->{humidity};
               $currentDataTemperature    = $currentData->{temperature};
               
