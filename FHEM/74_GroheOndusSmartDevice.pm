@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "5.0.2";
+my $VERSION = "5.0.3";
 
 use strict;
 use warnings;
@@ -62,6 +62,8 @@ sub GroheOndusSmartDevice_TimerExecute($);
 sub GroheOndusSmartDevice_TimerRemove($);
 
 sub GroheOndusSmartDevice_IOWrite($$);
+
+sub GroheOndusSmartDevice_CheckURL($$;$$);
 
 sub GroheOndusSmartDevice_SenseGuard_Update($);
 sub GroheOndusSmartDevice_SenseGuard_GetState($;$$);
@@ -1234,6 +1236,114 @@ sub GroheOndusSmartDevice_IOWrite($$)
   Log3($name, 4, "GroheOndusSmartDevice_IOWrite($name)");
 
   IOWrite( $hash, $param );
+}
+
+##################################
+# GroheOndusSmartDevice_CheckURL( $hash, $url )
+sub GroheOndusSmartDevice_CheckURL($$;$$)
+{
+  my ( $hash, $url, $callbackSuccess, $callbackFail ) = @_;
+  my $name    = $hash->{NAME};
+
+  $url = "/".$url
+    if(substr($url, 0, 1) ne "/");
+  
+
+  # definition of the lambda function wich is called to process received data
+  my $resultCallback = sub 
+  {
+    my ( $callbackparam, $data, $errorMsg ) = @_;
+
+#    my $stopwatch = gettimeofday();
+#    $hash->{helper}{Telegram_GetStateTimeRequest} = $stopwatch - $callbackparam->{timestampStart};
+#    $hash->{helper}{Telegram_GetStateCallback}    = strftime($TimeStampFormat, localtime($stopwatch));
+    Log3($name, 4, "GroheOndusSmartDevice_CheckURL($name) - resultCallback");
+
+    if( $errorMsg eq "" )
+    {
+      readingsBeginUpdate($hash);
+
+      if( AttrVal( $name, "debugJSON", 0 ) == 1 )
+      {
+        readingsBulkUpdate( $hash, "CheckURL_RAW", "\"" . $data . "\"", 1 );
+      }
+
+      my $decode_json = eval { decode_json($data) };
+
+      if($@)
+      {
+        Log3($name, 3, "GroheOndusSmartDevice_CheckURL($name) - JSON error while request: $@");
+
+        if( AttrVal( $name, "debugJSON", 0 ) == 1 )
+        {
+          readingsBulkUpdate( $hash, "CheckURL_JSON_ERROR", $@, 1 );
+        }
+        $errorMsg = "GETSTATE_JSON_ERROR";
+      }
+      else
+      {
+      }
+
+      readingsEndUpdate( $hash, 1 );
+    }
+
+#    $hash->{helper}{Telegram_GetStateTimeProcess}  = gettimeofday() - $stopwatch;
+#    GroheOndusSmartDevice_UpdateInternals($hash);
+
+    if( $errorMsg eq "" )
+    {
+      # if there is a callback then call it
+      if( defined($callbackSuccess) )
+      {
+        Log3($name, 4, "GroheOndusSmartDevice_CheckURL($name) - callbackSuccess");
+        $callbackSuccess->();
+      }
+    }
+    else
+    {
+      readingsSingleUpdate( $hash, "state", $errorMsg, 1 );
+
+      # if there is a callback then call it
+      if( defined($callbackFail) )
+      {
+        Log3($name, 4, "GroheOndusSmartDevice_CheckURL($name) - callbackFail");
+        $callbackFail->();
+      }
+    }
+  }; 
+
+  my $deviceId = $hash->{DEVICEID};
+  my $device_locationId = $hash->{ApplianceLocationId};
+  my $device_roomId     = $hash->{ApplianceRoomId};
+
+  if( defined( $device_locationId ) and
+    defined( $device_roomId ))
+  {
+    my $param = {};
+    $param->{method} = "GET";
+    $param->{url} = $hash->{IODev}{URL} . "/iot/locations/" . $device_locationId . "/rooms/" . $device_roomId . "/appliances/" . $deviceId . $url;
+    $param->{header} = "Content-Type: application/json";
+    $param->{data} = "{}";
+    $param->{httpversion} = "1.0";
+    $param->{ignoreredirects} = 0;
+    $param->{keepalive} = 1;
+      
+    $param->{resultCallback} = $resultCallback;
+    $param->{timestampStart} = gettimeofday();
+    
+    $hash->{helper}{Telegram_GetStateIOWrite} = strftime($TimeStampFormat, localtime($param->{timestampStart}));
+
+    GroheOndusSmartDevice_IOWrite( $hash, $param );
+  }
+  else
+  {
+    # if there is a callback then call it
+    if( defined($callbackFail) )
+    {
+      Log3($name, 4, "GroheOndusSmartDevice_CheckURL($name) - callbackFail");
+      $callbackFail->();
+    }
+  }
 }
 
 ##################################
@@ -3143,6 +3253,14 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
     GroheOndusSmartDevice_UpdateInternals($hash);
     return;
   }
+  ### Command "debugCheckURL"
+  elsif( lc $cmd eq lc "debugCheckURL" )
+  {
+    my $url = join( " ", @args );
+
+    GroheOndusSmartDevice_CheckURL($hash, $url);
+    return;
+  }
   ### unknown Command
   else
   {
@@ -3189,6 +3307,9 @@ sub GroheOndusSmartDevice_SenseGuard_Set($@)
       if($hash->{helper}{DEBUG} ne "0");
 
     $list .= "debugOverrideCheckTDT:0,1 "
+      if($hash->{helper}{DEBUG} ne "0");
+
+    $list .= "debugCheckURL "
       if($hash->{helper}{DEBUG} ne "0");
 
     return "Unknown argument $cmd, choose one of $list";
@@ -4411,6 +4532,14 @@ sub GroheOndusSmartDevice_Sense_Set($@)
     GroheOndusSmartDevice_TimerExecute($hash);
     return;
   }
+  ### Command "debugCheckURL"
+  elsif( lc $cmd eq lc "debugCheckURL" )
+  {
+    my $url = join( " ", @args );
+
+    GroheOndusSmartDevice_CheckURL($hash, $url);
+    return;
+  }
   ### unknown Command
   else
   {
@@ -4451,6 +4580,9 @@ sub GroheOndusSmartDevice_Sense_Set($@)
       if($hash->{helper}{DEBUG} ne "0");
 
     $list .= "debugForceUpdate:noArg "
+      if($hash->{helper}{DEBUG} ne "0");
+
+    $list .= "debugCheckURL "
       if($hash->{helper}{DEBUG} ne "0");
 
     return "Unknown argument $cmd, choose one of $list";
@@ -6036,6 +6168,14 @@ sub GroheOndusSmartDevice_Blue_Set($@)
     GroheOndusSmartDevice_TimerExecute($hash);
     return;
   }
+  ### Command "debugCheckURL"
+  elsif( lc $cmd eq lc "debugCheckURL" )
+  {
+    my $url = join( " ", @args );
+
+    GroheOndusSmartDevice_CheckURL($hash, $url);
+    return;
+  }
   ### unknown Command
   else
   {
@@ -6081,6 +6221,9 @@ sub GroheOndusSmartDevice_Blue_Set($@)
       if($hash->{helper}{DEBUG} ne "0");
 
     $list .= "debugForceUpdate:noArg "
+      if($hash->{helper}{DEBUG} ne "0");
+
+    $list .= "debugCheckURL "
       if($hash->{helper}{DEBUG} ne "0");
 
     return "Unknown argument $cmd, choose one of $list";

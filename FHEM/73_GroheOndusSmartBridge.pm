@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "5.0.2";
+my $VERSION = "5.0.3";
 
 use strict;
 use warnings;
@@ -1914,6 +1914,11 @@ sub GroheOndusSmartBridge_RequestErrorHandling($$$)
     {
       #$errorMsg = "wrong password";
       #$leftRetries = 0; # no retry
+    }
+    elsif( $param->{code} == 400 ) ### Bad request
+    {
+      $errorMsg = "Bad request";
+      $leftRetries = 0; # no retry
     }
     elsif( $param->{code} == 404 ) ### Appliance(s) not found
     {
