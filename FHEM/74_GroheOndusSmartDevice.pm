@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "5.0.3";
+my $VERSION = "5.0.4";
 
 use strict;
 use warnings;
@@ -999,7 +999,7 @@ sub GroheOndusSmartDevice_Parse($$)
       {
         # change state to "connected to cloud" -> Notify -> load timer
         readingsBeginUpdate($hash);
-        readingsBulkUpdate( $hash, "state", "connected over bridge to cloud", 1 );
+        readingsBulkUpdate( $hash, "state", "connected", 1 );
         readingsEndUpdate( $hash, 1 );
       }
 
@@ -2344,7 +2344,7 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
               $currentWithdrawalTimestampStop_LUTC  = $currentWithdrawalData->{date}.$DateToTimeStampExtStop;
               $currentWithdrawalDuration            = $currentWithdrawalData->{duration};
               $currentWithdrawalConsumption         = $currentWithdrawalData->{waterconsumption};
-              $currentWithdrawalMaxFlowrate         = $currentWithdrawalData->{maxflowrate};
+              $currentWithdrawalMaxFlowrate         = "not available"; #$currentWithdrawalData->{maxflowrate};
               $currentWithdrawalHotWaterShare       = $currentWithdrawalData->{hotwater_share};
               $currentWithdrawalCostWater           = $currentWithdrawalData->{water_cost};
               $currentWithdrawalCostEnergy          = $currentWithdrawalData->{energy_cost};
@@ -2354,18 +2354,23 @@ sub GroheOndusSmartDevice_SenseGuard_GetData($$;$$)
               my $currentWithdrawalTimestamp_LTZ_s_string = GroheOndusSmartDevice_GetLTZStringFromLUTC($currentWithdrawalTimestampStart_LUTC);
 
               $hash->{helper}{TotalAnalyzeStartTimestamp} = $currentWithdrawalDataTimestamp_LUTC if($hash->{helper}{TotalWithdrawalCount} == 0);
-              $hash->{helper}{TotalAnalyzeEndTimestamp} = $currentWithdrawalDataTimestamp_LUTC;
 
-              $hash->{helper}{TotalWaterConsumption} += $currentWithdrawalConsumption
-                if(defined($currentWithdrawalConsumption));
-              $hash->{helper}{TotalHotWaterShare} += $currentWithdrawalHotWaterShare
-                if(defined($currentWithdrawalHotWaterShare));
-              $hash->{helper}{TotalWaterCost} += $currentWithdrawalCostWater
-                if(defined($currentWithdrawalCostWater));
-              $hash->{helper}{TotalEnergyCost} += $currentWithdrawalCostEnergy
-                if(defined($currentWithdrawalCostEnergy));
-              $hash->{helper}{TotalWithdrawalCount}++;
-              $totalValuesChanged = 1;
+              if(not defined( $hash->{helper}{TotalAnalyzeEndTimestamp} ) or                        # first set
+                $hash->{helper}{TotalAnalyzeEndTimestamp} lt $currentWithdrawalDataTimestamp_LUTC ) # new values
+              {
+                $hash->{helper}{TotalAnalyzeEndTimestamp} = $currentWithdrawalDataTimestamp_LUTC;
+
+                $hash->{helper}{TotalWaterConsumption} += $currentWithdrawalConsumption
+                  if(defined($currentWithdrawalConsumption));
+                $hash->{helper}{TotalHotWaterShare} += $currentWithdrawalHotWaterShare
+                  if(defined($currentWithdrawalHotWaterShare));
+                $hash->{helper}{TotalWaterCost} += $currentWithdrawalCostWater
+                  if(defined($currentWithdrawalCostWater));
+                $hash->{helper}{TotalEnergyCost} += $currentWithdrawalCostEnergy
+                  if(defined($currentWithdrawalCostEnergy));
+                $hash->{helper}{TotalWithdrawalCount}++;
+                $totalValuesChanged = 1;
+              }
 
               if($lastProcessedWithdrawalTimestamp_LUTC lt $todayMidnight_LTZ and   # last is yesterday
                 not ($currentWithdrawalDataTimestamp_LUTC lt $todayMidnight_LTZ))   # and current is today -> today begins
