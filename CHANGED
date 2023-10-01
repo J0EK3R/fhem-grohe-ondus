@@ -1,5 +1,5 @@
 FHEM Grohe Ondus last changes:
-2023-09-30
- - V 5.0.3
+2023-10-01
+ - V 5.0.4
 
-new command "debugCheckURL"
+Flowrate is not available any more
