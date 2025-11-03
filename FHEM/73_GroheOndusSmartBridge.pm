@@ -30,7 +30,7 @@
 
 package main;
 
-my $VERSION = "5.0.4";
+my $VERSION = "6.0.0";
 
 use strict;
 use warnings;
@@ -929,18 +929,21 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
   {
     my ( $callbackparam, $data, $errorMsg ) = @_;
 
-    Log3($name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login\n$callbackparam->{httpheader}");
+    Log3($name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login - Header\n\"$callbackparam->{httpheader}\"");
 
     if( $errorMsg eq "" )
     {
       # find Location-entry in header
-      if ( $callbackparam->{httpheader} =~ m/Location: ondus:([^\"]*)\n/ )
+      if ( $callbackparam->{httpheader} =~ m/^Location:\s*(\S+)/mi )
       {
-        # take first match and replace "Location: ondus:" with "https:"
-        my $location = "https:" . $1;
+        # take first match
+        my $location = $1;
+
+        # replace "Location: ondus:" with "https:"
+        $location =~ s/^ondus:/https:/;
 
         # remove last trailing newline
-        $location =~ s/\r|\n//g;
+        $location =~ s/[\r\n]+$//;
 
         Log3($name, 5, "GroheOndusSmartBridge_Login_PostAddress($name) - Login Location\n\"$location\"");
         $hash->{helper}{ondusaddress} = $location;
@@ -991,7 +994,7 @@ sub GroheOndusSmartBridge_Login_PostAddress($;$$)
   my $param = {};
   $param->{method} = "POST";
   $param->{url}    = $hash->{helper}{loginaddress};
-  $param->{header} = "Content-Type: application/x-www-form-urlencoded";
+  $param->{header} = "Content-Type: application/x-www-form-urlencoded" . "\n" . "Referer: " . $LoginURL;
   $param->{data} = "username=" . urlEncode( AttrVal( $name, "groheOndusAccountEmail", "none" ) ) . "&password=" . urlEncode( GroheOndusSmartBridge_ReadPassword($hash) );
   $param->{httpversion} = "1.1";
   $param->{ignoreredirects} = 1;
@@ -1345,7 +1348,7 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
         #       "emergency_shutdown_enable":true,
         #       "address":
         #       {
-        #           "street":"Straße 5",
+        #           "street":"Straï¿½e 5",
         #           "city":"Dorf",
         #           "zipcode":"123456",
         #           "housenumber":"",
@@ -1456,7 +1459,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
         #[
         #   {
         #       "id":12345,
-        #       "name":"EG Küche",
+        #       "name":"EG Kï¿½che",
         #       "type":0,
         #       "room_type":15,
         #       "role":"owner"
