@@ -1348,7 +1348,7 @@ sub GroheOndusSmartBridge_GetLocations($;$$)
         #       "emergency_shutdown_enable":true,
         #       "address":
         #       {
-        #           "street":"Straï¿½e 5",
+        #           "street":"Stra?e 5",
         #           "city":"Dorf",
         #           "zipcode":"123456",
         #           "housenumber":"",
@@ -1459,7 +1459,7 @@ sub GroheOndusSmartBridge_GetRooms($$;$$)
         #[
         #   {
         #       "id":12345,
-        #       "name":"EG Kï¿½che",
+        #       "name":"EG K?che",
         #       "type":0,
         #       "room_type":15,
         #       "role":"owner"
@@ -2351,7 +2351,7 @@ sub GroheOndusSmartBridge_DeletePassword($)
   "abstract": "Modul to communicate with the GroheCloud",
   "x_lang": {
     "de": {
-      "abstract": "Modul zur DatenÃ¼bertragung zur GroheCloud"
+      "abstract": "Modul zur Datenübertragung zur GroheCloud"
     }
   },
   "keywords": [
